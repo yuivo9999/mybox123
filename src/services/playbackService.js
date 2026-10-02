@@ -35,6 +35,7 @@ export const playbackService = {
       streamId: stream.streamId,
       priority: stream.priority ?? -index,
       metadata: { channelName: channel.name, ...(stream.metadata ?? {}) },
+      playerHint: { ...(stream.playerHint ?? {}), autoplay: true },
     })));
   },
 
