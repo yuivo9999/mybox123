@@ -30,7 +30,7 @@ export function createMovieAdapter(config, transport = fetch) {
 
   let lastError = null;
   let lastCheckedAt = null;
-  let status = String(config.status ?? 'unknown');
+  let status = config.enabled === false ? 'disabled' : String(config.status ?? 'unknown');
 
   const request = async (options = {}) => {
     if (!sourceDefinition.endpoint) {
