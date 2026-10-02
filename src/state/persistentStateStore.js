@@ -46,6 +46,7 @@ export const persistentStateStore = {
     return refresh();
   },
   recordSearch(keyword) { userDataService.recordSearch(keyword); return refresh(); },
+  clearHistory() { userDataService.clearHistory(); return refresh(); },
   removeSearch(searchId) { userDataService.removeSearch(searchId); return refresh(); },
   clearSearches() { userDataService.clearSearches(); return refresh(); },
   clearUserData() { userDataService.clearUserData(); return refresh(); },
