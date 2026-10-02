@@ -1,14 +1,13 @@
 import React,{useEffect,useMemo,useState} from 'react';
 import {ChevronLeft,Heart,Radio} from 'lucide-react';
 import {playbackService} from '../services/playbackService';
-import {createPlaybackCore} from '../playback/playbackCore';
 import {SmartImage} from '../components/StateViews.jsx';
 
 function PlaybackView({request,kind,onBack,channels=[],favorites=[],onChannel,onPlay,toggleFavorite}){
  const [status,setStatus]=useState('idle'); const [candidate,setCandidate]=useState(request?.candidates?.[0]??null); const [resolvedInput,setResolvedInput]=useState(null); const [error,setError]=useState(''); const videoRef=React.useRef(null); const playbackCoreRef=React.useRef(null);
 
  const controller=useMemo(()=>playbackService.createController(request,{onEvent:e=>{if(e.event==='error')setError(e.error||'播放候选失败');if(e.event==='released')setStatus('released');if(e.event==='stopped')setStatus('stopped')},onStateChange:setStatus,onCandidateChange:next=>{setCandidate(next);setResolvedInput(null);if(next)setError('')},onResolvedInput:setResolvedInput,onParserError:({code})=>setError('解析失败：'+code),onPlayerError:({error:e})=>setError(e?.message||'播放器加载失败'),onExhausted:()=>setStatus('error')}),[request]);
- useEffect(()=>{playbackCoreRef.current=core; const onVisibility=()=>void core.handleAppState(document.visibilityState==='hidden'?'background':'foreground'); document.addEventListener('visibilitychange',onVisibility); const player=controller.attachPlayer(videoRef.current);const initial=controller.start();setCandidate(initial);if(!initial){setStatus('error');setError('没有可用的播放候选')}else controller.resolveAndLoad(initial).catch(e=>setError(e?.message||'播放初始化失败'));return()=>{document.removeEventListener('visibilitychange',onVisibility);playbackCoreRef.current=null;controller.leave();void player}},[core]);
+ useEffect(()=>{const onVisibility=()=>void controller.handleAppState(document.visibilityState==='hidden'?'background':'foreground'); document.addEventListener('visibilitychange',onVisibility); const player=controller.attachPlayer(videoRef.current);const initial=controller.start();setCandidate(initial);if(!initial){setStatus('error');setError('没有可用的播放候选')}else controller.resolveAndLoad(initial).catch(e=>setError(e?.message||'播放初始化失败'));return()=>{document.removeEventListener('visibilitychange',onVisibility);controller.leave();void player}},[controller]);
  const channel=channels.find(c=>c.channelId===request?.channelId); const now=Date.now(); const currentProgram=channel?.epg?.find(program=>program.status==='live' || (Date.parse(program.startAt)<=now && now<Date.parse(program.endAt))); const nextProgram=channel?.epg?.find(program=>program.status==='upcoming' || Date.parse(program.startAt)>now); const favorite=favorites.some(i=>i.targetType==='channel'&&i.targetId===channel?.channelId);
  const switchCandidate=id=>{const next=controller.switchCandidate(id);if(next){setCandidate(next);setResolvedInput(null)}};
  const switchChannel=next=>{if(next)onPlay?.(next)};
