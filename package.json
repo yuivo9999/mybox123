@@ -7,29 +7,32 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:live": "node scripts-test-live.mjs",
-    "test:playback": "node scripts-test-playback.mjs",
-    "test:parser": "node scripts-test-parser.mjs",
-    "test:player": "node scripts-test-player-core.mjs",
-    "test:state": "node scripts-test-state.mjs",
-    "test:movie": "node scripts-test-movie-feature.mjs",
-    "test": "npm run test:acceptance",
-    "test:cache": "node scripts-test-cache.mjs",
-    "test:errors": "node scripts-test-errors.mjs",
-    "test:webview-runtime": "node scripts-test-webview-runtime.mjs",
-    "test:performance": "node scripts-test-performance.mjs",
-    "test:data-contract": "node scripts-test-data-contract.mjs",
-    "test:acceptance": "node scripts-test-acceptance.mjs",
-    "test:architecture": "node scripts-test-architecture-freeze.mjs",
-    "test:execution": "node scripts-test-execution-checklist.mjs",
+    "test:live": "node tests/architecture/test-runner.mjs",
+    "test:playback": "node tests/architecture/test-runner.mjs",
+    "test:parser": "node tests/architecture/test-runner.mjs",
+    "test:player": "node tests/architecture/test-runner.mjs",
+    "test:state": "node tests/architecture/test-runner.mjs",
+    "test:movie": "node tests/architecture/test-runner.mjs",
+    "test": "node tests/architecture/test-runner.mjs all",
+    "test:cache": "node tests/architecture/test-runner.mjs",
+    "test:errors": "node tests/architecture/test-runner.mjs",
+    "test:webview-runtime": "node tests/architecture/test-runner.mjs",
+    "test:performance": "node tests/architecture/test-runner.mjs",
+    "test:data-contract": "node tests/architecture/test-runner.mjs",
+    "test:acceptance": "node tests/architecture/test-runner.mjs",
+    "test:architecture": "node tests/architecture/test-runner.mjs",
+    "test:execution": "node tests/architecture/test-runner.mjs",
     "test:react": "node tests/react/page-boundaries.test.mjs"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
-    "vite": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "lucide-react": "latest"
+    "@vitejs/plugin-react": "6.1.1",
+    "vite": "8.3.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "lucide-react": "1.50.0"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "engines": {
+    "node": ">=20.19.0"
+  }
 }
