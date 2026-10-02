@@ -53,8 +53,9 @@ export function App(){
    if(!movie)return;
    const episode=movie.episodes?.[episodeIndex]??movie.episodes?.[0]; if(!episode)return;
    const progress=persistent.progress.find((item)=>item.contentId===movie.contentId&&item.episodeId===episode.episodeId);
-   const request=playbackService.createVODRequest({content:movie,episode,episodeIndex,metadata:{title:movie.title,poster:movie.poster,episodeTitle:episode.title??'',sourceId,startPositionSeconds:progress?.completed?0:(progress?.positionSeconds??0)}});
-   if(sourceId){const sourceCandidates=request.candidates.filter(candidate=>candidate.sourceId===sourceId);if(sourceCandidates.length)request.candidates=sourceCandidates;sourceManagementService.touchUsage(sourceId);}
+   const preferredSource=sourceId||persistent.settings?.defaultMovieSource||null;
+   const request=playbackService.createVODRequest({content:movie,episode,episodeIndex,preferredSource,metadata:{title:movie.title,poster:movie.poster,episodeTitle:episode.title??'',sourceId:preferredSource,startPositionSeconds:persistent.settings?.autoplayResume?(progress?.completed?0:(progress?.positionSeconds??0)):0}});
+   if(preferredSource){const sourceCandidates=request.candidates.filter(candidate=>candidate.sourceId===preferredSource);if(sourceCandidates.length)request.candidates=sourceCandidates;sourceManagementService.touchUsage(preferredSource);}
    sessionStateStore.patch({selected:request,route:'movie-play',tab:'movies'}); persistent.recordMoviePlay(movie,episodeIndex,sourceId);
  };
  const testSource=async(source)=>{
@@ -78,7 +79,8 @@ export function App(){
  const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
  const playLive=(channel,streamId=null)=>{
    if(!channel)return;
-   const request=playbackService.createLiveRequest({channel,metadata:{title:channel.name,category:channel.category,channelId:channel.channelId}});
+   const preferredSource=streamId||persistent.settings?.defaultLiveSource||null;
+   const request=playbackService.createLiveRequest({channel,preferredSource,metadata:{title:channel.name,category:channel.category,channelId:channel.channelId}});
    if(streamId){const index=request.candidates.findIndex((candidate)=>candidate.streamId===streamId);if(index>=0){request.candidates=[request.candidates[index],...request.candidates.filter((_,i)=>i!==index)];sourceManagementService.touchUsage(request.candidates[0]?.sourceId);}}
    else sourceManagementService.touchUsage(request.candidates[0]?.sourceId);
    sessionStateStore.patch({selected:request,route:'live-play',tab:'live'}); persistent.recordLivePlay(channel,streamId);
@@ -91,11 +93,12 @@ export function App(){
   const errorText=errorCode===ErrorCode.NETWORK?'网络连接失败':errorCode===ErrorCode.SOURCE_EMPTY?'内容源返回空结果':'当前内容源无法正常使用';
   return <AppFrame><main className="page"><ErrorState text={errorText} retry={reloadSources} secondaryAction={()=>nav('sources')} secondaryActionText="切换源"/></main></AppFrame>;
 }
- return <div className="app-shell"><div className="screen">
+ const appearanceClass=`theme-${persistent.settings?.theme||'dark'} font-${persistent.settings?.fontSize||'medium'} cards-${persistent.settings?.cardStyle||'poster'} density-${persistent.settings?.density||'comfortable'}`;
+ return <div className={`app-shell ${appearanceClass}`}><div className="screen">
   {movieActive?<MovieFeature route={route} tab={tab} selected={selected} movies={contentState.movies} channels={contentState.channels} history={persistent.history} progress={persistent.progress} selectedSources={persistent.selectedSources} favorites={persistent.favorites} onMovie={openMovie} onPlay={playMovie} onTab={nav} onBack={()=>sessionStateStore.patch({route:route==='movie-play'?'detail':null,selected:route==='movie-play'?selected:null})} onLive={playLive} recordSearch={persistent.recordSearch} toggleFavorite={persistent.toggleFavorite}/>
    :route==='live-channel'?<LiveChannelPanel channel={selected} channels={contentState.channels} favorites={persistent.favorites} onBack={()=>sessionStateStore.patch({route:null,selected:null,tab:'live'})} onPlay={playLive} onChannel={openLiveChannel} toggleFavorite={persistent.toggleFavorite}/>
    :route==='live-play'?<PlaybackPage request={selected} kind="live" channels={contentState.channels} favorites={persistent.favorites} onChannel={openLiveChannel} onPlay={playLive} toggleFavorite={persistent.toggleFavorite} onBack={()=>sessionStateStore.patch({route:'live-channel',selected:contentState.channels.find(c=>c.channelId===selected?.channelId)??null})}/>
-   :<MainPage tab={tab} movies={contentState.movies} channels={contentState.channels} favorites={persistent.favorites} history={persistent.history} progress={persistent.progress} sources={persistent.sources} searches={persistent.searches} onTab={nav} onMovie={openMovie} onLive={playLive} onLiveChannel={openLiveChannel} onSearchHistory={openSearchHistory} toggleFavorite={persistent.toggleFavorite} onClearData={persistent.clearUserData} onClearHistory={persistent.clearHistory} onClearSearches={persistent.clearSearches} onRemoveSearch={persistent.removeSearch} onClearCache={persistent.clearCache} onSourceEnabled={setSourceEnabled} onSourceActive={setSourceActive} onTestSource={testSource} onSaveSources={saveSources} onRemoveSource={removeSource}/>}
+   :<MainPage tab={tab} movies={contentState.movies} channels={contentState.channels} favorites={persistent.favorites} history={persistent.history} progress={persistent.progress} settings={persistent.settings} sources={persistent.sources} searches={persistent.searches} onTab={nav} onMovie={openMovie} onLive={playLive} onLiveChannel={openLiveChannel} onSearchHistory={openSearchHistory} toggleFavorite={persistent.toggleFavorite} onClearData={persistent.clearUserData} onClearHistory={persistent.clearHistory} onClearSearches={persistent.clearSearches} onRemoveSearch={persistent.removeSearch} onClearCache={persistent.clearCache} onSourceEnabled={setSourceEnabled} onSourceActive={setSourceActive} onUpdateSettings={persistent.updateSettings} onTestSource={testSource} onSaveSources={saveSources} onRemoveSource={removeSource}/>}
   {!route&&<BottomNav tab={tab} onTab={nav}/>}
  </div></div>;
 }
