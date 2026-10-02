@@ -76,6 +76,11 @@ export const playbackService = {
       start: () => core.start(),
       resolveAndLoad: (candidate, options) => core.resolveAndLoad(candidate, options),
       subscribe: listener => core.subscribe(listener),
+      switchCandidate: id => core.switchCandidate(id),
+      switchEpisode: (...args) => core.switchEpisode(...args),
+      pause: () => core.pause(),
+      play: () => core.play(),
+      stop: () => core.stop(),
       leave: () => {
         if (policy.onPageLeave === 'release') core.release();
         else core.stop();
