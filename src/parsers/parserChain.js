@@ -12,7 +12,7 @@ export function createParserChain(parsers = []) {
         throw new Error(ParserErrorCode.INPUT_INVALID);
       }
 
-      for (const parser of ordered) {
+      if (candidate?.expiresAt) {\n        const expiresAt = typeof candidate.expiresAt === 'number' ? candidate.expiresAt : Date.parse(candidate.expiresAt);\n        if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) throw new Error(ParserErrorCode.SESSION_EXPIRED);\n      }\n\n      for (const parser of ordered) {
         if (!(await parser.matches(candidate, context))) continue;
         const result = await parser.resolve(candidate, context);
         if (!result) throw new Error(ParserErrorCode.PARSER_NOT_MATCHED);
