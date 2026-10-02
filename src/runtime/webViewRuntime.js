@@ -1,6 +1,12 @@
 import { isNativeHttpAvailable, nativeHttpRequest } from './nativeHttpBridge.js';
 
 const BRIDGE_VERSION = 1;
+const ALLOWED_BRIDGE_METHODS = new Set([
+  'setFullscreen',
+  'requestOrientation',
+  'getAppState',
+  'notifyLifecycle',
+]);
 
 function getBridge() {
   if (typeof window === 'undefined') return null;
@@ -43,6 +49,9 @@ export const webViewRuntime = {
   },
 
   call(method, payload = {}) {
+    if (!ALLOWED_BRIDGE_METHODS.has(method)) {
+      return { ok: false, code: 'BRIDGE_METHOD_NOT_ALLOWED' };
+    }
     const bridge = getBridge();
     if (!bridge || typeof bridge[method] !== 'function') {
       return { ok: false, code: 'BRIDGE_UNAVAILABLE' };
