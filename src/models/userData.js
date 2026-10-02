@@ -14,11 +14,27 @@ export function createSearchId(keyword) {
   return `search:${encodeURIComponent(keyword.trim().toLowerCase())}`;
 }
 
+export const defaultSettings = () => ({
+  initialized: false,
+  autoplayResume: true,
+  defaultMovieSource: null,
+  defaultLiveSource: null,
+  theme: 'dark',
+  fontSize: 'medium',
+  cardStyle: 'poster',
+  density: 'comfortable',
+});
+
+export const normalizeSettings = (value = {}) => ({
+  ...defaultSettings(),
+  ...(value && typeof value === 'object' ? value : {}),
+});
+
 export const emptyUserData = () => ({
   favorites: [],
   history: [],
   progress: [],
   searches: [],
-  settings: {},
+  settings: defaultSettings(),
   selectedSources: { movie: null, live: null },
 });
