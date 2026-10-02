@@ -46,6 +46,7 @@ async function loadSourceChannels(adapter) {
       return { value, cached: false };
     }
     if (cached.hit) return { value: cached.value, cached: true, stale: true };
+    throw errorService.normalize(new Error('LIVE_SOURCE_EMPTY'), { code: 'SourceEmptyError', context: { sourceId: adapter.sourceId, scope: 'live-source' } });
     return { value: [], cached: false };
   } catch (error) {
     if (cached.hit) return { value: cached.value, cached: true, stale: true, error };
