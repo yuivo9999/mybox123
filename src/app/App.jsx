@@ -3,7 +3,7 @@ import { Home, Film, Radio, Heart, User } from 'lucide-react';
 import { contentService } from '../services/contentService.js';
 import { playbackService } from '../services/playbackService.js';
 import { cacheService } from '../services/cacheService.js';
-import { syncAllSources } from '../services/sourceRuntimeService.js';
+import { syncAllSources, testSource as testConfiguredSource } from '../services/sourceRuntimeService.js';
 import { usePersistentState } from '../state/usePersistentState.js';
 import { useSessionState } from '../state/useSessionState.js';
 import { sessionStateStore } from '../state/sessionStateStore.js';
@@ -57,13 +57,7 @@ export function App(){
    if(sourceId){const sourceCandidates=request.candidates.filter(candidate=>candidate.sourceId===sourceId);if(sourceCandidates.length)request.candidates=sourceCandidates;}
    sessionStateStore.patch({selected:request,route:'movie-play',tab:'movies'}); persistent.recordMoviePlay(movie,episodeIndex,sourceId);
  };
- const testSource=async(source)=>{
-   const url=source?.sourceRef||source?.url; if(!url)return;
-   const current=persistent.sources; const mark=(status)=>persistent.saveSources(current.map(s=>s.sourceId===source.sourceId?{...s,status}:s));
-   mark('测试中');
-   try{const response=await fetch(url,{method:'GET',mode:'cors'});mark(response.ok?'可用':'不可用')}catch{mark('不可用')}
- };
- const saveSources=async(next)=>{persistent.saveSources(next);await reloadSources();};
+ const testSource=async(source)=>{\n   if(!source?.sourceId)return;\n   const current=persistent.sources;\n   const mark=(status)=>persistent.saveSources(current.map(s=>s.sourceId===source.sourceId?{...s,status}:s));\n   mark('测试中');\n   try{\n     const result=await testConfiguredSource(source);\n     mark(result.ok?'可用':'不可用');\n   }catch{\n     mark('不可用');\n   }\n };\n const saveSources=async(next)=>{persistent.saveSources(next);await reloadSources();};
  const setSourceEnabled=async(id,enabled)=>{persistent.setSourceEnabled(id,enabled);await reloadSources();};
  const setSourceActive=async(id)=>{persistent.setSourceActive(id);await reloadSources();};
  const removeSource=async(id)=>{persistent.removeSource(id);await reloadSources();};
@@ -81,7 +75,7 @@ export function App(){
  if(contentState.status==='idle'||contentState.status==='loading') return <AppFrame><main className="page"><LoadingState text="正在同步内容源…"/></main></AppFrame>;
  if(contentState.status==='error') {
   const errorCode=contentState.error?.[0]?.reason?.code ?? contentState.error?.code;
-  const errorText=errorCode===ErrorCode.NETWORK?'网络连接失败':'当前内容源无法正常使用';
+  const errorText=errorCode===ErrorCode.NETWORK?'网络连接失败':errorCode===ErrorCode.SOURCE_EMPTY?'内容源返回空结果':'当前内容源无法正常使用';
   return <AppFrame><main className="page"><ErrorState text={errorText} retry={reloadSources} secondaryAction={()=>nav('sources')} secondaryActionText="切换源"/></main></AppFrame>;
 }
  return <div className="app-shell"><div className="screen">
