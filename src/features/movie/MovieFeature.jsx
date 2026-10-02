@@ -294,5 +294,5 @@ function MoviePlayback({ request, onBack }) {
 const Page = ({ children }) => <main className="page">{children}</main>;
 const Header = ({ title }) => <header><div><span className="eyebrow">TVBOX REACT</span><h2>{title}</h2></div></header>;
 const SectionTitle = ({ title, action, onAction }) => <div className="section-title"><h3>{title}</h3>{action && <button onClick={onAction}>{action}</button>}</div>;
-const MovieGrid = ({ movies, onMovie }) => <div className="movie-grid">{movies.map((movie) => <article className="movie-card" key={movie.contentId} onClick={() => onMovie(movie)}><img src={movie.poster} /><div><b>{movie.title}</b><span>{movie.year} · {movie.category}</span></div></article>)}</div>;
+const MovieGrid = React.memo(function MovieGrid({ movies, onMovie }) { return <div className="movie-grid">{movies.map((movie) => <article className="movie-card" key={movie.contentId} onClick={() => onMovie(movie)}><img src={movie.poster} loading="lazy" decoding="async" /><div><b>{movie.title}</b><span>{movie.year} · {movie.category}</span></div></article>); });
 const MovieEmpty = ({ text, compact, onBack }) => <div className={compact ? 'empty compact' : 'empty'}>{onBack && <button className="back" onClick={onBack}><ChevronLeft />返回</button>}<Film size={22} /><span>{text}</span></div>;
