@@ -14,6 +14,7 @@ export function usePersistentState() {
     recordLivePlay: persistentStateStore.recordLivePlay,
     recordProgress: persistentStateStore.recordProgress,
     recordSearch: persistentStateStore.recordSearch,
+    clearHistory: persistentStateStore.clearHistory,
     removeSearch: persistentStateStore.removeSearch,
     clearSearches: persistentStateStore.clearSearches,
     clearUserData: persistentStateStore.clearUserData,
