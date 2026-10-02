@@ -72,7 +72,7 @@ export const persistentStateStore = {
     const source = sourceRepository.getAll().find(item => item.sourceId === sourceId);
     if (!source) return getSnapshot();
     if (!enabled) userDataService.clearSelectedSource(source.sourceType, sourceId);
-    const next = sourceRepository.getAll().map((item) => item.sourceId === sourceId ? { ...item, enabled: false, isActive: false } : item);
+    const next = sourceRepository.getAll().map((item) => item.sourceId === sourceId ? { ...item, enabled: Boolean(enabled), isActive: enabled ? item.isActive : false } : item);
     return this.saveSources(next);
   },
   removeSource(sourceId) {
