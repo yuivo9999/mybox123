@@ -73,7 +73,7 @@ export function normalizeContent({
     contentId,
     sourceId,
     sourceItemId: episode.sourceItemId ?? `${sourceItemId}:episode:${index + 1}`,
-    canonicalEpisodeId: episode.canonicalEpisodeId ?? episode.episodeId ?? episode.id ?? '',
+    canonicalEpisodeId: episode.canonicalEpisodeId ?? episode.globalId ?? '',
     number: index + 1,
     title: episode.title ?? episode,
     description: episode.description ?? '',
