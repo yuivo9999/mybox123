@@ -5,7 +5,7 @@ export function normalizeMovie({ sourceId, item, index = 0 }) {
     if (typeof episode === 'string') return { title: episode };
     return {
       sourceItemId: episode.sourceItemId ?? episode.id ?? `${item.sourceItemId}:episode:${episodeIndex + 1}`,
-      canonicalEpisodeId: episode.canonicalEpisodeId ?? episode.episodeId ?? episode.globalId ?? '',
+      canonicalEpisodeId: episode.canonicalEpisodeId ?? episode.globalId ?? '',
       title: episode.title ?? episode.name ?? `第${episodeIndex + 1}集`,
       description: episode.description ?? episode.desc ?? '',
       playbackCandidates: [
