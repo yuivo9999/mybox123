@@ -22,5 +22,6 @@ export function usePersistentState() {
     clearUserData: persistentStateStore.clearUserData,
     clearCache: persistentStateStore.clearCache,
     saveSettings: persistentStateStore.saveSettings,
+    updateSettings: persistentStateStore.updateSettings,
   };
 }

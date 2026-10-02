@@ -4,7 +4,974 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
 .channel-main{flex:1;min-width:0}.channel-favorite{padding:7px;color:#778194}.channel-favorite.active-fav{color:#ff6684}.channel-logo.large{width:132px;height:190px;border-radius:17px;display:grid;place-items:center}.channel-logo img{width:100%;height:100%;object-fit:cover;border-radius:inherit}.live-detail{align-items:start}.live-detail .channel-logo.large{background:#171c27}.live-stream{margin:0}.epg-list{display:grid;gap:8px}.epg-item{margin:0}.epg-item span{display:block}.epg-item b{display:block}.epg-item small{display:block;color:#8e97a8;margin-top:4px}
 .filter-row{display:flex;align-items:center;gap:8px;margin:8px 0 16px;color:#8e97a8;font-size:12px}.filter-row span{flex:1}.filter-row select{background:#171b23;color:#dce1ea;border:1px solid #262c37;border-radius:9px;padding:7px 9px}.pagination{display:flex;align-items:center;justify-content:center;gap:12px;margin:20px 0}.pagination button{border:1px solid #303744;border-radius:10px;padding:8px 12px}.pagination button:disabled{opacity:.35;cursor:not-allowed}.player-channel-switch{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.state-view{position:relative}.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.image-placeholder{width:100%;height:100%;min-height:44px;display:grid;place-items:center;background:#171a22;color:#657086;border-radius:inherit}.continue .image-placeholder{width:54px;height:72px;min-height:72px;flex:0 0 54px}.movie-card .image-placeholder{aspect-ratio:2/3}.detail-hero>.image-placeholder{width:132px;aspect-ratio:2/3}.channel-logo .image-placeholder{width:100%;height:100%;min-height:0}.error-state{gap:10px}.movie-live-entry{margin-top:10px;border:1px solid #252b37;border-radius:12px;padding:10px 13px;display:inline-flex;align-items:center;gap:7px}
 
-.top-header{display:flex;align-items:center;justify-content:space-between}.icon-button{display:inline-grid;place-items:center;border:1px solid #303744;background:#171b23;color:#dce1ea;border-radius:10px;padding:8px}.recommendation-banner{display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:center}.recommendation-banner img{width:120px;height:150px;object-fit:cover;border-radius:14px}.detail-meta{display:flex;flex-wrap:wrap;gap:6px;color:#8e97a8;font-size:12px}.history-card small{display:block;color:#8e97a8;margin-top:4px}.history-keyword{flex:1;text-align:left;color:#dce1ea}.file-button{position:relative;cursor:pointer}.file-button input{position:absolute;inset:0;opacity:0}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.62);display:grid;place-items:center;padding:20px;z-index:30}.modal{width:min(100%,420px);background:#11141b;border:1px solid #303744;border-radius:18px;padding:18px;display:grid;gap:12px}.modal input,.modal select{width:100%;box-sizing:border-box;background:#171b23;color:#fff;border:1px solid #303744;border-radius:10px;padding:11px}.first-launch{min-height:70vh;display:grid;align-content:center}.first-launch h1{margin:0 0 6px}.source-row{flex-wrap:wrap}.source-row>span{min-width:150px}.icon-button{cursor:pointer}.player-episode-switch{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.video-error span{display:block}.video-error .secondary{margin:5px}
+.top-header{display:flex;align-items:center;justify-content:space-between}.icon-button{display:inline-grid;place-items:center;border:1px solid #303744;background:#171b23;color:#dce1ea;border-radius:10px;padding:8px}.recommendation-banner{display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:center}.recommendation-banner img{width:120px;height:150px;object-fit:cover;border-radius:14px}.detail-meta{display:flex;flex-wrap:wrap;gap:6px;color:#8e97a8;font-size:12px}.history-card small{display:block;color:#8e97a8;margin-top:4px}.history-keyword{flex:1;text-align:left;color:#dce1ea}.file-button{position:relative;cursor:pointer}.file-button input{position:absolute;inset:0;opacity:0}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.62);display:grid;place-items:center;padding:20px;z-index:30}.modal{width:min(100%,420px);background:#11141b;border:1px solid #303744;border-radius:18px;padding:18px;display:grid;gap:12px}
+.theme-light .modal{background:#fff;border-color:#d9dee7;color:#151820}
+.theme-sangtian .modal{background:#fcf9f2;border-color:#d4c5a9;color:#261f18}
+.theme-sangtian .modal input, .theme-sangtian .modal select { background:#fbf6ec; border-color:#d8caa9; color:#261f18; }
+.modal input,.modal select{width:100%;box-sizing:border-box;background:#171b23;color:#fff;border:1px solid #303744;border-radius:10px;padding:11px}.first-launch{min-height:70vh;display:grid;align-content:center}.first-launch h1{margin:0 0 6px}.source-row{flex-wrap:wrap}.source-row>span{min-width:150px}.icon-button{cursor:pointer}.player-episode-switch{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.video-error span{display:block}.video-error .secondary{margin:5px}
 
 /* User settings */
 .theme-light{color:#151820;background:#eef1f5}.theme-light .screen{background:#f7f8fa;color:#151820}.theme-light .app-shell{background:#e8ebf0}.theme-light .menu,.theme-light .info-card,.theme-light .channel,.theme-light .live-banner{background:#fff;border-color:#d9dee7}.theme-light .secondary{border-color:#cbd2dd;color:#151820}.theme-light .movie-card img{background:#e3e7ed}.theme-light .searchbox{background:#fff;border-color:#cbd2dd}.theme-light nav{background:rgba(247,248,250,.94);border-color:#d9dee7;color:#566070}.theme-light nav button{color:#667085}.theme-light nav button.active{color:#151820}.theme-light .chips button,.theme-light .seg button{background:#fff;border-color:#d9dee7;color:#566070}.theme-light .chips button.active,.theme-light .seg button.active{background:#151820;color:#fff}.font-small{font-size:14px}.font-medium{font-size:16px}.font-large{font-size:18px}.font-small header h2{font-size:26px}.font-large header h2{font-size:30px}.density-compact .menu{padding:11px 13px;margin:4px 0}.density-compact .movie-grid{gap:9px}.density-compact .section-title{margin:18px 0 9px}.cards-compact .movie-card img{aspect-ratio:16/10}.cards-compact .movie-grid{grid-template-columns:repeat(2,1fr)}.setting-menu span small{display:block;color:#8e97a8;font-size:12px;margin-top:3px}
+
+/* ========================================================
+   桑田山河 (Sangtian Shanhe) Theme - Atmospheric Chinese Landscape & Parchment
+   ======================================================== */
+.theme-sangtian {
+  color: #261f18;
+  background: #e2d5bd;
+}
+.theme-sangtian .app-shell {
+  background: radial-gradient(circle at 50% 0%, #ece2cb 0%, #dfd1b8 45%, #cebe9e 100%);
+}
+.theme-sangtian .screen {
+  background: #f4ecdc;
+  background-image: 
+    radial-gradient(ellipse at 80% 20%, rgba(200, 180, 150, 0.25) 0%, transparent 50%),
+    linear-gradient(180deg, #f7f1e3 0%, #ede3cf 55%, #e6d8bf 100%);
+  color: #261f18;
+  box-shadow: 0 0 50px rgba(45, 34, 22, 0.35);
+}
+.theme-sangtian .eyebrow {
+  color: #7b6a57;
+  font-weight: 700;
+}
+.theme-sangtian header h2 {
+  color: #1e1711;
+  font-family: serif, "Noto Serif SC", "Source Han Serif", "Songti SC", STSong, sans-serif;
+  letter-spacing: 0.04em;
+}
+.theme-sangtian .hero {
+  border: 1px solid #d4c4a8;
+  background: linear-gradient(135deg, #2b221a 0%, #1f1812 100%);
+  color: #f7f0e3;
+}
+.theme-sangtian .hero p {
+  color: #cbbba6;
+}
+.theme-sangtian .primary {
+  background: #992c22;
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(153, 44, 34, 0.3);
+}
+.theme-sangtian .secondary {
+  border: 1px solid #c9b99e;
+  background: #fbf7ee;
+  color: #281f17;
+}
+.theme-sangtian .active-fav {
+  color: #b33224;
+}
+.theme-sangtian .section-title h3 {
+  color: #241c15;
+  font-family: serif, "Noto Serif SC", "Source Han Serif", sans-serif;
+  font-weight: 700;
+}
+.theme-sangtian .section-title button {
+  color: #7b6a57;
+}
+.theme-sangtian .movie-card img {
+  background: #ded0b8;
+  box-shadow: 0 4px 12px rgba(40, 30, 20, 0.08);
+}
+.theme-sangtian .movie-card b {
+  color: #231c15;
+}
+.theme-sangtian .movie-card span,
+.theme-sangtian .continue small,
+.theme-sangtian .channel small,
+.theme-sangtian .profile span,
+.theme-sangtian .info-card span {
+  color: #6e5e4d;
+}
+.theme-sangtian .continue,
+.theme-sangtian .live-banner,
+.theme-sangtian .channel,
+.theme-sangtian .menu,
+.theme-sangtian .info-card {
+  border: 1px solid #dbcbb1;
+  background: #fcf9f2;
+  box-shadow: 0 2px 8px rgba(45, 34, 22, 0.04);
+}
+.theme-sangtian .searchbox {
+  background: #fdfbf7;
+  border: 1px solid #d5c5aa;
+  color: #261f18;
+}
+.theme-sangtian .searchbox input {
+  color: #261f18;
+}
+.theme-sangtian .searchbox input::placeholder {
+  color: #8c7a65;
+}
+.theme-sangtian .chips button,
+.theme-sangtian .episode-grid button,
+.theme-sangtian .seg button {
+  background: #fbf6ec;
+  color: #554535;
+  border: 1px solid #d8caa9;
+}
+.theme-sangtian .chips button.active,
+.theme-sangtian .seg button.active {
+  background: #2a2018;
+  color: #fcf8f0;
+  border-color: #2a2018;
+}
+.theme-sangtian .episode-grid button:hover,
+.theme-sangtian .episode-grid button.active {
+  background: #992c22;
+  color: #ffffff;
+  border-color: #992c22;
+}
+.theme-sangtian .empty {
+  border: 1px dashed #cbbba0;
+  color: #7d6c59;
+  background: rgba(251, 246, 236, 0.5);
+}
+.theme-sangtian .channel-logo {
+  background: #ede2cd;
+  color: #4b3b2c;
+}
+.theme-sangtian nav {
+  background: rgba(36, 28, 22, 0.96);
+  border-top: 1px solid #4a3a2d;
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.2);
+}
+.theme-sangtian nav button {
+  color: #9f9180;
+}
+.theme-sangtian nav button.active {
+  color: #f7ede0;
+}
+.theme-sangtian .icon-button {
+  background: #fbf7ee;
+  border: 1px solid #dbcbb1;
+  color: #292018;
+}
+.theme-sangtian .avatar {
+  background: #992c22;
+  color: #ffffff;
+}
+
+/* ========================================================
+   桑田山河 Dedicated Top Bar (顶部栏) - Matching User Image
+   ======================================================== */
+.sangtian-topbar {
+  background: #241c16;
+  border-bottom: 1px solid #3c2f24;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  position: relative;
+  z-index: 20;
+}
+.sangtian-topbar-left {
+  display: flex;
+  align-items: center;
+}
+.sangtian-icon-btn {
+  width: 36px;
+  height: 36px;
+  background: #2e241c;
+  border: 1px solid #4d3c2e;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: #ddd2c4;
+  transition: all 0.15s;
+}
+.sangtian-icon-btn:hover {
+  background: #392d23;
+  color: #ffffff;
+}
+.sangtian-topbar-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sangtian-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #2e241c;
+  border: 1px solid #4d3c2e;
+  border-radius: 999px;
+  padding: 5px 12px;
+  color: #ded5ca;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.sangtian-pill-btn:hover {
+  background: #382c23;
+  border-color: #634f3d;
+}
+.sangtian-pill-btn .play-triangle {
+  flex-shrink: 0;
+}
+.sangtian-pill-btn .folder-icon {
+  color: #df9429;
+  flex-shrink: 0;
+}
+.sangtian-badge-red {
+  background: #b53828;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 6px;
+  min-width: 17px;
+  text-align: center;
+  line-height: 1.2;
+}
+.sangtian-badge-yellow {
+  background: #e69d24;
+  color: #1e1710;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 7px;
+  line-height: 1.2;
+}
+.sangtian-topbar-right {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+.sangtian-dropdown-menu {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  width: 210px;
+  background: #241c16;
+  border: 1px solid #4d3c2e;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  padding: 8px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dropdown-section-title {
+  font-size: 11px;
+  color: #9e8f7e;
+  font-weight: 700;
+  padding: 4px 8px;
+}
+.theme-options {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.theme-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: #d6cbbe;
+  font-size: 12px;
+  text-align: left;
+}
+.theme-option.active {
+  background: #392c23;
+  color: #f7efe1;
+  font-weight: 600;
+}
+.dropdown-divider {
+  height: 1px;
+  background: #3c2f24;
+  margin: 4px 0;
+}
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: #ded5ca;
+  font-size: 12px;
+  text-align: left;
+}
+.dropdown-item:hover {
+  background: #362a21;
+}
+.sangtian-toast {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #251d17;
+  color: #55c370;
+  border: 1px solid #4f3f31;
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 100;
+  animation: fadeIn 0.2s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ========================================================
+   Drawer (功能抽屉)
+   ======================================================== */
+.sangtian-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 60;
+  display: flex;
+}
+.sangtian-drawer {
+  width: 280px;
+  height: 100%;
+  background: #241c16;
+  border-right: 1px solid #3d2f24;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+  padding: 18px 16px;
+  box-sizing: border-box;
+}
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.drawer-brand h3 {
+  margin: 4px 0 0;
+  color: #f7ede0;
+  font-size: 20px;
+}
+.drawer-badge {
+  font-size: 10px;
+  background: #992c22;
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+.drawer-close-btn {
+  color: #b5a494;
+}
+.drawer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.drawer-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  color: #ded3c5;
+  font-size: 14px;
+  text-align: left;
+}
+.drawer-nav-item:hover {
+  background: #33271f;
+  color: #ffffff;
+}
+.drawer-footer {
+  border-top: 1px solid #3c2f24;
+  padding-top: 14px;
+}
+.drawer-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #9f9080;
+  margin-bottom: 10px;
+}
+.drawer-theme-buttons {
+  display: flex;
+  gap: 6px;
+}
+.drawer-theme-pill {
+  flex: 1;
+  padding: 6px 4px;
+  font-size: 11px;
+  border-radius: 8px;
+  background: #2e241c;
+  border: 1px solid #48392d;
+  color: #cfc4b7;
+}
+.drawer-theme-pill.active {
+  background: #992c22;
+  border-color: #992c22;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* ========================================================
+   Video Playback Window (顶部栏下方的视频播放窗口) - Matching Image
+   ======================================================== */
+.sangtian-window {
+  margin: 12px 14px 14px;
+  background: #191410;
+  border: 1px solid #44362b;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(35, 27, 20, 0.28);
+}
+.sangtian-window-bar {
+  height: 38px;
+  background: #241e18;
+  border-bottom: 1px solid #382d23;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+}
+.sangtian-window-tag {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #9f9182;
+}
+.sangtian-window-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sangtian-window-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #ded5ca;
+  background: #31261e;
+  border: 1px solid #4a3a2d;
+  padding: 3px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.sangtian-window-btn:hover {
+  background: #3d3026;
+  color: #ffffff;
+}
+.sangtian-window-btn.active {
+  background: #992c22;
+  border-color: #992c22;
+  color: #ffffff;
+}
+.sangtian-window-btn.icon-only {
+  padding: 3px 6px;
+}
+.sangtian-window-body {
+  background: #100d0a;
+  position: relative;
+  aspect-ratio: 16/9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.sangtian-video-element {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+.sangtian-terminal-panel {
+  width: 100%;
+  height: 100%;
+  background: #191410;
+  padding: 14px 16px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.terminal-code {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #ecd9ba;
+  white-space: pre-wrap;
+}
+.terminal-footer {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+.terminal-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #31261e;
+  border: 1px solid #4a3a2d;
+  border-radius: 6px;
+  padding: 4px 10px;
+  color: #ded5ca;
+  font-size: 12px;
+}
+.sangtian-video-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(16, 13, 10, 0.75);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #ecd9ba;
+  font-size: 13px;
+}
+.sangtian-loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(236, 217, 186, 0.2);
+  border-top-color: #e69d24;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.sangtian-video-error {
+  position: absolute;
+  inset: 0;
+  background: rgba(22, 17, 13, 0.9);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #ecd9ba;
+  gap: 8px;
+}
+.sangtian-error-btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.sangtian-btn-red {
+  background: #992c22;
+  color: #ffffff;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.sangtian-btn-sand {
+  background: #31261e;
+  border: 1px solid #4a3a2d;
+  color: #ded5ca;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+/* ========================================================
+   Floating Controls Bar (悬浮工具条) - Matching Image
+   ======================================================== */
+.sangtian-floating-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  margin-bottom: 12px;
+}
+.sangtian-zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(254, 252, 247, 0.95);
+  border: 1px solid #d4c5ad;
+  border-radius: 999px;
+  padding: 2px 6px;
+  box-shadow: 0 2px 8px rgba(45, 34, 23, 0.06);
+}
+.sangtian-zoom-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #f0e6d4;
+  color: #382c20;
+  font-size: 16px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+.sangtian-zoom-btn:hover {
+  background: #e2d4be;
+}
+.sangtian-speed-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #382c20;
+  padding: 0 4px;
+}
+.sangtian-model-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(254, 252, 247, 0.95);
+  border: 1px solid #d4c5ad;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2e2318;
+  box-shadow: 0 2px 8px rgba(45, 34, 23, 0.08);
+  transition: all 0.15s;
+}
+.sangtian-model-pill:hover {
+  border-color: #bfae94;
+  background: #ffffff;
+}
+.sparkle-gold {
+  color: #cf9535;
+}
+.model-pill-text {
+  max-width: 190px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chevron-down {
+  color: #7b6a57;
+}
+
+/* ========================================================
+   Bottom Console Card (下方主控制台卡片) - Borrowed 50% from Image
+   ======================================================== */
+.sangtian-console-card {
+  margin: 0 14px 24px;
+  background: #fdfbf7;
+  border: 1px solid #d8cca7;
+  border-radius: 18px;
+  box-shadow: 0 4px 20px rgba(45, 34, 23, 0.08);
+  padding: 14px 14px 12px;
+}
+.sangtian-console-subbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px dashed #dcd0bc;
+}
+.console-toggles {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.console-toggle-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.toggle-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #382c20;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.toggle-switch-group {
+  display: inline-flex;
+  background: #ede2cb;
+  border-radius: 999px;
+  padding: 1px;
+}
+.switch-badge {
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 999px;
+  color: #726250;
+}
+.switch-badge.active {
+  background: #2a2018;
+  color: #ffffff;
+}
+.console-tab-switches {
+  display: flex;
+  gap: 4px;
+}
+.console-tab-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #d4c5ad;
+  background: #f6eee0;
+  color: #554433;
+  display: grid;
+  place-items: center;
+  transition: all 0.15s;
+}
+.console-tab-btn.active {
+  background: #2a2018;
+  color: #ffffff;
+  border-color: #2a2018;
+}
+
+/* Console Body Sections */
+.console-section-header {
+  margin-bottom: 10px;
+}
+.section-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #8c7965;
+  display: block;
+}
+.console-section-header h4 {
+  margin: 2px 0 0;
+  font-size: 18px;
+  color: #241c14;
+  font-family: serif, "Noto Serif SC", sans-serif;
+}
+.console-subtitle {
+  color: #705f4e;
+  font-size: 13px;
+  margin: 4px 0 8px;
+}
+.console-description {
+  color: #4b3d30;
+  line-height: 1.6;
+  font-size: 13px;
+}
+.sangtian-episode-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  max-height: 190px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.sangtian-ep-btn {
+  padding: 9px 4px;
+  border-radius: 10px;
+  background: #f7efe1;
+  border: 1px solid #d7caa8;
+  color: #382c20;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  transition: all 0.15s;
+}
+.sangtian-ep-btn:hover {
+  background: #ede0cb;
+}
+.sangtian-ep-btn.active {
+  background: #992c22;
+  border-color: #992c22;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(153, 44, 34, 0.3);
+}
+.sangtian-empty-text {
+  color: #8c7b67;
+  font-size: 13px;
+  padding: 16px 0;
+  text-align: center;
+}
+.console-url-snippet {
+  margin-top: 14px;
+  background: #f0e6d2;
+  border: 1px solid #d8caa7;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.snippet-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #635341;
+}
+.snippet-code {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: #292017;
+  word-break: break-all;
+  background: #fff;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #d9ccb2;
+}
+.snippet-copy-btn {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #2b2119;
+  color: #ffffff;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.sangtian-quick-copy-bar {
+  margin-top: 12px;
+  background: #f2e8d5;
+  border: 1px solid #d8caa8;
+  border-radius: 10px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.copy-bar-text {
+  flex: 1;
+  font-size: 12px;
+  color: #4b3d30;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.copy-action-pill {
+  font-size: 11px;
+  font-weight: 700;
+  background: #2b2119;
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+.console-source-group {
+  margin-bottom: 12px;
+}
+.group-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #635341;
+  margin-bottom: 6px;
+  display: block;
+}
+.console-related-section {
+  margin-top: 14px;
+}
+.sangtian-related-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.sangtian-related-card {
+  width: 95px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.sangtian-related-card img {
+  width: 95px;
+  height: 130px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #ded1b8;
+}
+.sangtian-related-card b {
+  display: block;
+  font-size: 12px;
+  color: #241c14;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 4px;
+}
+.sangtian-related-card small {
+  display: block;
+  font-size: 11px;
+  color: #7b6a57;
+}
+
+/* Console Bottom Toolbar */
+.sangtian-console-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #e5dac6;
+}
+.console-action-icons {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.action-icon-btn {
+  color: #615140;
+  transition: all 0.15s;
+  padding: 4px;
+}
+.action-icon-btn:hover {
+  color: #992c22;
+  transform: translateY(-1px);
+}
+.console-ping-tag {
+  font-size: 11px;
+  color: #3b7b4a;
+  font-weight: 600;
+}
+.sangtian-submit-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #992c22;
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 12px rgba(153, 44, 34, 0.35);
+  cursor: pointer;
+  transition: transform 0.1s, background 0.15s;
+}
+.sangtian-submit-btn:hover {
+  background: #b33224;
+  transform: scale(1.04);
+}
+.sangtian-submit-btn:active {
+  transform: scale(0.96);
+}
+
+/* Modals */
+.sangtian-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.sangtian-modal {
+  width: min(100%, 420px);
+  background: #fcf9f2;
+  border: 1px solid #d4c5a9;
+  border-radius: 16px;
+  padding: 18px;
+  color: #261f18;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+.sangtian-modal h4 {
+  margin: 0 0 12px;
+  font-size: 17px;
+  color: #241c15;
+}
+.sangtian-modal-section {
+  margin-bottom: 12px;
+}
+.sangtian-modal-section span {
+  font-size: 12px;
+  font-weight: 600;
+  color: #635341;
+  display: block;
+  margin-bottom: 6px;
+}

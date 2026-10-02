@@ -19,7 +19,7 @@ export const defaultSettings = () => ({
   autoplayResume: true,
   defaultMovieSource: null,
   defaultLiveSource: null,
-  theme: 'dark',
+  theme: 'sangtian',
   fontSize: 'medium',
   cardStyle: 'poster',
   density: 'comfortable',

@@ -1,6 +1,7 @@
 import { parseJSONLive } from './jsonParser.js';
 import { parseM3U } from './m3uParser.js';
 import { parseXMLLive, parseXMLEPG } from './xmlParser.js';
+import { parseTXTLive, isTXTGenreFormat } from './txtParser.js';
 import { normalizeLiveChannel } from './normalizeLive.js';
 import { defaultLiveCapabilities, normalizeLiveCapabilities } from './liveCapabilities.js';
 
@@ -25,7 +26,13 @@ export function createLiveAdapter(config, transport = fetch) {
       const body = await response.text();
       const format = detectFormat(config.format, response.headers.get('content-type'), body);
       if (format === 'xml' && config.capabilities?.epg === undefined) capabilities = normalizeLiveCapabilities({ ...capabilities, epg: true, currentProgram: true, upcomingProgram: true });
-      const raw = format === 'm3u' ? parseM3U(body) : format === 'xml' ? parseXMLLive(body) : parseJSONLive(body);
+      const raw = format === 'm3u'
+        ? parseM3U(body)
+        : format === 'xml'
+        ? parseXMLLive(body)
+        : format === 'txt'
+        ? parseTXTLive(body)
+        : parseJSONLive(body);
       const epgPrograms = format === 'xml' ? parseXMLEPG(body) : [];
       const withEPG = raw.map((item) => ({
         ...item,
@@ -74,7 +81,10 @@ export function createLiveAdapter(config, transport = fetch) {
 
 function detectFormat(explicit, contentType = '', body = '') {
   if (explicit) return explicit;
-  if (/mpegurl|m3u/i.test(contentType) || /^#EXTM3U/i.test(body.trim())) return 'm3u';
-  if (/xml/i.test(contentType) || /^<\?xml|^<tv[\s>]/i.test(body.trim())) return 'xml';
-  return 'json';
+  const trimmed = String(body || '').trim();
+  if (/mpegurl|m3u/i.test(contentType) || /^#EXTM3U/i.test(trimmed)) return 'm3u';
+  if (/xml/i.test(contentType) || /^<\?xml|^<tv[\s>]/i.test(trimmed)) return 'xml';
+  if (/#genre#/i.test(trimmed) || isTXTGenreFormat(trimmed)) return 'txt';
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) return 'json';
+  return isTXTGenreFormat(trimmed) ? 'txt' : 'json';
 }
