@@ -1,7 +1,7 @@
 import { sourceRepository } from '../repositories/sourceRepository.js';
 import { syncMovieSources, testMovieSource } from './movieSourceService.js';
 import { liveRegistry, liveService } from './liveService.js';
-import { createLiveAdapter } from '../adapters/live/liveAdapter.js';
+import { sourceRegistryService } from './sourceRegistryService.js';
 import { userDataService } from './userDataService.js';
 
 export async function testSource(source, options = {}) {
@@ -12,11 +12,8 @@ export async function testSource(source, options = {}) {
   }
 
   if (source.sourceType === 'live') {
-    const adapter = createLiveAdapter({
-      ...source,
-      sourceRef: source.sourceRef || source.url,
-    }, options.transport ?? fetch);
-    return adapter.healthCheck(options);
+    const adapter = sourceRegistryService.registerLiveSource(source, options.transport ?? fetch);
+    try { return await adapter.healthCheck(options); } finally { liveRegistry.unregister?.(source.sourceId); }
   }
 
   return { ok: false, sourceId: source.sourceId, status: 'unsupported', checkedAt: Date.now() };
@@ -26,12 +23,10 @@ export async function syncAllSources() {
   const sources = sourceRepository.getAll().filter(source => source.enabled !== false);
   const movieResult = await syncMovieSources(sources);
 
-  liveRegistry.clear();
+  sourceRegistryService.clear();
   sources
     .filter(source => source.sourceType === 'live' && (source.sourceRef || source.url))
-    .forEach(source => {
-      liveRegistry.register(createLiveAdapter({ ...source, sourceRef: source.sourceRef || source.url }));
-    });
+    .forEach(source => sourceRegistryService.registerLiveSource(source));
 
   const liveResult = await liveService.sync();
   userDataService.migrateContentIdentities(movieResult.movies);
