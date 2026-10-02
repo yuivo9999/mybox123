@@ -11,7 +11,7 @@ export function createLiveAdapter(config, transport = fetch) {
   let lastError = null;
   let lastAttemptAt = null;
   let lastSuccessfulAt = null;
-  const capabilities = normalizeLiveCapabilities({
+  let capabilities = normalizeLiveCapabilities({
     ...defaultLiveCapabilities,
     ...(config.capabilities ?? {}),
     search: Boolean(config.capabilities?.search),
@@ -24,6 +24,7 @@ export function createLiveAdapter(config, transport = fetch) {
       if (!response.ok) throw new Error(`HTTP_${response.status}`);
       const body = await response.text();
       const format = detectFormat(config.format, response.headers.get('content-type'), body);
+      if (format === 'xml' && config.capabilities?.epg === undefined) capabilities = normalizeLiveCapabilities({ ...capabilities, epg: true, currentProgram: true, upcomingProgram: true });
       const raw = format === 'm3u' ? parseM3U(body) : format === 'xml' ? parseXMLLive(body) : parseJSONLive(body);
       const epgPrograms = format === 'xml' ? parseXMLEPG(body) : [];
       const withEPG = raw.map((item) => ({
