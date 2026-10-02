@@ -1,0 +1,47 @@
+import { sourceRepository } from '../repositories/sourceRepository.js';
+import { userDataService } from './userDataService.js';
+import { syncAllSources, testSource } from './sourceRuntimeService.js';
+
+export const sourceManagementService = {
+  async reload() {
+    return syncAllSources();
+  },
+  async save(sources) {
+    sourceRepository.saveAll(sources);
+    return this.reload();
+  },
+  async setEnabled(sourceId, enabled) {
+    const sources = sourceRepository.getAll();
+    const source = sources.find(item => item.sourceId === sourceId);
+    if (!source) return this.reload();
+    if (!enabled) userDataService.clearSelectedSource(source.sourceType, sourceId);
+    sourceRepository.saveAll(sources.map(item => item.sourceId === sourceId ? { ...item, enabled: Boolean(enabled), isActive: enabled ? item.isActive : false } : item));
+    return this.reload();
+  },
+  async setActive(sourceId) {
+    const sources = sourceRepository.getAll();
+    const source = sources.find(item => item.sourceId === sourceId);
+    if (!source) return this.reload();
+    const sourceType = source.sourceType || 'movie';
+    userDataService.setSelectedSource(sourceType, sourceId);
+    const now = Date.now();
+    sourceRepository.saveAll(sources.map(item => ({
+      ...item,
+      isActive: item.sourceType === sourceType ? item.sourceId === sourceId : item.isActive,
+      enabled: item.sourceId === sourceId ? true : item.enabled,
+      lastUsedAt: item.sourceId === sourceId ? now : item.lastUsedAt ?? null,
+    })));
+    return this.reload();
+  },
+  async remove(sourceId) {
+    const sources = sourceRepository.getAll();
+    const source = sources.find(item => item.sourceId === sourceId);
+    if (source) {
+      const selected = userDataService.getSnapshot().selectedSources;
+      if (selected[source.sourceType] === sourceId) userDataService.clearSelectedSource(source.sourceType, sourceId);
+    }
+    sourceRepository.saveAll(sources.filter(item => item.sourceId !== sourceId));
+    return this.reload();
+  },
+  test: testSource,
+};
