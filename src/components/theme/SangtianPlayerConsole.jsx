@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Copy, Download, Maximize2, Sparkles, Terminal, Paperclip,
+  Copy, Download, Maximize2, Minimize2, RotateCw, Tv, Sparkles, Terminal, Paperclip,
   Image as ImageIcon, Globe, Play, Clock3, ArrowUp, ChevronDown,
   FileText, LayoutGrid, SlidersHorizontal, Check, RefreshCw
 } from 'lucide-react';
@@ -20,6 +20,8 @@ export function SangtianPlayerWindow({
 }) {
   const [showTerminal, setShowTerminal] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(false);
+  const [isWebFullscreen, setIsWebFullscreen] = useState(false);
 
   const streamUrl = resolvedInput?.url || candidate?.url || candidate?.metadata?.url || 'https://live.tvbox.stream/stream.m3u8';
 
@@ -36,7 +38,7 @@ export function SangtianPlayerWindow({
       onFullscreen();
       return;
     }
-    const elem = videoRef?.current;
+    const elem = videoRef?.current?.parentElement || videoRef?.current;
     if (!elem) return;
     if (!document.fullscreenElement) {
       elem.requestFullscreen?.().catch(() => {});
@@ -45,8 +47,28 @@ export function SangtianPlayerWindow({
     }
   };
 
+  const handleToggleLandscape = () => {
+    setIsLandscape(prev => {
+      const next = !prev;
+      if (next) {
+        if (typeof screen !== 'undefined' && screen.orientation?.lock) {
+          screen.orientation.lock('landscape').catch(() => {});
+        }
+      } else {
+        if (typeof screen !== 'undefined' && screen.orientation?.unlock) {
+          screen.orientation.unlock().catch(() => {});
+        }
+      }
+      return next;
+    });
+  };
+
+  const handleToggleWebFullscreen = () => {
+    setIsWebFullscreen(prev => !prev);
+  };
+
   return (
-    <div className="sangtian-window">
+    <div className={`sangtian-window ${isLandscape ? 'is-landscape' : ''} ${isWebFullscreen ? 'is-web-fullscreen' : ''}`}>
       {/* Top Header Bar of the Window - Exactly matching screenshot */}
       <div className="sangtian-window-bar">
         <div className="sangtian-window-tag">
@@ -72,9 +94,27 @@ export function SangtianPlayerWindow({
           </button>
 
           <button
+            className={`sangtian-window-btn ${isLandscape ? 'active' : ''}`}
+            onClick={handleToggleLandscape}
+            title="横屏切换"
+          >
+            <RotateCw size={13} />
+            <span>{isLandscape ? '竖屏' : '横屏'}</span>
+          </button>
+
+          <button
+            className={`sangtian-window-btn ${isWebFullscreen ? 'active' : ''}`}
+            onClick={handleToggleWebFullscreen}
+            title="网页全屏播放"
+          >
+            <Tv size={13} />
+            <span>{isWebFullscreen ? '还原' : '网页全屏'}</span>
+          </button>
+
+          <button
             className="sangtian-window-btn icon-only"
             onClick={handleToggleFullscreen}
-            title="全屏播放"
+            title="系统全屏"
           >
             <Maximize2 size={13} />
           </button>
@@ -83,6 +123,20 @@ export function SangtianPlayerWindow({
 
       {/* Window Body - Video / Terminal */}
       <div className="sangtian-window-body">
+        {(isLandscape || isWebFullscreen) && (
+          <div className="fullscreen-quick-exit">
+            {isLandscape && (
+              <button className="sangtian-window-btn active" onClick={handleToggleLandscape}>
+                <RotateCw size={12} /> 退出横屏
+              </button>
+            )}
+            {isWebFullscreen && (
+              <button className="sangtian-window-btn active" onClick={handleToggleWebFullscreen}>
+                <Minimize2 size={12} /> 退出网页全屏
+              </button>
+            )}
+          </div>
+        )}
         {showTerminal ? (
           <div className="sangtian-terminal-panel">
             <pre className="terminal-code">

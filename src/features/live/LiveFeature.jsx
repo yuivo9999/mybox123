@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, Heart, Play, Radio } from 'lucide-react';
 import { liveService } from '../../services/liveService.js';
 import { requestManager } from '../../services/requestManager.js';
 import { usePageState, pageStateStore } from '../../state/pageStateStore.js';
 import { SmartImage, EmptyState, LoadingState, ErrorState } from '../../components/StateViews.jsx';
+import { SangtianPlayerWindow } from '../../components/theme/SangtianPlayerConsole.jsx';
 
 const ALL_CATEGORY = '全部';
 
@@ -19,13 +20,38 @@ export function createLiveFeature({ channels = [] } = {}) {
 export function LiveFeature({ channels = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite }) {
   const feature = useMemo(() => createLiveFeature({ channels }), [channels]);
   const page = usePageState();
+  const videoRef = useRef(null);
+
+  const [selectedChannelId, setSelectedChannelId] = useState(channels[0]?.channelId || '');
+  const [activeStreamIndex, setActiveStreamIndex] = useState(0);
+
+  useEffect(() => {
+    if (!selectedChannelId && channels.length > 0) {
+      setSelectedChannelId(channels[0].channelId);
+    }
+  }, [channels, selectedChannelId]);
+
+  const activeChannel = useMemo(() => {
+    return channels.find(c => c.channelId === selectedChannelId) || channels[0] || null;
+  }, [channels, selectedChannelId]);
+
+  const activeStream = useMemo(() => {
+    return activeChannel?.streams?.[activeStreamIndex] || activeChannel?.streams?.[0] || null;
+  }, [activeChannel, activeStreamIndex]);
+
+  useEffect(() => {
+    if (videoRef.current && activeStream?.url) {
+      videoRef.current.src = activeStream.url;
+      videoRef.current.play?.().catch(() => {});
+    }
+  }, [activeStream?.url]);
 
   useEffect(() => {
     const top = Number(page.live.scrollTop) || 0;
     requestAnimationFrame(() => window.scrollTo(0, top));
     const save = () => pageStateStore.patch('live', { scrollTop: window.scrollY });
     window.addEventListener('scroll', save, { passive: true });
-    return () => window.removeEventListener('scroll', save)
+    return () => window.removeEventListener('scroll', save);
   }, []);
 
   const category = page.live.category;
@@ -37,6 +63,75 @@ export function LiveFeature({ channels = [], favorites = [], onChannel, onPlay, 
   return (
     <Page>
       <Header title="直播" />
+
+      {/* 1. Top Video Playback Window matching the image with landscape and web fullscreen */}
+      {activeChannel && (
+        <>
+          <SangtianPlayerWindow
+            videoRef={videoRef}
+            status={activeStream ? 'playing' : 'idle'}
+            candidate={{
+              label: activeStream?.label || '默认线路',
+              url: activeStream?.url,
+              protocol: activeStream?.protocol || 'HLS/M3U8',
+              sourceId: activeChannel?.sourceRefs?.[0]?.sourceId,
+            }}
+            terminalTag={`LIVE · ${activeChannel.name}`}
+          >
+            <video
+              ref={videoRef}
+              controls
+              playsInline
+              autoPlay
+              className="sangtian-video-element"
+            />
+          </SangtianPlayerWindow>
+
+          {/* Current Channel Bar & Stream Selector */}
+          <div className="live-current-bar">
+            <div className="live-current-info">
+              <span className="live-pill">● 正在直播</span>
+              <b>{activeChannel.name}</b>
+              <small>{activeChannel.category} · {activeStream?.label || '线路 1'}</small>
+            </div>
+            <div className="live-current-actions">
+              {activeChannel.streams?.length > 1 && (
+                <div className="stream-switcher">
+                  {activeChannel.streams.map((s, idx) => (
+                    <button
+                      key={s.streamId || idx}
+                      className={activeStreamIndex === idx ? 'active' : ''}
+                      onClick={() => setActiveStreamIndex(idx)}
+                    >
+                      {s.label || `线路 ${idx + 1}`}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                className="secondary icon-button"
+                onClick={() => toggleFavorite('channel', activeChannel.channelId)}
+                title="收藏频道"
+              >
+                <Heart
+                  size={16}
+                  fill={favorites.some(i => i.targetType === 'channel' && i.targetId === activeChannel.channelId) ? 'currentColor' : 'none'}
+                />
+              </button>
+              <button
+                className="primary"
+                style={{ padding: '5px 10px', fontSize: 12 }}
+                onClick={() => onPlay?.(activeChannel, activeStream?.streamId)}
+                title="进入全屏详情"
+              >
+                <Play size={13} /> 沉浸播放
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* 2. Category Chips */}
       <div className="chips">
         {categories.map(item => (
           <button key={item} className={category === item ? 'active' : ''} onClick={() => pageStateStore.patch('live', { category: item })}>
@@ -44,16 +139,29 @@ export function LiveFeature({ channels = [], favorites = [], onChannel, onPlay, 
           </button>
         ))}
       </div>
+
+      {/* 3. Channel List */}
       <div className="channel-list">
         {visible.map(channel => {
+          const isCurrent = channel.channelId === activeChannel?.channelId;
           const favorite = favorites.some(i => i.targetType === 'channel' && i.targetId === channel.channelId);
           return (
-            <div className="channel" key={channel.channelId} onClick={() => onChannel(channel)}>
+            <div
+              className={`channel ${isCurrent ? 'active-playing' : ''}`}
+              key={channel.channelId}
+              onClick={() => {
+                setSelectedChannelId(channel.channelId);
+                setActiveStreamIndex(0);
+              }}
+            >
               <div className="channel-logo">
                 <SmartImage src={channel.logo} alt={channel.name} fallback={<Radio />} />
               </div>
               <div className="channel-main">
-                <b>{channel.name}</b>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <b>{channel.name}</b>
+                  {isCurrent && <span className="live-pill" style={{ fontSize: 10, padding: '1px 5px' }}>播放中</span>}
+                </div>
                 <small>{channel.category} · {channel.streams.length} 条线路 · {channel.sourceRefs.length} 个来源</small>
                 {(() => {
                   const current = (channel.capabilities?.currentProgram || channel.capabilities?.upcomingProgram)
@@ -67,7 +175,16 @@ export function LiveFeature({ channels = [], favorites = [], onChannel, onPlay, 
               <button className={favorite ? 'channel-favorite active-fav' : 'channel-favorite'} onClick={e => { e.stopPropagation(); toggleFavorite('channel', channel.channelId) }}>
                 <Heart size={17} fill={favorite ? 'currentColor' : 'none'} />
               </button>
-              <button className="secondary" onClick={e => { e.stopPropagation(); onPlay(channel) }}>
+              <button
+                className="secondary"
+                onClick={e => {
+                  e.stopPropagation();
+                  setSelectedChannelId(channel.channelId);
+                  setActiveStreamIndex(0);
+                  onPlay(channel);
+                }}
+                title="沉浸播放"
+              >
                 <Play size={17} />
               </button>
             </div>
