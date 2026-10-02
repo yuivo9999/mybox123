@@ -69,7 +69,7 @@ export function App(){
  const removeSource=async(id)=>{persistent.removeSource(id);await reloadSources();};
  const nav=(key)=>sessionStateStore.patch({tab:key,route:null,selected:null});
  const openSearchHistory=(keyword)=>{pageStateStore.patch('search',{query:keyword});sessionStateStore.patch({tab:'movies',route:'search',selected:null});};
- const openLiveChannel=(channel)=>{if(!channel)return;sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
+ const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
  const playLive=(channel,streamId=null)=>{
    if(!channel)return;
    const request=playbackService.createLiveRequest({channel,metadata:{title:channel.name,category:channel.category,channelId:channel.channelId}});
