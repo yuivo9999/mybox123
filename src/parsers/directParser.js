@@ -1,10 +1,13 @@
-import { createResolvedMediaInput } from '../models/parser.js';
+import { createResolvedMediaInput, inferMediaProtocol } from '../models/parser.js';
 
 export const directParser = {
   id: 'direct',
-  priority: 10,
+  priority: 100,
   matches(candidate) {
-    return !candidate?.parserHint || candidate.parserHint === 'direct';
+    const protocol = String(candidate?.protocol ?? inferMediaProtocol(candidate?.mediaUrl ?? candidate?.url)).toLowerCase();
+    return (!candidate?.parserHint || candidate.parserHint === 'direct')
+      && protocol !== 'hls'
+      && protocol !== 'dash';
   },
   async resolve(candidate) {
     return createResolvedMediaInput({
