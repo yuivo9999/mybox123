@@ -15,9 +15,16 @@ export async function syncAllSources() {
 
   const liveResult = await liveService.sync();
   userDataService.migrateContentIdentities(movieResult.movies);
+  const resultBySource = new Map([...movieResult.results, ...liveResult.results].map(result => [result.sourceId, result]));
+  const updatedSources = sources.map(source => {
+    const result = resultBySource.get(source.sourceId);
+    if (!result) return source;
+    return { ...source, status: result.status === 'fulfilled' ? (result.stale ? '使用缓存' : '正常') : '异常', lastCheckedAt: Date.now() };
+  });
+  sourceRepository.saveAll(updatedSources);
 
   return {
-    sources,
+    sources: updatedSources,
     movies: movieResult.movies,
     channels: liveResult.channels,
     results: [...movieResult.results, ...liveResult.results],
