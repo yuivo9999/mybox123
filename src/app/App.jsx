@@ -70,16 +70,16 @@ export function App(){
      mark('不可用');
    }
  };
- const saveSources=async(next)=>{await sourceManagementService.save(next);persistent.reload?.();};
- const setSourceEnabled=async(id,enabled)=>{await sourceManagementService.setEnabled(id,enabled);persistent.reload?.();};
+ const saveSources=async(next)=>{const validIds=new Set(next.map(source=>source.sourceId));const current=persistent.settings||{};const patch={};if(current.defaultMovieSource&&!validIds.has(current.defaultMovieSource))patch.defaultMovieSource=null;if(current.defaultLiveSource&&!validIds.has(current.defaultLiveSource))patch.defaultLiveSource=null;await sourceManagementService.save(next);if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();};
+ const setSourceEnabled=async(id,enabled)=>{await sourceManagementService.setEnabled(id,enabled);const source=persistent.sources.find(item=>item.sourceId===id);const patch={};if(!enabled&&source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;if(!enabled&&source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();};
  const setSourceActive=async(id)=>{await sourceManagementService.setActive(id);persistent.reload?.();};
- const removeSource=async(id)=>{await sourceManagementService.remove(id);persistent.reload?.();};
+ const removeSource=async(id)=>{const source=persistent.sources.find(item=>item.sourceId===id);await sourceManagementService.remove(id);const patch={};if(source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;if(source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();};
  const nav=(key)=>sessionStateStore.patch({tab:key,route:null,selected:null});
  const openSearchHistory=(keyword)=>{pageStateStore.patch('search',{query:keyword});sessionStateStore.patch({tab:'movies',route:'search',selected:null});};
  const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
  const playLive=(channel,streamId=null)=>{
    if(!channel)return;
-   const preferredSource=streamId||persistent.settings?.defaultLiveSource||null;
+   const preferredSource=persistent.settings?.defaultLiveSource||null;
    const request=playbackService.createLiveRequest({channel,preferredSource,metadata:{title:channel.name,category:channel.category,channelId:channel.channelId}});
    if(streamId){const index=request.candidates.findIndex((candidate)=>candidate.streamId===streamId);if(index>=0){request.candidates=[request.candidates[index],...request.candidates.filter((_,i)=>i!==index)];sourceManagementService.touchUsage(request.candidates[0]?.sourceId);}}
    else sourceManagementService.touchUsage(request.candidates[0]?.sourceId);
