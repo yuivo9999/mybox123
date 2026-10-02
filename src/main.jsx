@@ -14,6 +14,7 @@ import { sessionStateStore } from './state/sessionStateStore.js';
 import { MovieFeature } from './features/movie/MovieFeature.jsx';
 import { LiveFeature, LiveChannelPanel } from './features/live/LiveFeature.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
+import { webViewRuntime } from './runtime/webViewRuntime.js';
 
 const movies = contentService.getMovies(normalizedMovies);
 const channels = liveService.getChannels(normalizedChannels);
@@ -26,6 +27,37 @@ function App() {
   useEffect(() => {
     cacheService.prune();
   }, []);
+
+  useEffect(() => {
+    return webViewRuntime.mount({
+      onBack: () => {
+        if (typeof document !== 'undefined' && document.fullscreenElement) {
+          void webViewRuntime.setFullscreen(false);
+          return true;
+        }
+        if (route === 'movie-play') {
+          sessionStateStore.patch({ route: 'detail' });
+          return true;
+        }
+        if (route === 'live-play') {
+          sessionStateStore.patch({ route: 'live-channel' });
+          return true;
+        }
+        if (route === 'detail' || route === 'live-channel') {
+          sessionStateStore.patch({ route: null, selected: null });
+          return true;
+        }
+        return false;
+      },
+      onAppStateChange: (state) => {
+        // Runtime lifecycle is deliberately kept outside page business logic.
+        // PlaybackService/PlaybackCore remains the owner of media state.
+        if (state === 'foreground' && (route === 'movie-play' || route === 'live-play')) {
+          webViewRuntime.call('getAppState');
+        }
+      },
+    });
+  }, [route]);
 
   const openMovie = (movie) => sessionStateStore.patch({ selected: movie, route: 'detail' });
 
