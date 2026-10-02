@@ -45,7 +45,7 @@ export const playbackService = {
       contentId: content?.contentId,
       episodeId: episode?.episodeId,
       candidates: this.getVODCandidates({ content, episode, episodeIndex }),
-      metadata: { episodeIndex, ...(metadata ?? {}) },
+      metadata: { episodeIndex, episodes: content?.episodes?.map((item) => ({ episodeId: item.episodeId, title: item.title })) ?? [], ...(metadata ?? {}) },
     });
   },
 
