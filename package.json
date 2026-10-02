@@ -21,7 +21,8 @@
     "test:data-contract": "node scripts-test-data-contract.mjs",
     "test:acceptance": "node scripts-test-acceptance.mjs",
     "test:architecture": "node scripts-test-architecture-freeze.mjs",
-    "test:execution": "node scripts-test-execution-checklist.mjs"
+    "test:execution": "node scripts-test-execution-checklist.mjs",
+    "test:react": "node tests/react/page-boundaries.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
