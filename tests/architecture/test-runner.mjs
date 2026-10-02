@@ -11,7 +11,7 @@ function sourceFiles(dir) {
   for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
     const relative = path.join(dir, entry.name);
     if (entry.isDirectory()) result.push(...sourceFiles(relative));
-    else if (/\\.(js|jsx|mjs)$/.test(entry.name)) result.push(relative);
+    else if (/\.(js|jsx|mjs)$/.test(entry.name)) result.push(relative);
   }
   return result;
 }
