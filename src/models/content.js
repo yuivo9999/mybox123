@@ -8,6 +8,14 @@ export const ContentType = Object.freeze({
   OTHER: 'other',
 });
 
+function cleanIdentity(value) {
+  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+export function createContentIdentity({ title, year = '', type = '' } = {}) {
+  return [cleanIdentity(title), cleanIdentity(year), cleanIdentity(type)].filter(Boolean).join('|');
+}
+
 export function createContentId(sourceId, sourceItemId) {
   return `content:${sourceId}:${sourceItemId}`;
 }
@@ -28,10 +36,29 @@ export function normalizeEpisode({ contentId, sourceId, sourceItemId, number, ti
   };
 }
 
-export function normalizeContent({ sourceId, sourceItemId, title, type, poster = '', backdrop = '', description = '', year = '', category = '', episodes = [] }) {
-  const contentId = createContentId(sourceId, sourceItemId);
+export function normalizeContent({
+  sourceId,
+  sourceItemId,
+  title,
+  type,
+  poster = '',
+  backdrop = '',
+  description = '',
+  year = '',
+  category = '',
+  region = '',
+  director = '',
+  actors = [],
+  popularity = 0,
+  episodes = [],
+}) {
+  const legacyContentId = createContentId(sourceId, sourceItemId);
+  const contentIdentity = createContentIdentity({ title, year, type });
+  const contentId = `content:${contentIdentity || legacyContentId}`;
   return {
     contentId,
+    legacyContentId,
+    contentIdentity,
     contentType: type,
     title,
     subtitle: '',
@@ -40,8 +67,11 @@ export function normalizeContent({ sourceId, sourceItemId, title, type, poster =
     description,
     year,
     category,
-    directors: [],
-    actors: [],
+    region,
+    directors: director ? [director] : [],
+    director,
+    actors: Array.isArray(actors) ? actors : [],
+    popularity: Number(popularity) || 0,
     sourceRefs: [{ sourceId, sourceItemId }],
     episodes: episodes.map((episode, index) => normalizeEpisode({
       contentId,
