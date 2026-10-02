@@ -47,7 +47,6 @@ async function loadSourceChannels(adapter) {
     }
     if (cached.hit) return { value: cached.value, cached: true, stale: true };
     throw errorService.normalize(new Error('LIVE_SOURCE_EMPTY'), { code: 'SourceEmptyError', context: { sourceId: adapter.sourceId, scope: 'live-source' } });
-    return { value: [], cached: false };
   } catch (error) {
     if (cached.hit) return { value: cached.value, cached: true, stale: true, error };
     throw error;
@@ -61,6 +60,14 @@ function sortChannels(channels, { order = 'system', userOrder = [] } = {}) {
       const ai = userIndex.has(a.channelId) ? userIndex.get(a.channelId) : Number.MAX_SAFE_INTEGER;
       const bi = userIndex.has(b.channelId) ? userIndex.get(b.channelId) : Number.MAX_SAFE_INTEGER;
       if (ai !== bi) return ai - bi;
+    }
+    if (order === 'system') {
+      const categoryCompare = String(a.category ?? '').localeCompare(String(b.category ?? ''));
+      if (categoryCompare) return categoryCompare;
+      const priorityCompare = (a.sourcePriority ?? 0) - (b.sourcePriority ?? 0);
+      if (priorityCompare) return priorityCompare;
+      const nameCompare = String(a.name ?? '').localeCompare(String(b.name ?? ''));
+      if (nameCompare) return nameCompare;
     }
     const aOrder = order === 'source' ? a.sourceOrder : a.systemOrder;
     const bOrder = order === 'source' ? b.sourceOrder : b.systemOrder;
