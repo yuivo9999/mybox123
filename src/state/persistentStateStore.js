@@ -1,5 +1,6 @@
 import { userDataService } from '../services/userDataService.js';
 import { sourceRepository } from '../repositories/sourceRepository.js';
+import { sourceConfigs } from '../data/demoData.js';
 
 const listeners = new Set();
 let snapshot = null;
@@ -11,7 +12,7 @@ function loadSnapshot() {
     progress: userDataService.getSnapshot().progress,
     searches: userDataService.getSnapshot().searches,
     settings: userDataService.getSettings(),
-    sources: sourceRepository.getAll(),
+    sources: sourceRepository.getAll(sourceConfigs),
   });
 }
 
@@ -82,4 +83,3 @@ export const persistentStateStore = {
   },
 };
 
-void loadSnapshot;
