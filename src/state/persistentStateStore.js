@@ -39,7 +39,7 @@ export const persistentStateStore = {
   getSnapshot,
   reload: refresh,
   toggleFavorite(targetType, targetId) { userDataService.toggleFavorite(targetType, targetId); return refresh(); },
-  recordMoviePlay(movie, episodeIndex = 0) { userDataService.recordMoviePlay(movie, episodeIndex); return refresh(); },
+  recordMoviePlay(movie, episodeIndex = 0, sourceId = null) { userDataService.recordMoviePlay(movie, episodeIndex, sourceId); return refresh(); },
   recordLivePlay(channel, streamId = null) { userDataService.recordLivePlay(channel, streamId); return refresh(); },
   recordProgress(contentId, episodeId, positionSeconds, durationSeconds = null, completed = false) {
     userDataService.recordProgress(contentId, episodeId, positionSeconds, durationSeconds, completed);
@@ -52,8 +52,30 @@ export const persistentStateStore = {
   clearUserData() { userDataService.clearUserData(); return refresh(); },
   clearCache() { return cacheService.clearAll(); },
   saveSources(sources) { sourceRepository.saveAll(sources); return refresh(); },
-  setSourceActive(sourceId) { const all = sourceRepository.getAll(); return this.saveSources(all.map(s => ({ ...s, isActive: s.sourceId === sourceId, enabled: s.sourceId === sourceId ? true : s.enabled }))); },
-  setSourceEnabled(sourceId, enabled) { const next = sourceRepository.getAll().map((s) => s.sourceId === sourceId ? { ...s, enabled: Boolean(enabled) } : s); return this.saveSources(next); },
-  removeSource(sourceId) { return this.saveSources(sourceRepository.getAll().filter((s) => s.sourceId !== sourceId)); },
+  setSourceActive(sourceId) {
+    const all = sourceRepository.getAll();
+    const source = all.find(item => item.sourceId === sourceId);
+    if (!source) return getSnapshot();
+    const sourceType = source.sourceType || 'movie';
+    const saved = userDataService.setSelectedSource(sourceType, sourceId);
+    const now = Date.now();
+    sourceRepository.saveAll(all.map(item => ({
+      ...item,
+      isActive: item.sourceId === sourceId,
+      enabled: item.sourceId === sourceId ? true : item.enabled,
+      lastUsedAt: item.sourceId === sourceId ? now : item.lastUsedAt ?? null,
+    })));
+    return refresh();
+  },
+  setSourceEnabled(sourceId, enabled) {
+    const next = sourceRepository.getAll().map((source) => source.sourceId === sourceId ? { ...source, enabled: Boolean(enabled) } : source);
+    return this.saveSources(next);
+  },
+  removeSource(sourceId) {
+    const source = sourceRepository.getAll().find(item => item.sourceId === sourceId);
+    const selected = userDataService.getSnapshot().selectedSources;
+    if (source && selected[source.sourceType] === sourceId) userDataService.clearSelectedSource(source.sourceType, sourceId);
+    return this.saveSources(sourceRepository.getAll().filter((item) => item.sourceId !== sourceId));
+  },
   saveSettings(settings) { userDataService.saveSettings(settings); return refresh(); },
 };
