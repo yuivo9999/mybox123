@@ -91,6 +91,30 @@ export const userDataService = {
     if (next.some(item => item.favoriteId === id)) userDataRepository.saveFavorites(next);
     return next;
   },
+  toggleLiveFavorite(channel, userOrder = null) {
+    if (!channel?.channelId) return userDataRepository.getFavorites();
+    const current = userDataRepository.getFavorites();
+    const id = userDataRepository.ids.createFavoriteId('channel', channel.channelId);
+    const exists = current.find(item => item.favoriteId === id);
+    if (exists) {
+      const next = current.filter(item => item.favoriteId !== id);
+      userDataRepository.saveFavorites(next);
+      return next;
+    }
+    const nextOrder = Number.isFinite(userOrder) ? userOrder : current.filter(item => item.targetType === 'channel').length;
+    const item = {
+      favoriteId: id,
+      targetType: 'channel',
+      targetId: channel.channelId,
+      createdAt: Date.now(),
+      lastAccessedAt: Date.now(),
+      userOrder: nextOrder,
+      sourceRefs: (channel.sourceRefs ?? []).map(ref => ({ ...ref })),
+    };
+    const next = [...current, item];
+    userDataRepository.saveFavorites(next);
+    return next;
+  },
   toggleFavorite(targetType, targetId) {
     if (!targetType || targetId == null) return userDataRepository.getFavorites();
     const current = userDataRepository.getFavorites();
