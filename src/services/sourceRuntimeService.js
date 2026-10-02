@@ -1,6 +1,6 @@
 import { sourceRepository } from '../repositories/sourceRepository.js';
 import { syncMovieSources, testMovieSource } from './movieSourceService.js';
-import { liveRegistry, liveService } from './liveService.js';
+import { liveService } from './liveService.js';
 import { sourceRegistryService } from './sourceRegistryService.js';
 import { userDataService } from './userDataService.js';
 
@@ -12,8 +12,7 @@ export async function testSource(source, options = {}) {
   }
 
   if (source.sourceType === 'live') {
-    const adapter = sourceRegistryService.registerLiveSource(source, options.transport ?? fetch);
-    try { return await adapter.healthCheck(options); } finally { liveRegistry.unregister?.(source.sourceId); }
+    return sourceRegistryService.testLiveSource(source, options);
   }
 
   return { ok: false, sourceId: source.sourceId, status: 'unsupported', checkedAt: Date.now() };
