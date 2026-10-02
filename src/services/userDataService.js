@@ -1,7 +1,7 @@
 import { userDataRepository } from '../repositories/userDataRepository';
 
 export const userDataService = {
-  getSnapshot() {
+  getSettings() {\n    return userDataRepository.getSettings();\n  },\n  saveSettings(value) {\n    userDataRepository.saveSettings(value);\n    return value;\n  },\n  getSnapshot() {
     return {
       favorites: userDataRepository.getFavorites(),
       history: userDataRepository.getHistory(),
