@@ -9,6 +9,7 @@ export function usePersistentState() {
   );
   return {
     ...snapshot,
+    reload: persistentStateStore.reload,
     toggleFavorite: persistentStateStore.toggleFavorite,
     recordMoviePlay: persistentStateStore.recordMoviePlay,
     recordLivePlay: persistentStateStore.recordLivePlay,
