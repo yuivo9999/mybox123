@@ -56,7 +56,7 @@ export function MoviePlaybackPage({ request, movies = [], favorites = [], toggle
       active = false;
       if (request?.contentId && request?.episodeId && progressRef.current.currentTime > 0) {
         const progress = progressRef.current;
-        persistent.recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, false);
+        recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, false);
       }
       controller.leave();
       void player;
