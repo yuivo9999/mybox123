@@ -27,7 +27,7 @@ jobs:
         run: npm install
 
       - name: Generate Android platform
-        run: npx cap add android
+        run: npx cap sync android
 
       - name: Commit generated Android project
         run: |
