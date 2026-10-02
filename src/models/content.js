@@ -12,8 +12,11 @@ function cleanIdentity(value) {
   return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-export function createContentIdentity({ title, year = '', type = '' } = {}) {
-  return [cleanIdentity(title), cleanIdentity(year), cleanIdentity(type)].filter(Boolean).join('|');
+export function createContentIdentity({ canonicalId = '', title = '', year = '', type = '', region = '' } = {}) {
+  const canonical = cleanIdentity(canonicalId);
+  if (canonical) return `canonical:${canonical}`;
+  const fallback = [cleanIdentity(title), cleanIdentity(year), cleanIdentity(type), cleanIdentity(region)].filter(Boolean).join('|');
+  return fallback ? `unresolved:${fallback}` : '';
 }
 
 export function createContentId(sourceId, sourceItemId) {
@@ -39,6 +42,7 @@ export function normalizeEpisode({ contentId, sourceId, sourceItemId, number, ti
 export function normalizeContent({
   sourceId,
   sourceItemId,
+  canonicalId = '',
   title,
   type,
   poster = '',
@@ -50,11 +54,29 @@ export function normalizeContent({
   director = '',
   actors = [],
   popularity = 0,
+  status = '',
+  updateStatus = status,
+  totalEpisodes = null,
+  currentEpisode = null,
+  createdAt = null,
+  updatedAt = null,
   episodes = [],
 }) {
   const legacyContentId = createContentId(sourceId, sourceItemId);
-  const contentIdentity = createContentIdentity({ title, year, type });
+  const contentIdentity = createContentIdentity({ canonicalId, title, year, type, region });
+  // Without a stable external identity, keep the content source-qualified.
+  // This prevents display-name collisions while still allowing explicit cross-source aggregation.
   const contentId = `content:${contentIdentity || legacyContentId}`;
+  const normalizedEpisodes = episodes.map((episode, index) => normalizeEpisode({
+    contentId,
+    sourceId,
+    sourceItemId: episode.sourceItemId ?? `${sourceItemId}:episode:${index + 1}`,
+    number: index + 1,
+    title: episode.title ?? episode,
+    description: episode.description ?? '',
+    playbackCandidates: episode.playbackCandidates ?? [],
+  }));
+  const episodeCount = totalEpisodes == null ? normalizedEpisodes.length : Math.max(0, Number(totalEpisodes) || 0);
   return {
     contentId,
     legacyContentId,
@@ -72,16 +94,15 @@ export function normalizeContent({
     director,
     actors: Array.isArray(actors) ? actors : [],
     popularity: Number(popularity) || 0,
+    updateStatus: updateStatus || '',
+    status: updateStatus || '',
+    totalEpisodes: episodeCount,
+    currentEpisode: currentEpisode == null ? (normalizedEpisodes.length || null) : Math.max(0, Number(currentEpisode) || 0),
+    availableSourceCount: 1,
+    createdAt: createdAt == null ? null : createdAt,
+    updatedAt: updatedAt == null ? null : updatedAt,
     sourceRefs: [{ sourceId, sourceItemId }],
-    episodes: episodes.map((episode, index) => normalizeEpisode({
-      contentId,
-      sourceId,
-      sourceItemId: episode.sourceItemId ?? `${sourceItemId}:episode:${index + 1}`,
-      number: index + 1,
-      title: episode.title ?? episode,
-      description: episode.description ?? '',
-      playbackCandidates: episode.playbackCandidates ?? [],
-    })),
+    episodes: normalizedEpisodes,
     syncAt: Date.now(),
   };
 }
