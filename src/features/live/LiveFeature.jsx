@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Heart, Play, Radio } from 'lucide-react';
 import { liveService } from '../../services/liveService.js';
+import { requestManager } from '../../services/requestManager.js';
 
 const ALL_CATEGORY = '全部';
 
@@ -120,6 +121,7 @@ export function LiveChannelPanel({
       startAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
       endAt: new Date(now + 4 * 60 * 60 * 1000).toISOString(),
     };
+    const requestKeys = (channel?.sourceRefs ?? []).map((ref) => `live:epg:${ref.sourceId}:${channel?.channelId ?? ''}:${range.startAt}:${range.endAt}`);
     feature.getEPG(channel, range).then((items) => {
       if (active && items.length) setEpg(items);
     }).catch(() => {
@@ -127,7 +129,10 @@ export function LiveChannelPanel({
     }).finally(() => {
       if (active) setEpgLoading(false);
     });
-    return () => { active = false; };
+    return () => {
+      active = false;
+      requestKeys.forEach((key) => requestManager.cancel(key));
+    };
   }, [channel, feature]);
 
   if (!channel) return <Empty text="频道不存在" />;
