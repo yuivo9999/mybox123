@@ -20,7 +20,7 @@ function filterEPG(programs = [], range = {}) {
 }
 
 function sourceCacheKey(sourceId) {
-  return createCacheKey({ namespace: CacheNamespace.SOURCE, sourceId, contentId: 'live-channels', params: { type: 'channels' } });
+  return createCacheKey({ namespace: CacheNamespace.LIVE_SOURCE, sourceId, contentId: 'live-channels', params: { type: 'channels' } });
 }
 
 function liveChannelCacheKey(channelRef) {
@@ -36,13 +36,13 @@ function epgCacheKey(channelRef, range) {
 
 async function loadSourceChannels(adapter) {
   const key = sourceCacheKey(adapter.sourceId);
-  const cached = cacheStorage.get(CacheNamespace.SOURCE, key, { allowStale: true });
+  const cached = cacheStorage.get(CacheNamespace.LIVE_SOURCE, key, { allowStale: true });
   if (cached.hit && !cached.stale) return { value: cached.value, cached: true };
 
   try {
     const value = await requestManager.run(`live:channels:${adapter.sourceId}`, (signal) => adapter.getChannels({ signal }));
     if (Array.isArray(value) && value.length) {
-      cacheStorage.set(CacheNamespace.SOURCE, key, value);
+      cacheStorage.set(CacheNamespace.LIVE_SOURCE, key, value);
       return { value, cached: false };
     }
     if (cached.hit) return { value: cached.value, cached: true, stale: true };
@@ -106,6 +106,16 @@ export const liveService = {
   },
   getById: (items = [], channelId) => items.find((item) => item.channelId === channelId) ?? null,
 
+  async refreshSource(sourceId) {
+    return this.sync([sourceId]);
+  },
+
+  async refreshChannel(channelRef) {
+    const streams = await this.getStreams(channelRef);
+    const epg = await this.getEPG(channelRef);
+    return { channel: { ...channelRef, streams, epg }, streams, epg };
+  },
+
   async getStreams(channelRef) {
     const cacheKey = liveChannelCacheKey(channelRef);
     const cached = cacheStorage.get(CacheNamespace.LIVE_CHANNEL, cacheKey, { allowStale: true });
@@ -144,7 +154,7 @@ export const liveService = {
   },
 
   getPlaybackCandidates(channelRef, streams = null) {
-    const sourceStreams = streams ?? channelRef?.streams ?? [];
+    const sourceStreams = (streams ?? channelRef?.streams ?? []).filter((stream) => !stream.expiresAt || Date.parse(stream.expiresAt) > Date.now());
     return sourceStreams
       .filter((stream) => stream?.url && stream.status !== 'failed')
       .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
