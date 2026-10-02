@@ -1,3 +1,6 @@
+import { ErrorCode } from '../models/errors.js';
+import { errorService } from '../services/errorService.js';
+
 const CACHE_PREFIX = 'tvbox:cache:v1:';
 const CACHE_VERSION = 1;
 
@@ -78,8 +81,8 @@ function prune(namespace) {
 
 function set(namespace, key, value, { ttl = CacheTTL[namespace] } = {}) {
   const serializedValue = JSON.stringify(value);
-  if (serializedValue === undefined) throw new Error('CACHE_SERIALIZE_FAILED');
-  if (serializedValue.length > MAX_SERIALIZED_BYTES_PER_ENTRY) throw new Error('CACHE_ENTRY_TOO_LARGE');
+  if (serializedValue === undefined) throw errorService.normalize(new Error('CACHE_SERIALIZE_FAILED'), { code: ErrorCode.STORAGE, context: { scope: 'cache-write', namespace, key } });
+  if (serializedValue.length > MAX_SERIALIZED_BYTES_PER_ENTRY) throw errorService.normalize(new Error('CACHE_ENTRY_TOO_LARGE'), { code: ErrorCode.STORAGE, context: { scope: 'cache-write', namespace, key } });
 
   const now = Date.now();
   const entry = {
@@ -90,7 +93,11 @@ function set(namespace, key, value, { ttl = CacheTTL[namespace] } = {}) {
     expiresAt: ttl == null ? 0 : now + Math.max(0, ttl),
     value,
   };
-  window.localStorage.setItem(storageKey(key), JSON.stringify(entry));
+  try {
+    window.localStorage.setItem(storageKey(key), JSON.stringify(entry));
+  } catch (error) {
+    throw errorService.normalize(error, { code: ErrorCode.STORAGE, context: { scope: 'cache-write', namespace, key } });
+  }
   prune(namespace);
   return value;
 }
