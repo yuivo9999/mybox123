@@ -19,6 +19,9 @@ export const userDataRepository = {
   saveSettings: (value) => storage.write('settings', value),
   getSelectedSources: () => storage.read('selectedSources', emptyUserData().selectedSources),
   saveSelectedSources: (value) => storage.write('selectedSources', value),
+  getSourceConfig: () => storage.read('sources', []),
+  saveSourceConfig: (value) => storage.write('sources', value),
+  getMigrationState: () => storage.read('migration:legacy-v2', null),
   clearUserData: () => {
     storage.write('favorites', []);
     storage.write('history', []);
