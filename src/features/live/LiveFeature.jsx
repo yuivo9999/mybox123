@@ -107,6 +107,7 @@ export function LiveChannelPanel({
   onChannel,
   toggleFavorite,
 }) {
+  const feature = useMemo(() => createLiveFeature({ channels }), [channels]);
   const [epg, setEpg] = useState(channel?.epg ?? []);
   const [epgLoading, setEpgLoading] = useState(false);
 
@@ -114,7 +115,7 @@ export function LiveChannelPanel({
     let active = true;
     setEpg(channel?.epg ?? []);
     setEpgLoading(true);
-    liveService.getEPG(channel, {}).then((items) => {
+    feature.getEPG(channel, {}).then((items) => {
       if (active && items.length) setEpg(items);
     }).catch(() => {
       // EPG is optional; cached/empty state remains visible.
@@ -122,7 +123,7 @@ export function LiveChannelPanel({
       if (active) setEpgLoading(false);
     });
     return () => { active = false; };
-  }, [channel]);
+  }, [channel, feature]);
 
   if (!channel) return <Empty text="频道不存在" />;
 
