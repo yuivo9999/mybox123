@@ -52,6 +52,7 @@ export const persistentStateStore = {
   clearUserData() { userDataService.clearUserData(); return refresh(); },
   clearCache() { return cacheService.clearAll(); },
   saveSources(sources) { sourceRepository.saveAll(sources); return refresh(); },
+  setSourceActive(sourceId) { const all = sourceRepository.getAll(); return this.saveSources(all.map(s => ({ ...s, isActive: s.sourceId === sourceId, enabled: s.sourceId === sourceId ? true : s.enabled }))); },
   setSourceEnabled(sourceId, enabled) { const next = sourceRepository.getAll().map((s) => s.sourceId === sourceId ? { ...s, enabled: Boolean(enabled) } : s); return this.saveSources(next); },
   removeSource(sourceId) { return this.saveSources(sourceRepository.getAll().filter((s) => s.sourceId !== sourceId)); },
   saveSettings(settings) { userDataService.saveSettings(settings); return refresh(); },
