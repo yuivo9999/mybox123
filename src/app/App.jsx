@@ -79,7 +79,7 @@ export function App(){
  if(!persistent.settings?.initialized) return <FirstLaunch onLater={()=>persistent.saveSettings({...persistent.settings,initialized:true,initializedAt:Date.now()})} onSources={()=>{persistent.saveSettings({...persistent.settings,initialized:true,initializedAt:Date.now()});nav('sources')}}/>;
  if(contentState.status==='idle'||contentState.status==='loading') return <AppFrame><main className="page"><LoadingState text="正在同步内容源…"/></main></AppFrame>;
  if(contentState.status==='error') {
-  const errorCode=contentState.error?.code;
+  const errorCode=contentState.error?.[0]?.reason?.code ?? contentState.error?.code;
   const errorText=errorCode===ErrorCode.NETWORK?'网络连接失败':'当前内容源无法正常使用';
   return <AppFrame><main className="page"><ErrorState text={errorText} retry={reloadSources} secondaryAction={()=>nav('sources')} secondaryActionText="切换源"/></main></AppFrame>;
 }
