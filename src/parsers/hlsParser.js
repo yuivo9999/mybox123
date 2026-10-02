@@ -21,7 +21,7 @@ export const hlsParser = {
       });
       if (!response.ok) throw new Error(ParserErrorCode.MANIFEST_ERROR);
       const text = await response.text();
-      return { ...base, manifest: parseHlsManifest(text, base.url) };
+      return { ...base, redirectChain: response.url && response.url !== base.url ? [base.url, response.url] : [base.url], manifest: parseHlsManifest(text, response.url || base.url) };
     } catch (error) {
       if (error?.message === ParserErrorCode.SESSION_EXPIRED) throw error;
       throw new Error(error?.message === ParserErrorCode.MANIFEST_ERROR ? error.message : ParserErrorCode.NETWORK_ERROR);
