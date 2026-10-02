@@ -1,6 +1,6 @@
 export const PlayerCapability = Object.freeze({
   SEEK:'seek', VOLUME:'volume', PAUSE:'pause', AUTOPLAY:'autoplay',
-  HLS:'hls', DASH:'dash', MP4:'mp4', TS:'ts', FLV:'flv',
+  HLS:'hls', DASH:'dash', MP4:'mp4', TS:'ts', FLV:'flv', RTMP:'rtmp', RTSP:'rtsp',
   AUDIO_TRACKS:'audioTracks', SUBTITLE_TRACKS:'subtitleTracks',
   TRACK_SELECTION:'trackSelection', QUALITY_SELECTION:'qualitySelection',
   CUSTOM_HEADERS:'customHeaders', COOKIES:'cookies', LIVE_RECONNECT:'liveReconnect',
@@ -21,6 +21,7 @@ export function createPlayerCapabilities(video) {
     [PlayerCapability.DASH]: canPlay('application/dash+xml'),
     [PlayerCapability.MP4]: canPlay('video/mp4'), [PlayerCapability.TS]: canPlay('video/mp2t'),
     [PlayerCapability.FLV]: canPlay('video/x-flv'),
+    [PlayerCapability.RTMP]: false, [PlayerCapability.RTSP]: false,
     [PlayerCapability.AUDIO_TRACKS]: Boolean(video?.audioTracks),
     [PlayerCapability.SUBTITLE_TRACKS]: Boolean(video?.textTracks),
     [PlayerCapability.TRACK_SELECTION]: Boolean(video?.audioTracks || video?.textTracks),
