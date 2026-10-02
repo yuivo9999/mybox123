@@ -4,6 +4,7 @@ import { parseXMLLive, parseXMLEPG } from './xmlParser.js';
 import { parseTXTLive, isTXTGenreFormat } from './txtParser.js';
 import { normalizeLiveChannel } from './normalizeLive.js';
 import { defaultLiveCapabilities, normalizeLiveCapabilities } from './liveCapabilities.js';
+import { resilientFetch } from '../../utils/resilientFetch.js';
 
 export function createLiveAdapter(config, transport = fetch) {
   const sourceId = config.sourceId;
@@ -21,10 +22,10 @@ export function createLiveAdapter(config, transport = fetch) {
   const load = async (options = {}) => {
     lastAttemptAt = Date.now();
     try {
-      const response = await transport(config.sourceRef, { headers: config.headers ?? {}, signal: options.signal });
+      const response = await resilientFetch(config.sourceRef, { headers: config.headers ?? {}, signal: options.signal }, transport);
       if (!response.ok) throw new Error(`HTTP_${response.status}`);
       const body = await response.text();
-      const format = detectFormat(config.format, response.headers.get('content-type'), body);
+      const format = detectFormat(config.format, response.headers?.get?.('content-type') || '', body);
       if (format === 'xml' && config.capabilities?.epg === undefined) capabilities = normalizeLiveCapabilities({ ...capabilities, epg: true, currentProgram: true, upcomingProgram: true });
       const raw = format === 'm3u'
         ? parseM3U(body)
@@ -75,7 +76,14 @@ export function createLiveAdapter(config, transport = fetch) {
       stale: Boolean(lastSuccessfulSnapshot.length && lastError),
       lastError,
     }),
-    healthCheck: async () => ({ ok: !lastError, sourceId, error: lastError, checkedAt: Date.now() }),
+    healthCheck: async (options = {}) => {
+      try {
+        await load(options);
+        return { ok: true, sourceId, status: 'healthy', checkedAt: Date.now(), error: null };
+      } catch (error) {
+        return { ok: false, sourceId, status: 'error', checkedAt: Date.now(), error };
+      }
+    },
   };
 }
 

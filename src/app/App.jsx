@@ -61,7 +61,7 @@ export function App(){
  const testSource=async(source)=>{
    if(!source?.sourceId)return;
    const current=persistent.sources;
-   const mark=(status)=>sourceManagementService.updateStatus(source.sourceId,status);
+   const mark=(status)=>{sourceManagementService.updateStatus(source.sourceId,status);persistent.reload?.();};
    mark('测试中');
    try{
      const result=await sourceManagementService.test(source);
@@ -86,7 +86,7 @@ export function App(){
    sessionStateStore.patch({selected:request,route:'live-play',tab:'live'}); persistent.recordLivePlay(channel,streamId);
  };
  const movieActive=['detail','movie-play','search'].includes(route)||tab==='home'||tab==='movies';
- const isManagementTab = ['sources', 'settings', 'me', 'about', 'data-management'].includes(tab);
+ const isManagementTab = ['sources', 'settings', 'me', 'about', 'data-management', 'history', 'search-history'].includes(tab);
 
  if(!persistent.settings?.initialized) return <FirstLaunch onLater={()=>persistent.saveSettings({...persistent.settings,initialized:true,initializedAt:Date.now()})} onSources={()=>{persistent.saveSettings({...persistent.settings,initialized:true,initializedAt:Date.now()});nav('sources')}}/>;
  
