@@ -62,7 +62,7 @@ export const persistentStateStore = {
     const now = Date.now();
     sourceRepository.saveAll(all.map(item => ({
       ...item,
-      isActive: item.sourceId === sourceId,
+      isActive: item.sourceType === sourceType ? item.sourceId === sourceId : item.isActive,
       enabled: item.sourceId === sourceId ? true : item.enabled,
       lastUsedAt: item.sourceId === sourceId ? now : item.lastUsedAt ?? null,
     })));
