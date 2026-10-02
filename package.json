@@ -13,8 +13,9 @@
     "test:player": "node scripts-test-player-core.mjs",
     "test:state": "node scripts-test-state.mjs",
     "test:movie": "node scripts-test-movie-feature.mjs",
-    "test": "npm run test:cache && npm run test:live && npm run test:playback && npm run test:parser && npm run test:player && npm run test:state && npm run test:movie",
-    "test:cache": "node scripts-test-cache.mjs"
+    "test": "npm run test:cache && npm run test:errors && npm run test:live && npm run test:playback && npm run test:parser && npm run test:player && npm run test:state && npm run test:movie",
+    "test:cache": "node scripts-test-cache.mjs",
+    "test:errors": "node scripts-test-errors.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
