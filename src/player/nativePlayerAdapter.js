@@ -13,7 +13,7 @@ function call(method,payload={}) {
 export function createNativePlayerAdapter(hooks={}) {
  let state=PlayerState.IDLE,input=null,released=false,capabilities=Object.freeze({
   [PlayerCapability.SEEK]:true,[PlayerCapability.VOLUME]:true,[PlayerCapability.PAUSE]:true,
-  [PlayerCapability.AUTOPLAY]:true,[PlayerCapability.CUSTOM_HEADERS]:true,[PlayerCapability.COOKIES]:true,
+  [PlayerCapability.AUTOPLAY]:true,[PlayerCapability.CUSTOM_HEADERS]:true,[PlayerCapability.RTMP]:true,[PlayerCapability.RTSP]:true,[PlayerCapability.COOKIES]:true,
   [PlayerCapability.AUDIO_TRACKS]:true,[PlayerCapability.SUBTITLE_TRACKS]:true,
   [PlayerCapability.TRACK_SELECTION]:true,[PlayerCapability.QUALITY_SELECTION]:true,
   [PlayerCapability.LIVE_RECONNECT]:true,
