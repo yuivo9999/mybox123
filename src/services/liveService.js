@@ -58,7 +58,7 @@ async function loadSourceChannels(adapter) {
   }
 
   try {
-    const value = await adapter.getChannels();
+    const value = await requestManager.run(`live:channels:${adapter.sourceId}`, (signal) => adapter.getChannels({ signal }));
     if (Array.isArray(value) && value.length) {
       cacheStorage.set(CacheNamespace.SOURCE, key, value);
       return { value, cached: false };
