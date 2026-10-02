@@ -15,8 +15,7 @@ function cleanIdentity(value) {
 export function createContentIdentity({ canonicalId = '', title = '', year = '', type = '', region = '' } = {}) {
   const canonical = cleanIdentity(canonicalId);
   if (canonical) return `canonical:${canonical}`;
-  const fallback = [cleanIdentity(title), cleanIdentity(year), cleanIdentity(type), cleanIdentity(region)].filter(Boolean).join('|');
-  return fallback ? `unresolved:${fallback}` : '';
+  return '';
 }
 
 export function createContentId(sourceId, sourceItemId) {
