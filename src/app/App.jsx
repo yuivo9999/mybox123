@@ -3,7 +3,7 @@ import { Home, Film, Radio, Heart, User } from 'lucide-react';
 import { contentService } from '../services/contentService.js';
 import { playbackService } from '../services/playbackService.js';
 import { cacheService } from '../services/cacheService.js';
-import { syncAllSources, testSource as testConfiguredSource } from '../services/sourceRuntimeService.js';
+import { sourceManagementService } from '../services/sourceManagementService.js';
 import { usePersistentState } from '../state/usePersistentState.js';
 import { useSessionState } from '../state/useSessionState.js';
 import { sessionStateStore } from '../state/sessionStateStore.js';
@@ -23,7 +23,7 @@ export function App(){
  const reloadSources=async()=>{
    setContentState(state=>({...state,status:'loading',error:null}));
    try{
-     const result=await syncAllSources();
+     const result=await sourceManagementService.reload();
      const movies=contentService.getMovies(result.movies);
      const failed=result.results.filter(item=>item.status==='rejected');
      setContentState({status:failed.length&&!movies.length&&!result.channels.length?'error':'success',movies,channels:result.channels,error:failed.length?failed:null});
@@ -63,16 +63,16 @@ export function App(){
    const mark=(status)=>persistent.saveSources(current.map(s=>s.sourceId===source.sourceId?{...s,status}:s));
    mark('测试中');
    try{
-     const result=await testConfiguredSource(source);
+     const result=await sourceManagementService.test(source);
      mark(result.ok?'可用':'不可用');
    }catch{
      mark('不可用');
    }
  };
- const saveSources=async(next)=>{persistent.saveSources(next);await reloadSources();};
- const setSourceEnabled=async(id,enabled)=>{persistent.setSourceEnabled(id,enabled);await reloadSources();};
- const setSourceActive=async(id)=>{persistent.setSourceActive(id);await reloadSources();};
- const removeSource=async(id)=>{persistent.removeSource(id);await reloadSources();};
+ const saveSources=async(next)=>{await sourceManagementService.save(next);persistent.reload?.();};
+ const setSourceEnabled=async(id,enabled)=>{await sourceManagementService.setEnabled(id,enabled);persistent.reload?.();};
+ const setSourceActive=async(id)=>{await sourceManagementService.setActive(id);persistent.reload?.();};
+ const removeSource=async(id)=>{await sourceManagementService.remove(id);persistent.reload?.();};
  const nav=(key)=>sessionStateStore.patch({tab:key,route:null,selected:null});
  const openSearchHistory=(keyword)=>{pageStateStore.patch('search',{query:keyword});sessionStateStore.patch({tab:'movies',route:'search',selected:null});};
  const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
