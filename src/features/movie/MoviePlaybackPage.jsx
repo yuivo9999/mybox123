@@ -5,7 +5,7 @@ import { playbackService } from '../../services/playbackService.js';
 import { usePersistentState } from '../../state/usePersistentState.js';
 
 export function MoviePlaybackPage({ request, movies = [], favorites = [], toggleFavorite, onBack, onEpisode, onMovie }) {
-  const persistent = usePersistentState();
+  const { recordProgress } = usePersistentState();
   const progressRef = useRef({ currentTime: 0, duration: null, persistedAt: 0 });
   const [source, setSource] = useState(request?.metadata?.sourceId ?? request?.candidates?.[0]?.sourceId ?? '');
   const [candidate, setCandidate] = useState(request?.candidates?.[0] ?? null);
@@ -24,7 +24,7 @@ export function MoviePlaybackPage({ request, movies = [], favorites = [], toggle
         const duration = event.duration ?? null;
         progressRef.current = { ...progressRef.current, currentTime, duration };
         if (request?.contentId && request?.episodeId && currentTime - progressRef.current.persistedAt >= 15) {
-          persistent.recordProgress(request.contentId, request.episodeId, currentTime, duration, false);
+          recordProgress(request.contentId, request.episodeId, currentTime, duration, false);
           progressRef.current.persistedAt = currentTime;
         }
       }
@@ -39,7 +39,7 @@ export function MoviePlaybackPage({ request, movies = [], favorites = [], toggle
     onParserError: ({ code }) => setError('解析失败：' + code),
     onPlayerError: ({ error: playerError }) => setError(playerError?.message || '播放器加载失败'),
     onExhausted: () => setStatus('error'),
-  }), [request, persistent]);
+  }), [request, recordProgress]);
 
   useEffect(() => {
     let active = true;
@@ -61,7 +61,7 @@ export function MoviePlaybackPage({ request, movies = [], favorites = [], toggle
       controller.leave();
       void player;
     };
-  }, [controller, request, persistent]);
+  }, [controller, request, recordProgress]);
 
   const switchCandidate = id => {
     const next = controller.switchCandidate(id);
