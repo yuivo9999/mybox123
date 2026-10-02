@@ -63,7 +63,10 @@ export const liveService = {
     const epg = results.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
 
     // Existing normalized EPG acts as a non-blocking cache/fallback.
-    const fallback = channelRef?.epg ?? [];
+    const fallback = (channelRef?.epg ?? []).filter((program) =>
+      (!range.startAt || program.endAt >= range.startAt) &&
+      (!range.endAt || program.startAt <= range.endAt),
+    );
     const value = epg.length ? epg : fallback;
     epgCache.set(key, value);
     return value;
