@@ -15,15 +15,18 @@ function expect(file, patterns, label = file) {
   for (const pattern of patterns) assert.match(source, pattern, label + ' missing required contract');
 }
 
-expectNo('src/app/App.jsx', [/createPlaybackCore/]);
+expectNo('src/app/App.jsx', [/createPlaybackCore/, /sourceRuntimeService/]);
 expectNo('src/pages/PlaybackPage.jsx', [/createPlaybackCore/]);
-expectNo('src/features/movie/MovieFeature.jsx', [/createPlaybackCore/, /playbackService/]);
+expectNo('src/features/movie/MovieFeature.jsx', [/createPlaybackCore/, /playbackService/, /usePersistentState/]);
 expectNo('src/pages/MainPage.jsx', [/new Blob\(/, /FileReader/, /URL\.createObjectURL/, /document\.createElement/]);
 expect('src/pages/MainPage.jsx', [/sourceConfigService/]);
 expect('src/app/App.jsx', [/sourceManagementService/]);
 expect('src/features/movie/MovieFeature.jsx', [/MoviePlaybackPage/]);
 expect('src/services/sourceConfigService.js', [/importFile/, /download/]);
-expect('src/services/sourceManagementService.js', [/setEnabled/, /setActive/, /remove/]);
+expect('src/services/sourceManagementService.js', [/setEnabled/, /setActive/, /remove/, /touchUsage/]);
+expectNo('src/services/userDataService.js', [/sourceRepository/, /getSourceConfig/, /saveSourceConfig/, /touchSource/]);
+expectNo('src/repositories/userDataRepository.js', [/getSourceConfig/, /saveSourceConfig/]);
+expect('src/features/movie/MoviePlaybackPage.jsx', [/playbackService\.createController/, /recordProgress/]);
 
 const packageJson = JSON.parse(read('package.json'));
 for (const script of ['test:live','test:playback','test:parser','test:player','test:state','test:movie','test:cache','test:errors','test:webview-runtime','test:performance','test:data-contract','test:acceptance','test:architecture','test:execution']) {
