@@ -13,6 +13,7 @@ class MemoryStorage {
 globalThis.window = { localStorage: new MemoryStorage() };
 
 const { createContentId, createEpisodeId, normalizeContent } = await import('./src/models/content.js');
+const { mergeContents } = await import('./src/services/contentService.js');
 const { createChannelId, createStreamId, normalizeChannel, getEpgProgramStatus } = await import('./src/models/live.js');
 const { storage } = await import('./src/storage/storage.js');
 const { cacheStorage, CacheNamespace, createCacheKey } = await import('./src/storage/cache.js');
@@ -35,7 +36,7 @@ assert.equal(content.totalEpisodes, 12);
 assert.equal(content.currentEpisode, 3);
 assert.equal(content.availableSourceCount, 1);
 assert.equal(content.updateStatus, '更新中');
-assert.equal(content.episodes[0].episodeId, createEpisodeId(content.contentId, 'source-a', 'episode-1'));
+assert.equal(content.episodes[0].episodeId, createEpisodeId(content.contentId, 'source-a', 'episode-1', 'ep-global-1'));
 
 const sameDisplayDifferentSource = normalizeContent({
   sourceId: 'source-b',
@@ -46,6 +47,14 @@ const sameDisplayDifferentSource = normalizeContent({
 });
 assert.notEqual(sameDisplayDifferentSource.contentId, content.contentId);
 assert.equal(sameDisplayDifferentSource.contentIdentity, '');
+
+const sameCanonicalOtherSource = normalizeContent({ sourceId: 'source-b', sourceItemId: 'movie-99', canonicalId: 'global-movie-1', title: 'Demo', type: 'movie', episodes: [{ sourceItemId: 'ep-b', canonicalEpisodeId: 'ep-global-1', title: '正片' }] });
+const merged = mergeContents([content, sameCanonicalOtherSource]);
+assert.equal(merged.length, 1);
+assert.equal(merged[0].availableSourceCount, 2);
+assert.equal(merged[0].sourceRefs.length, 2);
+assert.equal(merged[0].episodes.length, 1);
+assert.equal(merged[0].episodes[0].sourceRefs.length, 2);
 
 const channel = normalizeChannel({
   sourceId: 'live-a',
