@@ -28,6 +28,10 @@ export const errorService = {
   },
 
   classifySource(error, context = {}) {
+    const normalized = toAppError(error, { context, scope: context.scope ?? 'source' });
+    if (normalized.code === ErrorCode.NETWORK) {
+      return toAppError(error, { code: ErrorCode.NETWORK, context, retryable: true, scope: context.scope ?? 'network' });
+    }
     return toAppError(error, { code: ErrorCode.SOURCE, context, scope: context.scope ?? 'source' });
   },
 };
