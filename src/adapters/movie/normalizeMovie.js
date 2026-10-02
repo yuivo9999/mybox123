@@ -15,7 +15,8 @@ export function normalizeMovie({ sourceId, item, index = 0 }) {
   });
   return normalizeContent({
     sourceId,
-    sourceItemId: item.sourceItemId ?? `item-${index + 1}`,
+    sourceItemId: item.sourceItemId ?? item.id ?? `item-${index + 1}`,
+    canonicalId: item.canonicalId ?? item.contentId ?? item.externalId ?? item.tmdbId ?? item.imdbId ?? '',
     title: item.title,
     type: item.type,
     poster: item.poster,
@@ -27,6 +28,11 @@ export function normalizeMovie({ sourceId, item, index = 0 }) {
     director: item.director,
     actors: item.actors,
     popularity: item.popularity,
+    updateStatus: item.updateStatus ?? item.status ?? '',
+    totalEpisodes: item.totalEpisodes,
+    currentEpisode: item.currentEpisode,
+    createdAt: item.createdAt ?? null,
+    updatedAt: item.updatedAt ?? null,
     episodes,
   });
 }
