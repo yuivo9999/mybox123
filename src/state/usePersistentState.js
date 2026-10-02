@@ -21,6 +21,7 @@ export function usePersistentState() {
     clearCache: persistentStateStore.clearCache,
     saveSources: persistentStateStore.saveSources,
     setSourceEnabled: persistentStateStore.setSourceEnabled,
+    setSourceActive: persistentStateStore.setSourceActive,
     removeSource: persistentStateStore.removeSource,
     saveSettings: persistentStateStore.saveSettings,
   };
