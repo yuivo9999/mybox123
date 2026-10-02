@@ -249,7 +249,7 @@ function Main({
 
 function PlaybackView({ request, kind, onBack }) {
   const persistent = usePersistentState();
-  const progressRef = React.useRef({ currentTime: 0, duration: null });
+  const progressRef = React.useRef({ currentTime: 0, duration: null, persistedAt: 0 });
   const [status, setStatus] = useState('idle');
   const [candidate, setCandidate] = useState(request?.candidates?.[0] ?? null);
   const [resolvedInput, setResolvedInput] = useState(null);
@@ -260,7 +260,7 @@ function PlaybackView({ request, kind, onBack }) {
   const core = useMemo(() => createPlaybackCore(task, {
     onEvent: (event) => {
       if (event.event === 'error') setError(event.error || '播放候选失败');
-      if (event.event === 'progress') progressRef.current = { currentTime: event.currentTime ?? 0, duration: event.duration ?? null };
+      if (event.event === 'progress') {\n        const currentTime = event.currentTime ?? 0;\n        const duration = event.duration ?? null;\n        progressRef.current = { ...progressRef.current, currentTime, duration };\n        if (kind === 'vod' && request?.contentId && request?.episodeId && currentTime > 0 && currentTime - progressRef.current.persistedAt >= 15) {\n          persistent.recordProgress(request.contentId, request.episodeId, currentTime, duration, false);\n          progressRef.current.persistedAt = currentTime;\n        }\n      }
       if (event.event === 'completed' && kind === 'vod' && request?.contentId && request?.episodeId) {
         const progress = progressRef.current;
         persistent.recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, true);
@@ -295,7 +295,7 @@ function PlaybackView({ request, kind, onBack }) {
       core.release();
       void player;
     };
-  }, [core, kind, request, persistent]);
+  }, [core, kind, request, persistent.recordProgress]);
 
   const switchCandidate = (candidateId) => {
     const next = core.switchCandidate(candidateId);
