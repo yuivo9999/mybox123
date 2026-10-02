@@ -110,6 +110,7 @@ function App() {
             onLiveChannel={openLiveChannel}
             toggleFavorite={persistent.toggleFavorite}
             onClearData={persistent.clearUserData}
+            onClearCache={persistent.clearCache}
           />
         )}
         {!route && <BottomNav tab={tab} onTab={nav} />}
@@ -228,6 +229,7 @@ function Main({
       <Page>
         <Header title="设置" />
         <Menu icon={Settings} title="数据清理" onClick={() => { onClearData(); alert('用户收藏、历史、进度与搜索历史已清理，源配置保持不变。'); }} />
+        <Menu icon={Database} title="缓存清理" onClick={() => { onClearCache(); alert('缓存已清理，收藏、历史、进度、搜索历史、源配置与设置保持不变。'); }} />
         <InfoCard title="数据保护" text="清理用户数据不会删除源配置；外部源刷新也不会直接覆盖用户数据。" />
       </Page>
     );
