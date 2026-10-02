@@ -20,10 +20,12 @@ export const userDataService = {
         if (legacyContentId !== content.contentId) contentMap.set(legacyContentId, content.contentId);
       }
       (content.episodes ?? []).forEach(episode => {
-        for (const ref of episode.sourceRefs ?? []) {
-          const legacyContentId = createContentId(ref.sourceId, ref.sourceItemId);
-          const legacyEpisodeId = `episode:${legacyContentId}:${ref.sourceId}:${ref.sourceItemId}`;
-          episodeMap.set(legacyEpisodeId, episode.episodeId);
+        for (const contentRef of content.sourceRefs ?? []) {
+          const legacyContentId = createContentId(contentRef.sourceId, contentRef.sourceItemId);
+          for (const episodeRef of episode.sourceRefs ?? []) {
+            const legacyEpisodeId = `episode:${legacyContentId}:${episodeRef.sourceId}:${episodeRef.sourceItemId}`;
+            episodeMap.set(legacyEpisodeId, episode.episodeId);
+          }
         }
       });
     });
