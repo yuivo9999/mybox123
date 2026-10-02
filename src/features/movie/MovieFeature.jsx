@@ -23,7 +23,7 @@ export function MovieFeature(props){
   if(route==='detail'){
     const movie=feature.getDetail(selected?.contentId??selected);
     if(!movie)return <MovieEmpty text="影视内容不存在" onBack={onBack}/>;
-    return <MovieDetail movie={movie} movies={movies} favorite={favorites.some((item)=>item.targetType==='content'&&item.targetId===movie.contentId)} onBack={onBack} onPlay={onPlay} onFavorite={()=>toggleFavorite('content',movie.contentId)}/>;
+    return <MovieDetail movie={movie} movies={movies} onMovie={onMovie} favorite={favorites.some((item)=>item.targetType==='content'&&item.targetId===movie.contentId)} onBack={onBack} onPlay={onPlay} onFavorite={()=>toggleFavorite('content',movie.contentId)}/>;
   }
   if(route==='movie-play') return <MoviePlayback request={selected} movies={movies} onBack={onBack} onEpisode={onPlay}/>;
   if(tab==='movies') return <MovieCatalog movies={movies} state={movieState} setState={setMovieState} onMovie={onMovie} onSearch={()=>onMovie(null,'search')} recordSearch={recordSearch}/>;
@@ -71,13 +71,13 @@ function MovieSearch({movies,initial,recordSearch,onMovie,onBack,onQuery}){
  return <Page><button className="back" onClick={onBack}><ChevronLeft/>返回</button><Header title="搜索"/><div className="searchbox"><Search size={18}/><input autoFocus value={query} onChange={e=>{setQuery(e.target.value);onQuery(e.target.value)}} onKeyDown={e=>e.key==='Enter'&&recordSearch(query)} placeholder="搜索影视内容"/>{query&&<X size={16} onClick={()=>{setQuery('');onQuery('')}}/>}</div>{!query&&<EmptyState text="输入关键词搜索影视"/>}{query&&<><SectionTitle title="搜索结果"/><MovieGrid movies={result} onMovie={onMovie}/>{!result.length&&<MovieEmpty text="搜索无结果"/>}</>}</Page>;
 }
 
-function MovieDetail({movie,movies,onBack,onPlay,favorite,onFavorite}){
+function MovieDetail({movie,movies,onMovie,onBack,onPlay,favorite,onFavorite}){
  const [sourceId,setSourceId]=useState(movie.sourceRefs?.[0]?.sourceId??''); const related=movieService.getRelated({movies,movie});
  const sourceIds=[...new Set((movie.sourceRefs??[]).map((ref)=>ref.sourceId).filter(Boolean))];
  return <Page><button className="back" onClick={onBack}><ChevronLeft/>返回</button><div className="detail-hero"><SmartImage src={movie.poster} alt={movie.title} fallback={<div className="image-placeholder"><Film/></div>}/><div><span className="eyebrow">{movie.category} · {movie.year}</span><h1>{movie.title}</h1><p>{movie.description}</p><div className="actions"><button className="primary" onClick={()=>onPlay(movie,0,sourceId)}><Play size={16}/>播放</button><button className={favorite?'secondary active-fav':'secondary'} onClick={onFavorite}><Heart size={16} fill={favorite?'currentColor':'none'}/>{favorite?'已收藏':'收藏'}</button></div></div></div>
  <SectionTitle title="剧集"/><div className="episode-grid">{movie.episodes.map((episode,index)=><button key={episode.episodeId} onClick={()=>onPlay(movie,index,sourceId)}>{episode.title}</button>)}</div>
  <SectionTitle title="来源选择"/><div className="chips">{sourceIds.length?sourceIds.map(id=><button className={sourceId===id?'active':''} key={id} onClick={()=>setSourceId(id)}>{id}</button>):<span>暂无来源</span>}</div>
- <SectionTitle title="相关推荐"/>{related.length?<MovieGrid movies={related} onMovie={(item)=>onPlay(item,0) && null}/>:<MovieEmpty compact text="暂无相关推荐"/>}
+ <SectionTitle title="相关推荐"/>{related.length?<MovieGrid movies={related} onMovie={onMovie}/>:<MovieEmpty compact text="暂无相关推荐"/>}
  </Page>;
 }
 
