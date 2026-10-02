@@ -21,10 +21,6 @@ export function usePersistentState() {
     clearSearches: persistentStateStore.clearSearches,
     clearUserData: persistentStateStore.clearUserData,
     clearCache: persistentStateStore.clearCache,
-    saveSources: persistentStateStore.saveSources,
-    setSourceEnabled: persistentStateStore.setSourceEnabled,
-    setSourceActive: persistentStateStore.setSourceActive,
-    removeSource: persistentStateStore.removeSource,
     saveSettings: persistentStateStore.saveSettings,
   };
 }
