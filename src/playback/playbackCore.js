@@ -6,6 +6,7 @@ import { createPlaybackEventBus } from './playbackEventBus.js';
 import { createPlaybackStateMachine } from './playbackStateMachine.js';
 import { createPlaybackNetworkPolicy } from './playbackNetworkPolicy.js';
 import { classifyPlaybackError } from './playbackErrorPolicy.js';
+import { playbackResourceManager } from './playbackResourceManager.js';
 
 export function createPlaybackCore(task, hooks = {}) {
   let active = false;
@@ -121,7 +122,7 @@ export function createPlaybackCore(task, hooks = {}) {
       if (!player && playerElement) attachPlayer(playerElement);
       active = true;
       resourceRelease?.();
-      resourceRelease = hooks.resourceManager?.acquire(task.request.taskId) ?? null;
+      resourceRelease = (hooks.resourceManager ?? playbackResourceManager).acquire(task.request.taskId, (previousTaskId) => hooks.onResourceReplaced?.(previousTaskId));
       const initial = task.start();
       if (initial) transition(PlayerState.LOADING);
       return initial;
