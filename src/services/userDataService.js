@@ -84,6 +84,13 @@ export const userDataService = {
     userDataRepository.saveProgress(progress);
     return true;
   },
+  touchFavorite(targetType, targetId) {
+    const id = userDataRepository.ids.createFavoriteId(targetType, targetId);
+    const current = userDataRepository.getFavorites();
+    const next = current.map(item => item.favoriteId === id ? { ...item, lastAccessedAt: Date.now() } : item);
+    if (next.some(item => item.favoriteId === id)) userDataRepository.saveFavorites(next);
+    return next;
+  },
   toggleFavorite(targetType, targetId) {
     if (!targetType || targetId == null) return userDataRepository.getFavorites();
     const current = userDataRepository.getFavorites();
