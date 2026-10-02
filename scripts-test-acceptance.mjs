@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import process from 'node:process';
 
 const checks = [
+  ['Final execution checklist', 'scripts-test-execution-checklist.mjs'],
   ['Architecture freeze', 'scripts-test-architecture-freeze.mjs'],
   ['Model / Utility Unit', 'scripts-test-data-contract.mjs'],
   ['Cache lifecycle', 'scripts-test-cache.mjs'],
