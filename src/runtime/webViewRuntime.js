@@ -1,3 +1,5 @@
+import { isNativeHttpAvailable, nativeHttpRequest } from './nativeHttpBridge.js';
+
 const BRIDGE_VERSION = 1;
 
 function getBridge() {
@@ -29,10 +31,15 @@ export const webViewRuntime = {
     return {
       webView: typeof window !== 'undefined',
       bridge: Boolean(bridge),
+      nativeHttp: isNativeHttpAvailable(),
       fullscreen: typeof document !== 'undefined' && Boolean(document.fullscreenEnabled),
       storage: typeof window !== 'undefined' && Boolean(safeCall(() => window.localStorage)),
       cookie: typeof document !== 'undefined' && typeof document.cookie === 'string',
     };
+  },
+
+  nativeHttpRequest(request, options = {}) {
+    return nativeHttpRequest(request, options);
   },
 
   call(method, payload = {}) {
