@@ -15,6 +15,7 @@ export function usePersistentState() {
     recordProgress: persistentStateStore.recordProgress,
     recordSearch: persistentStateStore.recordSearch,
     clearUserData: persistentStateStore.clearUserData,
+    clearCache: persistentStateStore.clearCache,
     saveSources: persistentStateStore.saveSources,
     saveSettings: persistentStateStore.saveSettings,
   };
