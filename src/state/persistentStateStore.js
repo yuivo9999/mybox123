@@ -58,7 +58,7 @@ export const persistentStateStore = {
     const source = all.find(item => item.sourceId === sourceId);
     if (!source) return getSnapshot();
     const sourceType = source.sourceType || 'movie';
-    const saved = userDataService.setSelectedSource(sourceType, sourceId);
+    userDataService.setSelectedSource(sourceType, sourceId);
     const now = Date.now();
     sourceRepository.saveAll(all.map(item => ({
       ...item,
