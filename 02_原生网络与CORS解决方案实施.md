@@ -286,28 +286,6 @@ requestManager
 
 ---
 
-## 11. 阶段交接记录
-
-- 阶段：
-- 完成日期：
-- Commit：
-- Native HTTP 实现位置：
-- JS bridge 实现位置：
-- 支持的 method：
-- 支持的 responseType：
-- timeout：
-- abort：
-- Cookie：
-- Header：
-- HTTP 明文策略：
-- 播放链路处理方式：
-- 已验证的真实请求：
-- 未完成：
-- 风险：
-- 下一阶段：
-- 下一 AI 第一件事：
-- 下一 AI 必须先检查：
-- 不要重复做：
 ## 阶段交接记录
 
 - 阶段：阶段 2：原生网络与 CORS 解决方案实施
