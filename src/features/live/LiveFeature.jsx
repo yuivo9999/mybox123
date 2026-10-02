@@ -31,8 +31,8 @@ export function LiveFeature({
 }) {
   const feature = useMemo(() => createLiveFeature({ channels }), [channels]);
   const [category, setCategory] = useState(ALL_CATEGORY);
-  const categories = feature.getCategories();
-  const visibleChannels = feature.list({ category });
+  const categories = useMemo(() => feature.getCategories(), [feature]);
+  const visibleChannels = useMemo(() => feature.list({ category }), [feature, category]);
 
   return (
     <Page>
@@ -57,7 +57,7 @@ export function LiveFeature({
           return (
             <div className="channel" key={channel.channelId} onClick={() => onChannel(channel)}>
               <div className="channel-logo">
-                {channel.logo ? <img src={channel.logo} alt="" /> : <Radio />}
+                {channel.logo ? <img src={channel.logo} alt="" loading="lazy" decoding="async" /> : <Radio />}
               </div>
               <div className="channel-main">
                 <b>{channel.name}</b>
@@ -115,7 +115,12 @@ export function LiveChannelPanel({
     let active = true;
     setEpg(channel?.epg ?? []);
     setEpgLoading(true);
-    feature.getEPG(channel, {}).then((items) => {
+    const now = Date.now();
+    const range = {
+      startAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+      endAt: new Date(now + 4 * 60 * 60 * 1000).toISOString(),
+    };
+    feature.getEPG(channel, range).then((items) => {
       if (active && items.length) setEpg(items);
     }).catch(() => {
       // EPG is optional; cached/empty state remains visible.
@@ -137,7 +142,7 @@ export function LiveChannelPanel({
       <button className="back" onClick={onBack}><ChevronLeft />返回直播列表</button>
       <div className="detail-hero live-detail">
         <div className="channel-logo large">
-          {channel.logo ? <img src={channel.logo} alt="" /> : <Radio size={34} />}
+          {channel.logo ? <img src={channel.logo} alt="" loading="lazy" decoding="async" /> : <Radio size={34} />}
         </div>
         <div>
           <span className="eyebrow">{channel.category} · {channel.sourceRefs.length} 个来源</span>
