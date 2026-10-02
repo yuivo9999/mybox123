@@ -27,7 +27,8 @@ export function createPlaybackSessionManager() {
     return id;
   };
 
-  const get = (sessionId) => sessions.get(sessionId) ?? null;
+  const getRaw = (sessionId) => sessions.get(sessionId) ?? null;
+  const get = () => null;
   const isExpired = (sessionId) => {
     const session = getRaw(sessionId);
     if (!session?.expiresAt) return false;
@@ -47,6 +48,6 @@ export function createPlaybackSessionManager() {
   const clear = (sessionId) => sessions.delete(sessionId);
   const clearAll = () => sessions.clear();
 
-  return { create, get, isExpired, requestContext, clear, clearAll };
+  return { create, get, has: sessionId => sessions.has(sessionId), isExpired, requestContext, clear, clearAll };
 }
 export const playbackSessionManager = createPlaybackSessionManager();
