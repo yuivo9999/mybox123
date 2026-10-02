@@ -19,6 +19,12 @@ export const sourceRegistryService = {
     return adapter;
   },
 
+  async testLiveSource(source, options = {}) {
+    const normalized = normalizeSource(source);
+    const adapter = createLiveAdapter(normalized, options.transport ?? fetch);
+    return adapter.healthCheck(options);
+  },
+
   async syncMovieSources(sources) {
     return syncMovieSources(sources);
   },
