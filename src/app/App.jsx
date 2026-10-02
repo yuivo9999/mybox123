@@ -46,6 +46,7 @@ export function App(){
  const openMovie=(movie,routeOverride=null)=>{
    if(routeOverride==='search'){sessionStateStore.patch({tab:'movies',route:'search',selected:null});return}
    if(!movie)return;
+   if(movie.contentId) persistent.touchFavorite?.('content', movie.contentId);
    sessionStateStore.patch({selected:movie,route:'detail',tab:'movies'});
  };
  const playMovie=(movie,episodeIndex=0,sourceId=null)=>{
