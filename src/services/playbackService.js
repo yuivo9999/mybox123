@@ -14,7 +14,7 @@ function sortCandidates(candidates) {
 }
 
 export const playbackService = {
-  getVODCandidates({ content, episode, episodeIndex = 0 } = {}) {
+  getVODCandidates({ content, episode, episodeIndex = 0, preferredSource = null } = {}) {
     if (!content || !episode) return [];
     return sortCandidates((episode.playbackCandidates ?? []).map((candidate, index) => normalizePlaybackCandidate({
       ...candidate,
@@ -22,7 +22,7 @@ export const playbackService = {
       contentId: candidate.contentId ?? content.contentId,
       episodeId: candidate.episodeId ?? episode.episodeId,
       sourceId: candidate.sourceId ?? episode.sourceRefs?.[0]?.sourceId ?? content.sourceRefs?.[0]?.sourceId,
-      priority: candidate.priority ?? -index,
+      priority: (candidate.priority ?? -index) + (preferredSource && candidate.sourceId === preferredSource ? 100000 : 0),
     })));
   },
 
@@ -41,21 +41,21 @@ export const playbackService = {
     })));
   },
 
-  createVODRequest({ content, episode, episodeIndex = 0, metadata } = {}) {
+  createVODRequest({ content, episode, episodeIndex = 0, preferredSource = null, metadata } = {}) {
     return createPlaybackRequest({
       kind: PlaybackKind.VOD,
       contentId: content?.contentId,
       episodeId: episode?.episodeId,
-      candidates: this.getVODCandidates({ content, episode, episodeIndex }),
+      candidates: this.getVODCandidates({ content, episode, episodeIndex, preferredSource }),
       metadata: { episodeIndex, episodes: content?.episodes?.map((item) => ({ episodeId: item.episodeId, title: item.title })) ?? [], ...(metadata ?? {}) },
     });
   },
 
-  createLiveRequest({ channel, metadata } = {}) {
+  createLiveRequest({ channel, preferredSource = null, metadata } = {}) {
     return createPlaybackRequest({
       kind: PlaybackKind.LIVE,
       channelId: channel?.channelId,
-      candidates: this.getLiveCandidates(channel),
+      candidates: this.getLiveCandidates(channel).sort((a, b) => (preferredSource && a.sourceId === preferredSource ? -1 : 0) - (preferredSource && b.sourceId === preferredSource ? -1 : 0)),
       metadata,
     });
   },
