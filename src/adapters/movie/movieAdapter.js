@@ -33,27 +33,34 @@ export function createMovieAdapter(config, transport = fetch) {
   let status = config.enabled === false ? 'disabled' : String(config.status ?? 'unknown');
 
   const request = async (options = {}) => {
-    if (!sourceDefinition.endpoint) {
-      throw toAppError(new Error('MOVIE_SOURCE_ENDPOINT_REQUIRED'), {
-        code: ErrorCode.SOURCE,
-        scope: 'movie-source-request',
-        context: { sourceId },
-      });
+    let finalUrl = sourceDefinition.endpoint;
+    if (finalUrl.includes('api.php') || finalUrl.includes('provide/vod') || finalUrl.includes('/vod/')) {
+      if (!finalUrl.includes('ac=')) {
+        finalUrl += (finalUrl.includes('?') ? '&' : '?') + 'ac=videolist';
+      }
     }
 
     let response;
     try {
-      response = await transport(sourceDefinition.endpoint, {
+      response = await transport(finalUrl, {
         headers: config.headers ?? {},
         signal: options.signal,
       });
     } catch (error) {
-      throw toAppError(error, {
-        code: ErrorCode.NETWORK,
-        retryable: true,
-        scope: 'movie-source-request',
-        context: { sourceId, endpoint: sourceDefinition.endpoint },
-      });
+      try {
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(finalUrl)}`;
+        response = await transport(proxyUrl, {
+          headers: {},
+          signal: options.signal,
+        });
+      } catch (proxyError) {
+        throw toAppError(error, {
+          code: ErrorCode.NETWORK,
+          retryable: true,
+          scope: 'movie-source-request',
+          context: { sourceId, endpoint: finalUrl },
+        });
+      }
     }
 
     if (!response?.ok) {
