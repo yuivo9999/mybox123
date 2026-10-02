@@ -1,6 +1,5 @@
 import { userDataService } from '../services/userDataService.js';
 import { sourceRepository } from '../repositories/sourceRepository.js';
-import { sourceConfigs } from '../data/demoData.js';
 
 const listeners = new Set();
 let snapshot = null;
@@ -50,6 +49,10 @@ export const persistentStateStore = {
     userDataService.recordMoviePlay(movie, episodeIndex);
     return refresh();
   },
+  recordLivePlay(channel, streamId = null) {
+    userDataService.recordLivePlay(channel, streamId);
+    return refresh();
+  },
   recordProgress(contentId, episodeId, positionSeconds, durationSeconds = null, completed = false) {
     userDataService.recordProgress(contentId, episodeId, positionSeconds, durationSeconds, completed);
     return refresh();
@@ -71,4 +74,3 @@ export const persistentStateStore = {
     return refresh();
   },
 };
-
