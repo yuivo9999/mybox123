@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Home, Film, Radio, Heart, User, Search, ChevronLeft, Play, Clock3, Settings, Database, Server, Info, X } from 'lucide-react';
 import './styles/app.css';
-import { movies as normalizedMovies, channels as normalizedChannels, sourceConfigs } from './data/demoData';
+import { movies as normalizedMovies, channels as normalizedChannels } from './data/demoData';
 import { contentService } from './services/contentService';
 import { liveService } from './services/liveService';
 import { playbackService } from './services/playbackService';
