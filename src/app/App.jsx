@@ -54,7 +54,7 @@ export function App(){
    const episode=movie.episodes?.[episodeIndex]??movie.episodes?.[0]; if(!episode)return;
    const progress=persistent.progress.find((item)=>item.contentId===movie.contentId&&item.episodeId===episode.episodeId);
    const request=playbackService.createVODRequest({content:movie,episode,episodeIndex,metadata:{title:movie.title,poster:movie.poster,episodeTitle:episode.title??'',sourceId,startPositionSeconds:progress?.completed?0:(progress?.positionSeconds??0)}});
-   if(sourceId){const sourceCandidates=request.candidates.filter(candidate=>candidate.sourceId===sourceId);if(sourceCandidates.length)request.candidates=sourceCandidates;}
+   if(sourceId){const sourceCandidates=request.candidates.filter(candidate=>candidate.sourceId===sourceId);if(sourceCandidates.length)request.candidates=sourceCandidates;sourceManagementService.touchUsage(sourceId);}
    sessionStateStore.patch({selected:request,route:'movie-play',tab:'movies'}); persistent.recordMoviePlay(movie,episodeIndex,sourceId);
  };
  const testSource=async(source)=>{
@@ -79,7 +79,8 @@ export function App(){
  const playLive=(channel,streamId=null)=>{
    if(!channel)return;
    const request=playbackService.createLiveRequest({channel,metadata:{title:channel.name,category:channel.category,channelId:channel.channelId}});
-   if(streamId){const index=request.candidates.findIndex((candidate)=>candidate.streamId===streamId);if(index>=0)request.candidates=[request.candidates[index],...request.candidates.filter((_,i)=>i!==index)]}
+   if(streamId){const index=request.candidates.findIndex((candidate)=>candidate.streamId===streamId);if(index>=0){request.candidates=[request.candidates[index],...request.candidates.filter((_,i)=>i!==index)];sourceManagementService.touchUsage(request.candidates[0]?.sourceId);}}
+   else sourceManagementService.touchUsage(request.candidates[0]?.sourceId);
    sessionStateStore.patch({selected:request,route:'live-play',tab:'live'}); persistent.recordLivePlay(channel,streamId);
  };
  const movieActive=['detail','movie-play','search'].includes(route)||tab==='home'||tab==='movies';
