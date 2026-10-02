@@ -98,6 +98,8 @@ export function createPlaybackCore(task, hooks = {}) {
     if (!player) throw new Error('PLAYER_ADAPTER_NOT_ATTACHED');
     player.load(input);
     player.prepare();
+    const startPosition = Number(task.request.metadata?.startPositionSeconds ?? 0);
+    if (task.request.kind === PlaybackKind.VOD && startPosition > 0) player.seek(startPosition);
     if (input.playerHint?.autoplay) await player.play();
     return input;
   };
