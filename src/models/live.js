@@ -1,5 +1,16 @@
-export function createChannelId(sourceId, sourceItemId) {
-  return `channel:${sourceId}:${sourceItemId}`;
+function cleanIdentity(value) {
+  return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+export function createChannelIdentity({ canonicalId = '', channelKey = '', name = '', category = '' } = {}) {
+  const canonical = cleanIdentity(canonicalId || channelKey);
+  if (canonical) return `canonical:${canonical}`;
+  // No stable cross-source identity: keep the channel source-qualified.
+  return `unresolved:${cleanIdentity(name)}|${cleanIdentity(category)}`;
+}
+
+export function createChannelId(sourceId, sourceItemId, identity = '') {
+  return `channel:${identity || `${sourceId}:${sourceItemId}`}`;
 }
 
 export function createStreamId(sourceId, sourceItemId, index = 0) {
@@ -10,9 +21,19 @@ export function createSourceChannelId(sourceId, sourceItemId) {
   return `source-channel:${sourceId}:${sourceItemId}`;
 }
 
-export function normalizeChannel({ sourceId, sourceItemId, name, category, logo = '', streams = [], epg = [] }) {
-  const channelId = createChannelId(sourceId, sourceItemId);
+export function getEpgProgramStatus(program, now = Date.now()) {
+  const start = Date.parse(program?.startAt ?? '');
+  const end = Date.parse(program?.endAt ?? '');
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 'unknown';
+  if (now < start) return 'upcoming';
+  if (now >= start && now < end) return 'live';
+  return 'ended';
+}
+
+export function normalizeChannel({ sourceId, sourceItemId, canonicalId = '', channelKey = '', name, category, logo = '', streams = [], epg = [] }) {
   const sourceChannelId = createSourceChannelId(sourceId, sourceItemId);
+  const identity = createChannelIdentity({ canonicalId, channelKey, name, category });
+  const channelId = createChannelId(sourceId, sourceItemId, identity);
   return {
     channelId,
     name,
@@ -39,6 +60,7 @@ export function normalizeChannel({ sourceId, sourceItemId, name, category, logo 
       endAt: program.endAt ?? '',
       title: program.title ?? '',
       description: program.description ?? '',
+      status: getEpgProgramStatus(program),
     })),
     status: 'available',
     syncAt: Date.now(),
