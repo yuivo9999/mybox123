@@ -8,7 +8,7 @@ import { usePageState, pageStateStore } from '../../state/pageStateStore.js';
 import { SmartImage, EmptyState, ErrorState } from '../../components/StateViews.jsx';
 
 export function MovieFeature(props){
- const { route,tab,selected,movies=[],channels=[],history,favorites,onMovie,onPlay,onTab,onBack,onLive,recordSearch,toggleFavorite }=props;
+ const { route,tab,selected,movies=[],channels=[],history,progress,favorites,onMovie,onPlay,onTab,onBack,onLive,recordSearch,toggleFavorite }=props;
  const page=usePageState(); const movieState=page.movies;
  useEffect(()=>{
   const pageKey=route==='search'?'search':tab==='movies'?'movies':'home';
@@ -18,7 +18,7 @@ export function MovieFeature(props){
   window.addEventListener('scroll',save,{passive:true});
   return()=>window.removeEventListener('scroll',save);
  },[route,tab]);
- const feature=useMemo(()=>createMovieFeature({movies,history}),[movies,history]);
+ const feature=useMemo(()=>createMovieFeature({movies,history,progress}),[movies,history]);
  if(route==='search') return <MovieSearch movies={movies} initial={page.search.query} recordSearch={recordSearch} onMovie={onMovie} onBack={onBack} onQuery={query=>pageStateStore.patch('search',{query})}/>;
  if(route==='detail'){const movie=feature.getDetail(selected?.contentId??selected);if(!movie)return <MovieEmpty text="影视内容不存在" onBack={onBack}/>;return <MovieDetail movie={movie} movies={movies} onMovie={onMovie} favorite={favorites.some(i=>i.targetType==='content'&&i.targetId===movie.contentId)} onBack={onBack} onPlay={onPlay} onFavorite={()=>toggleFavorite('content',movie.contentId)}/>;}
  if(route==='movie-play') return <MoviePlayback request={selected} movies={movies} favorites={favorites} toggleFavorite={toggleFavorite} onBack={onBack} onEpisode={onPlay} onMovie={onMovie}/>
@@ -26,8 +26,8 @@ export function MovieFeature(props){
  return <MovieHome feature={feature} channels={channels} onTab={onTab} onMovie={onMovie} onPlay={onPlay} onLive={onLive} onSearch={()=>onMovie(null,'search')}/>;
 }
 
-export function createMovieFeature({movies=[],history=[]}={}){return{
- getHome:(options)=>movieService.getHome({movies,history,...(options??{})}),
+export function createMovieFeature({movies=[],history=[],progress=[]}={}){return{
+ getHome:(options)=>movieService.getHome({movies,history,progress,...(options??{})}),
  getList:(options)=>movieService.list({movies,...(options??{})}),
  search:(keyword)=>movieService.search({movies,keyword}),
  getDetail:(contentId)=>movieService.getDetail({movies,contentId}),
