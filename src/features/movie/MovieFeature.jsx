@@ -10,6 +10,14 @@ import { SmartImage, EmptyState, ErrorState } from '../../components/StateViews.
 export function MovieFeature(props){
  const { route,tab,selected,movies=[],channels=[],history,favorites,onMovie,onPlay,onTab,onBack,onLive,recordSearch,toggleFavorite }=props;
  const page=usePageState(); const movieState=page.movies;
+ useEffect(()=>{
+  const pageKey=route==='search'?'search':tab==='movies'?'movies':'home';
+  const saved=page[pageKey]?.scrollTop??0;
+  requestAnimationFrame(()=>window.scrollTo(0,saved));
+  const save=()=>pageStateStore.patch(pageKey,{scrollTop:window.scrollY});
+  window.addEventListener('scroll',save,{passive:true});
+  return()=>window.removeEventListener('scroll',save);
+ },[route,tab]);
  const feature=useMemo(()=>createMovieFeature({movies,history}),[movies,history]);
  if(route==='search') return <MovieSearch movies={movies} initial={page.search.query} recordSearch={recordSearch} onMovie={onMovie} onBack={onBack} onQuery={query=>pageStateStore.patch('search',{query})}/>;
  if(route==='detail'){const movie=feature.getDetail(selected?.contentId??selected);if(!movie)return <MovieEmpty text="影视内容不存在" onBack={onBack}/>;return <MovieDetail movie={movie} movies={movies} onMovie={onMovie} favorite={favorites.some(i=>i.targetType==='content'&&i.targetId===movie.contentId)} onBack={onBack} onPlay={onPlay} onFavorite={()=>toggleFavorite('content',movie.contentId)}/>;}
