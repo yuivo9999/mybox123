@@ -57,7 +57,19 @@ export function App(){
    if(sourceId){const sourceCandidates=request.candidates.filter(candidate=>candidate.sourceId===sourceId);if(sourceCandidates.length)request.candidates=sourceCandidates;}
    sessionStateStore.patch({selected:request,route:'movie-play',tab:'movies'}); persistent.recordMoviePlay(movie,episodeIndex,sourceId);
  };
- const testSource=async(source)=>{\n   if(!source?.sourceId)return;\n   const current=persistent.sources;\n   const mark=(status)=>persistent.saveSources(current.map(s=>s.sourceId===source.sourceId?{...s,status}:s));\n   mark('测试中');\n   try{\n     const result=await testConfiguredSource(source);\n     mark(result.ok?'可用':'不可用');\n   }catch{\n     mark('不可用');\n   }\n };\n const saveSources=async(next)=>{persistent.saveSources(next);await reloadSources();};
+ const testSource=async(source)=>{
+   if(!source?.sourceId)return;
+   const current=persistent.sources;
+   const mark=(status)=>persistent.saveSources(current.map(s=>s.sourceId===source.sourceId?{...s,status}:s));
+   mark('测试中');
+   try{
+     const result=await testConfiguredSource(source);
+     mark(result.ok?'可用':'不可用');
+   }catch{
+     mark('不可用');
+   }
+ };
+ const saveSources=async(next)=>{persistent.saveSources(next);await reloadSources();};
  const setSourceEnabled=async(id,enabled)=>{persistent.setSourceEnabled(id,enabled);await reloadSources();};
  const setSourceActive=async(id)=>{persistent.setSourceActive(id);await reloadSources();};
  const removeSource=async(id)=>{persistent.removeSource(id);await reloadSources();};
