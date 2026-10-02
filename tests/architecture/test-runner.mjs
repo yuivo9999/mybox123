@@ -6,6 +6,17 @@ const root = process.cwd();
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const args = new Set(process.argv.slice(2));
 
+function sourceFiles(dir) {
+  const result = [];
+  for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
+    const relative = path.join(dir, entry.name);
+    if (entry.isDirectory()) result.push(...sourceFiles(relative));
+    else if (/\\.(js|jsx|mjs)$/.test(entry.name)) result.push(relative);
+  }
+  return result;
+}
+const allSourceFiles = sourceFiles('src');
+
 function expectNo(file, patterns, label = file) {
   const source = read(file);
   for (const pattern of patterns) assert.doesNotMatch(source, pattern, label + ' contains forbidden dependency');
