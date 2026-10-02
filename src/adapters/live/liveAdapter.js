@@ -2,13 +2,23 @@ import { parseJSONLive } from './jsonParser.js';
 import { parseM3U } from './m3uParser.js';
 import { parseXMLLive, parseXMLEPG } from './xmlParser.js';
 import { normalizeLiveChannel } from './normalizeLive.js';
+import { defaultLiveCapabilities, normalizeLiveCapabilities } from './liveCapabilities.js';
 
 export function createLiveAdapter(config, transport = fetch) {
   const sourceId = config.sourceId;
   let snapshot = [];
+  let lastSuccessfulSnapshot = [];
   let lastError = null;
+  let lastAttemptAt = null;
+  let lastSuccessfulAt = null;
+  const capabilities = normalizeLiveCapabilities({
+    ...defaultLiveCapabilities,
+    ...(config.capabilities ?? {}),
+    search: Boolean(config.capabilities?.search),
+  });
 
   const load = async (options = {}) => {
+    lastAttemptAt = Date.now();
     try {
       const response = await transport(config.sourceRef, { headers: config.headers ?? {}, signal: options.signal });
       if (!response.ok) throw new Error(`HTTP_${response.status}`);
@@ -20,24 +30,43 @@ export function createLiveAdapter(config, transport = fetch) {
         ...item,
         epg: [...(item.epg ?? []), ...epgPrograms.filter((program) => program.channelRef === item.sourceItemId || program.channelRef === item.channelKey)],
       }));
-      snapshot = withEPG.map((item, index) => normalizeLiveChannel({ sourceId, item, index }));
+      const normalized = withEPG.map((item, index) => normalizeLiveChannel({ sourceId, item, index }));
+      snapshot = normalized;
+      lastSuccessfulSnapshot = normalized;
+      lastSuccessfulAt = Date.now();
       lastError = null;
-      return snapshot;
+      return normalized;
     } catch (error) {
-      lastError = { code: error?.message || 'LIVE_ADAPTER_ERROR', sourceId };
+      lastError = { code: error?.message || 'LIVE_ADAPTER_ERROR', sourceId, at: Date.now() };
       throw error;
     }
   };
 
+  const current = () => snapshot.length ? snapshot : lastSuccessfulSnapshot;
+
   return {
     sourceId,
+    capabilities,
     getChannels: load,
-    getCategories: async () => [...new Set((snapshot.length ? snapshot : await load()).map((channel) => channel.category))],
-    getStreams: async (channelRef) => (snapshot.length ? snapshot : await load()).find((channel) => channel.channelId === channelRef?.channelId)?.streams ?? [],
+    getCategories: async () => [...new Set(current().map((channel) => channel.category))],
+    getStreams: async (channelRef) => {
+      const channels = current();
+      const sourceRef = channelRef?.sourceRefs?.find((ref) => ref.sourceId === sourceId);
+      const channel = channels.find((item) => item.channelId === channelRef?.channelId || item.sourceRefs?.some((ref) => ref.sourceChannelId === sourceRef?.sourceChannelId));
+      return channel?.streams ?? [];
+    },
     getEPG: async (channelRef, range = {}) => {
-      const channel = (snapshot.length ? snapshot : await load()).find((item) => item.channelId === channelRef?.channelId);
+      const channels = current();
+      const sourceRef = channelRef?.sourceRefs?.find((ref) => ref.sourceId === sourceId);
+      const channel = channels.find((item) => item.channelId === channelRef?.channelId || item.sourceRefs?.some((ref) => ref.sourceChannelId === sourceRef?.sourceChannelId));
       return (channel?.epg ?? []).filter((program) => (!range.startAt || program.endAt >= range.startAt) && (!range.endAt || program.startAt <= range.endAt));
     },
+    getSnapshotState: () => ({
+      lastAttemptAt,
+      lastSuccessfulAt,
+      stale: Boolean(lastSuccessfulSnapshot.length && lastError),
+      lastError,
+    }),
     healthCheck: async () => ({ ok: !lastError, sourceId, error: lastError, checkedAt: Date.now() }),
   };
 }
