@@ -13,6 +13,7 @@ import { useSessionState } from './state/useSessionState.js';
 import { sessionStateStore } from './state/sessionStateStore.js';
 import { MovieFeature } from './features/movie/MovieFeature.jsx';
 import { LiveFeature, LiveChannelPanel } from './features/live/LiveFeature.jsx';
+import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 
 const movies = contentService.getMovies(normalizedMovies);
 const channels = liveService.getChannels(normalizedChannels);
@@ -347,4 +348,8 @@ const MovieGrid = ({ movies: items, onMovie }) => <div className="movie-grid">{i
 const Menu = ({ icon: Icon, title, onClick, badge }) => <button className="menu" onClick={onClick}><Icon size={19} /><span>{title}</span>{badge > 0 && <em>{badge}</em>}<ChevronLeft className="flip" size={17} /></button>;
 const BottomNav = ({ tab, onTab }) => <nav>{[['home', Home, '首页'], ['movies', Film, '影视'], ['live', Radio, '直播'], ['favorites', Heart, '收藏'], ['me', User, '我的']].map(([key, Icon, label]) => <button className={tab === key ? 'active' : ''} onClick={() => onTab(key)} key={key}><Icon size={21} fill={tab === key ? 'currentColor' : 'none'} /><span>{label}</span></button>)}</nav>;
 
-createRoot(document.getElementById('root')).render(<App />);
+createRoot(document.getElementById('root')).render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>,
+);
