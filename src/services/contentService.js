@@ -1,9 +1,10 @@
 function mergeEpisodes(existing, incoming) {
-  const byKey = new Map(existing.map(episode => [episode.episodeId, episode]));
+  const byKey = new Map(existing.map(episode => [episode.episodeIdentity || episode.episodeId, episode]));
   for (const episode of incoming) {
-    const current = byKey.get(episode.episodeId);
+    const key = episode.episodeIdentity || episode.episodeId;
+    const current = byKey.get(key);
     if (!current) {
-      byKey.set(episode.episodeId, { ...episode, sourceRefs: [...(episode.sourceRefs ?? [])], playbackCandidates: [...(episode.playbackCandidates ?? [])] });
+      byKey.set(key, { ...episode, sourceRefs: [...(episode.sourceRefs ?? [])], playbackCandidates: [...(episode.playbackCandidates ?? [])] });
       continue;
     }
     current.sourceRefs.push(...(episode.sourceRefs ?? []).filter(ref => !current.sourceRefs.some(item => item.sourceId === ref.sourceId && item.sourceItemId === ref.sourceItemId)));
