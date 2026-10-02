@@ -1,26 +1,14 @@
-export function createPlaybackResourceManager() {
-  let ownerTaskId = null;
-  let ownerRelease = null;
-
-  return {
-    acquire(taskId, onReplaced = () => {}) {
-      if (ownerTaskId && ownerTaskId !== taskId) {
-        ownerRelease?.();
-        onReplaced(ownerTaskId);
-      }
-      ownerTaskId = taskId;
-      ownerRelease = () => {
-        if (ownerTaskId === taskId) {
-          ownerTaskId = null;
-          ownerRelease = null;
-        }
-      };
-      return ownerRelease;
-    },
-    get ownerTaskId() {
-      return ownerTaskId;
-    },
-  };
+import { playbackTaskRegistry } from './playbackTaskRegistry.js';
+export function createPlaybackResourceManager(registry=playbackTaskRegistry){
+ let ownerTaskId=null,ownerRelease=null;
+ return {
+  acquire(taskId,onReplaced=()=>{}){
+   if(ownerTaskId&&ownerTaskId!==taskId){const previous=ownerTaskId;ownerRelease?.();onReplaced(previous);registry.stopAndRelease(previous);}
+   ownerTaskId=taskId;
+   ownerRelease=()=>{if(ownerTaskId===taskId){ownerTaskId=null;ownerRelease=null;}};
+   return ownerRelease;
+  },
+  get ownerTaskId(){return ownerTaskId;},
+ };
 }
-
-export const playbackResourceManager = createPlaybackResourceManager();
+export const playbackResourceManager=createPlaybackResourceManager();
