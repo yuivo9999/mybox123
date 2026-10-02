@@ -40,6 +40,14 @@ expectNo('src/repositories/userDataRepository.js', [/getSourceConfig/, /saveSour
 expectNo('src/state/persistentStateStore.js', [/sourceRepository/, /saveSources\(/, /setSourceEnabled/, /setSourceActive/, /removeSource/]);
 expect('src/features/movie/MoviePlaybackPage.jsx', [/playbackService\.createController/, /recordProgress/]);
 
+const pageAndFeatureFiles = allSourceFiles.filter(file => file.startsWith('src/pages/') || file.startsWith('src/features/'));
+for (const file of pageAndFeatureFiles) expectNo(file, [/\bcreatePlaybackCore\s*\(/, /\bFileReader\b/, /\bnew Blob\(/, /URL\.createObjectURL/], file);
+for (const file of allSourceFiles) {
+  const source = read(file);
+  if (file !== 'src/playback/playbackCore.js' && file !== 'src/services/playbackService.js') assert.doesNotMatch(source, /from ['"][^'"]*playbackCore[^'"]*['"]/);
+  if (file !== 'src/services/sourceManagementService.js' && file !== 'src/services/sourceRuntimeService.js') assert.doesNotMatch(source, /from ['"][^'"]*sourceRuntimeService[^'"]*['"]/);
+}
+
 const packageJson = JSON.parse(read('package.json'));
 for (const script of ['test:live','test:playback','test:parser','test:player','test:state','test:movie','test:cache','test:errors','test:webview-runtime','test:performance','test:data-contract','test:acceptance','test:architecture','test:execution']) {
   assert.match(packageJson.scripts[script] ?? '', /tests\/architecture\/test-runner\.mjs/, 'missing test runner: ' + script);
