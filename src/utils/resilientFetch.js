@@ -1,6 +1,7 @@
 /**
  * Resilient Fetch Utility
  * - Prevents indefinite hanging with automatic timeout (default 8s)
+ * - Safely decodes data: URLs in-memory (supports both Base64 and URL-encoded UTF-8)
  * - Detects and bypasses browser CORS & Mixed-Content blocks
  * - Fallbacks to reliable CORS proxies (corsproxy.io -> allorigins)
  */
@@ -12,6 +13,29 @@ function isMixedContent(url) {
   return window.location.protocol === 'https:' && url.startsWith('http://');
 }
 
+export function decodeDataUrl(dataUrl) {
+  const commaIndex = dataUrl.indexOf(',');
+  if (commaIndex === -1) return '';
+  const meta = dataUrl.slice(0, commaIndex);
+  const rawData = dataUrl.slice(commaIndex + 1);
+
+  if (meta.includes(';base64')) {
+    try {
+      const binary = atob(rawData);
+      const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+      return new TextDecoder('utf-8').decode(bytes);
+    } catch {
+      return atob(rawData);
+    }
+  }
+
+  try {
+    return decodeURIComponent(rawData);
+  } catch {
+    return unescape(rawData);
+  }
+}
+
 export async function resilientFetch(url, options = {}, transport = fetch) {
   if (!url || typeof url !== 'string') {
     throw new Error('URL_REQUIRED');
@@ -19,8 +43,24 @@ export async function resilientFetch(url, options = {}, transport = fetch) {
 
   const trimmedUrl = url.trim();
 
-  // Local data or blob URLs do not need proxies or timeouts
-  if (trimmedUrl.startsWith('data:') || trimmedUrl.startsWith('blob:')) {
+  // 1. Direct in-memory decoding for Data URLs (Base64 or URL-encoded)
+  if (trimmedUrl.startsWith('data:')) {
+    try {
+      const decodedText = decodeDataUrl(trimmedUrl);
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/plain; charset=utf-8' }),
+        text: async () => decodedText,
+        json: async () => JSON.parse(decodedText),
+      };
+    } catch (err) {
+      // Fallback if custom parser fails
+    }
+  }
+
+  // 2. Blob URLs
+  if (trimmedUrl.startsWith('blob:')) {
     return transport(trimmedUrl, options);
   }
 

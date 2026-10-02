@@ -176,7 +176,7 @@ export const sourceConfigService = {
       const trimmed = text.trim();
       const fileName = file.name || 'live.txt';
       if (/#genre#/i.test(trimmed) || /^#EXTM3U/i.test(trimmed) || fileName.endsWith('.txt') || fileName.endsWith('.m3u')) {
-        const dataUrl = await this.readFileAsDataURL(file);
+        const dataUrl = `data:text/plain;charset=utf-8,${encodeURIComponent(text)}`;
         const sourceName = fileName.replace(/\.[^.]+$/, '') || '本地直播源 (TXT)';
         const currentSources = this.read();
         const newSource = {
