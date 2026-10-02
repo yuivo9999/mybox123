@@ -30,7 +30,7 @@ export const webViewRuntime = {
       webView: typeof window !== 'undefined',
       bridge: Boolean(bridge),
       fullscreen: typeof document !== 'undefined' && Boolean(document.fullscreenEnabled),
-      storage: typeof window !== 'undefined' && Boolean(window.localStorage),
+      storage: typeof window !== 'undefined' && Boolean(safeCall(() => window.localStorage)),
       cookie: typeof document !== 'undefined' && typeof document.cookie === 'string',
     };
   },
