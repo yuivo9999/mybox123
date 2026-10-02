@@ -2,6 +2,7 @@ import { mergeLiveChannels } from '../adapters/live/normalizeLive.js';
 import { createLiveRegistry } from '../adapters/live/liveRegistry.js';
 import { cacheStorage, CacheNamespace, createCacheKey } from '../storage/cache.js';
 import { errorService } from './errorService.js';
+import { requestManager } from './requestManager.js';
 
 export const liveRegistry = createLiveRegistry();
 
@@ -107,7 +108,7 @@ export const liveService = {
     if (cached.hit && !cached.stale) return cached.value?.streams ?? [];
 
     const adapters = liveRegistry.list().filter((adapter) => channelRef?.sourceRefs?.some((ref) => ref.sourceId === adapter.sourceId));
-    const results = await Promise.allSettled(adapters.map((adapter) => adapter.getStreams(channelRef)));
+    const results = await Promise.allSettled(adapters.map((adapter) => requestManager.run(`live:streams:${adapter.sourceId}:${channelRef?.channelId ?? ''}`, (signal) => adapter.getStreams(channelRef, { signal }))));
     const streams = results.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
     if (streams.length) {
       cacheStorage.set(CacheNamespace.LIVE_CHANNEL, cacheKey, { streams });
@@ -127,7 +128,7 @@ export const liveService = {
     const adapters = liveRegistry.list().filter((adapter) =>
       channelRef?.sourceRefs?.some((ref) => ref.sourceId === adapter.sourceId),
     );
-    const results = await Promise.allSettled(adapters.map((adapter) => adapter.getEPG(channelRef, normalizedRange)));
+    const results = await Promise.allSettled(adapters.map((adapter) => requestManager.run(`live:epg:${adapter.sourceId}:${channelRef?.channelId ?? ''}:${normalizedRange.startAt ?? ''}:${normalizedRange.endAt ?? ''}`, (signal) => adapter.getEPG(channelRef, normalizedRange, { signal }))));
     const epg = results.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
     if (epg.length) {
       cacheStorage.set(CacheNamespace.EPG, key, epg);
