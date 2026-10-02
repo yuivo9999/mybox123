@@ -81,6 +81,7 @@ export const playbackService = {
       pause: () => core.pause(),
       play: () => core.play(),
       stop: () => core.stop(),
+      handleAppState: state => core.handleAppState(state),
       leave: () => {
         if (policy.onPageLeave === 'release') core.release();
         else core.stop();
