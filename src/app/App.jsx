@@ -15,6 +15,7 @@ import { webViewRuntime } from '../runtime/webViewRuntime.js';
 import { MainPage } from '../pages/MainPage.jsx';
 import { PlaybackPage } from '../pages/PlaybackPage.jsx';
 import { LoadingState, ErrorState } from '../components/StateViews.jsx';
+import { ErrorCode } from '../models/errors.js';
 
 export function App(){
  const session=useSessionState(); const persistent=usePersistentState(); const {tab,route,selected}=session;
@@ -77,7 +78,11 @@ export function App(){
  const movieActive=['detail','movie-play','search'].includes(route)||tab==='home'||tab==='movies';
  if(!persistent.settings?.initialized) return <FirstLaunch onLater={()=>persistent.saveSettings({...persistent.settings,initialized:true,initializedAt:Date.now()})} onSources={()=>{persistent.saveSettings({...persistent.settings,initialized:true,initializedAt:Date.now()});nav('sources')}}/>;
  if(contentState.status==='idle'||contentState.status==='loading') return <AppFrame><main className="page"><LoadingState text="正在同步内容源…"/></main></AppFrame>;
- if(contentState.status==='error') return <AppFrame><main className="page"><ErrorState text="内容源加载失败，请检查源配置或网络。" retry={reloadSources}/></main></AppFrame>;
+ if(contentState.status==='error') {
+  const errorCode=contentState.error?.code;
+  const errorText=errorCode===ErrorCode.NETWORK?'网络连接失败':'当前内容源无法正常使用';
+  return <AppFrame><main className="page"><ErrorState text={errorText} retry={reloadSources} secondaryAction={()=>nav('sources')} secondaryActionText="切换源"/></main></AppFrame>;
+}
  return <div className="app-shell"><div className="screen">
   {movieActive?<MovieFeature route={route} tab={tab} selected={selected} movies={contentState.movies} channels={contentState.channels} history={persistent.history} favorites={persistent.favorites} onMovie={openMovie} onPlay={playMovie} onTab={nav} onBack={()=>sessionStateStore.patch({route:route==='movie-play'?'detail':null,selected:route==='movie-play'?selected:null})} onLive={playLive} recordSearch={persistent.recordSearch} toggleFavorite={persistent.toggleFavorite}/>
    :route==='live-channel'?<LiveChannelPanel channel={selected} channels={contentState.channels} favorites={persistent.favorites} onBack={()=>sessionStateStore.patch({route:null,selected:null,tab:'live'})} onPlay={playLive} onChannel={openLiveChannel} toggleFavorite={persistent.toggleFavorite}/>
