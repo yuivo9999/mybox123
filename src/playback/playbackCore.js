@@ -1,12 +1,22 @@
 import { PlaybackFailureCode } from '../models/playback.js';
+import { parserService } from '../parsers/parserService.js';
 
-/**
- * Stage-13 boundary only: owns a PlaybackTask, not parser/player implementation.
- * Stage 14/15 can plug Parser and PlayerAdapter into this boundary without changing pages.
- */
 export function createPlaybackCore(task, hooks = {}) {
   let active = false;
   const unsubscribe = task.subscribe((event) => hooks.onEvent?.(event));
+
+  const resolve = async (candidate = task.currentCandidate, options = {}) => {
+    if (!candidate) return null;
+    try {
+      const resolved = await parserService.resolve(candidate, options);
+      hooks.onResolvedInput?.(resolved);
+      return resolved;
+    } catch (error) {
+      const code = error?.message || PlaybackFailureCode.PARSER;
+      hooks.onParserError?.({ candidate, error, code });
+      return null;
+    }
+  };
 
   return {
     get request() { return task.request; },
@@ -15,6 +25,7 @@ export function createPlaybackCore(task, hooks = {}) {
       active = true;
       return task.start();
     },
+    resolve,
     markPlaying() {
       return task.markPlaying();
     },
