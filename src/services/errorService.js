@@ -2,6 +2,14 @@ import { ErrorCode, errorForUser, serializeError, toAppError } from '../models/e
 
 const listeners = new Set();
 
+const SOURCE_ERROR_CODES = new Set([
+  ErrorCode.SOURCE,
+  ErrorCode.SOURCE_EMPTY,
+  ErrorCode.SOURCE_RESPONSE,
+  ErrorCode.PARSE,
+  ErrorCode.NORMALIZE,
+]);
+
 export const errorService = {
   normalize(error, options = {}) {
     return toAppError(error, options);
@@ -29,9 +37,22 @@ export const errorService = {
 
   classifySource(error, context = {}) {
     const normalized = toAppError(error, { context, scope: context.scope ?? 'source' });
+
     if (normalized.code === ErrorCode.NETWORK) {
-      return toAppError(error, { code: ErrorCode.NETWORK, context, retryable: true, scope: context.scope ?? 'network' });
+      return toAppError(error, {
+        code: ErrorCode.NETWORK,
+        context,
+        retryable: true,
+        scope: context.scope ?? 'network',
+      });
     }
-    return toAppError(error, { code: ErrorCode.SOURCE, context, scope: context.scope ?? 'source' });
+
+    if (SOURCE_ERROR_CODES.has(normalized.code)) return normalized;
+
+    return toAppError(error, {
+      code: ErrorCode.SOURCE,
+      context,
+      scope: context.scope ?? 'source',
+    });
   },
 };
