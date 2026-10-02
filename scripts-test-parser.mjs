@@ -27,4 +27,9 @@ await assert.rejects(
   (error) => error.message === ParserErrorCode.INPUT_INVALID,
 );
 
+await assert.rejects(
+  () => parserService.resolve({ mediaUrl: 'https://example.com/expired.m3u8', expiresAt: Date.now() - 1 }),
+  (error) => error.message === ParserErrorCode.SESSION_EXPIRED,
+);
+
 console.log('Parser core tests passed');
