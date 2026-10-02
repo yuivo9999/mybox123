@@ -108,6 +108,7 @@ function App() {
             onMovie={openMovie}
             onLive={playLive}
             onLiveChannel={openLiveChannel}
+            toggleFavorite={persistent.toggleFavorite}
             onClearData={persistent.clearUserData}
           />
         )}
@@ -129,6 +130,7 @@ function Main({
   onMovie,
   onLive,
   onLiveChannel,
+  toggleFavorite,
   onClearData,
 }) {
   if (tab === 'live') {
@@ -139,10 +141,7 @@ function Main({
         onChannel={onLiveChannel}
         onPlay={onLive}
         onTab={onTab}
-        toggleFavorite={(targetType, targetId) => {
-          // LiveFeature writes only through the persistent data boundary.
-          window.dispatchEvent(new CustomEvent('tvbox:favorite', { detail: { targetType, targetId } }));
-        }}
+        toggleFavorite={toggleFavorite}
       />
     );
   }
