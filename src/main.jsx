@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Home, Film, Radio, Heart, User, Search, ChevronLeft, Play, Clock3, Settings, Database, Server, Info, X } from 'lucide-react';
+import { Home, Film, Radio, Heart, User, Search, ChevronLeft, Play, Clock3, Settings, Database, Server, Info } from 'lucide-react';
 import './styles/app.css';
 import { movies as normalizedMovies, channels as normalizedChannels } from './data/demoData';
 import { contentService } from './services/contentService';
@@ -11,6 +11,7 @@ import { usePersistentState } from './state/usePersistentState.js';
 import { useSessionState } from './state/useSessionState.js';
 import { sessionStateStore } from './state/sessionStateStore.js';
 import { MovieFeature } from './features/movie/MovieFeature.jsx';
+import { LiveFeature, LiveChannelPanel } from './features/live/LiveFeature.jsx';
 
 const movies = contentService.getMovies(normalizedMovies);
 const channels = liveService.getChannels(normalizedChannels);
@@ -38,14 +39,26 @@ function App() {
     sessionStateStore.patch({ tab: key, route: null, selected: null });
   };
 
-  const openLive = (channel) => {
-    sessionStateStore.patch({
-      selected: playbackService.createLiveRequest({
-        channel,
-        metadata: { title: channel.name, category: channel.category },
-      }),
-      route: 'live-play',
+  const openLiveChannel = (channel) => {
+    sessionStateStore.patch({ selected: channel, route: 'live-channel', tab: 'live' });
+  };
+
+  const playLive = (channel, streamId = null) => {
+    const request = playbackService.createLiveRequest({
+      channel,
+      metadata: { title: channel.name, category: channel.category },
     });
+    if (streamId) {
+      const index = request.candidates.findIndex((candidate) => candidate.streamId === streamId);
+      if (index >= 0) {
+        request.candidates = [
+          request.candidates[index],
+          ...request.candidates.filter((_, itemIndex) => itemIndex !== index),
+        ];
+      }
+    }
+    sessionStateStore.patch({ selected: request, route: 'live-play', tab: 'live' });
+    persistent.recordLivePlay(channel, streamId);
   };
 
   const movieFeatureActive = route === 'detail' || route === 'movie-play' || tab === 'home' || tab === 'movies';
@@ -66,12 +79,22 @@ function App() {
             onPlay={playMovie}
             onTab={nav}
             onBack={() => sessionStateStore.patch({ route: route === 'movie-play' ? 'detail' : null })}
-            onLive={openLive}
+            onLive={playLive}
             recordSearch={persistent.recordSearch}
             toggleFavorite={persistent.toggleFavorite}
           />
+        ) : route === 'live-channel' ? (
+          <LiveChannelPanel
+            channel={selected}
+            channels={channels}
+            favorites={persistent.favorites}
+            onBack={() => sessionStateStore.patch({ route: null, selected: null, tab: 'live' })}
+            onPlay={playLive}
+            onChannel={openLiveChannel}
+            toggleFavorite={persistent.toggleFavorite}
+          />
         ) : route === 'live-play' ? (
-          <LivePlayer request={selected} onBack={() => sessionStateStore.patch({ route: null })} />
+          <LivePlayer request={selected} onBack={() => sessionStateStore.patch({ route: selected?.channelId ? 'live-channel' : null })} />
         ) : (
           <Main
             tab={tab}
@@ -79,11 +102,12 @@ function App() {
             channels={channels}
             favorites={persistent.favorites}
             history={persistent.history}
-            toggleFav={persistent.toggleFavorite}
             sources={persistent.sources}
             searches={persistent.searches}
             onTab={nav}
             onMovie={openMovie}
+            onLive={playLive}
+            onLiveChannel={openLiveChannel}
             onClearData={persistent.clearUserData}
           />
         )}
@@ -93,47 +117,89 @@ function App() {
   );
 }
 
-function Main({ tab, movies, channels, favorites, history, toggleFav, sources, searches, onTab, onMovie, onClearData }) {
+function Main({
+  tab,
+  movies,
+  channels,
+  favorites,
+  history,
+  sources,
+  searches,
+  onTab,
+  onMovie,
+  onLive,
+  onLiveChannel,
+  onClearData,
+}) {
   if (tab === 'live') {
     return (
-      <Page>
-        <Header title="直播" />
-        <div className="chips"><button className="active">全部</button></div>
-        <div className="channel-list">
-          {channels.map((channel) => (
-            <div className="channel" key={channel.channelId}>
-              <div className="channel-logo"><Radio /></div>
-              <div><b>{channel.name}</b><small>{channel.category} · {channel.streams.length} 条线路</small></div>
-              <button className="secondary" onClick={() => sessionStateStore.patch({
-                selected: playbackService.createLiveRequest({
-                  channel,
-                  metadata: { title: channel.name, category: channel.category },
-                }),
-                route: 'live-play',
-              })}><Play size={17} /></button>
-            </div>
-          ))}
-        </div>
-        <InfoCard title="Live 数据边界" text="频道、线路、EPG 与影视内容保持独立；源刷新不直接改写用户数据。" />
-      </Page>
+      <LiveFeature
+        channels={channels}
+        favorites={favorites}
+        onChannel={onLiveChannel}
+        onPlay={onLive}
+        onTab={onTab}
+        toggleFavorite={(targetType, targetId) => {
+          // LiveFeature writes only through the persistent data boundary.
+          window.dispatchEvent(new CustomEvent('tvbox:favorite', { detail: { targetType, targetId } }));
+        }}
+      />
     );
   }
 
   if (tab === 'favorites') {
-    const favMovies = movies.filter((movie) => favorites.some((item) => item.targetType === 'content' && item.targetId === movie.contentId));
+    const favMovies = movies.filter((movie) =>
+      favorites.some((item) => item.targetType === 'content' && item.targetId === movie.contentId),
+    );
+    const favChannels = channels.filter((channel) =>
+      favorites.some((item) => item.targetType === 'channel' && item.targetId === channel.channelId),
+    );
     return (
       <Page>
         <Header title="收藏" />
-        <div className="seg"><button className="active">影视</button><button>Live</button></div>
+        <div className="seg"><button className="active">影视</button></div>
         <MovieGrid movies={favMovies} onMovie={onMovie} />
-        {!favMovies.length && <Empty text="还没有收藏内容" />}
+        <SectionTitle title="Live 频道" />
+        <div className="channel-list">
+          {favChannels.map((channel) => (
+            <button className="menu" key={channel.channelId} onClick={() => onLiveChannel(channel)}>
+              <Radio size={18} />
+              <span>{channel.name}<small>{channel.category} · {channel.streams.length} 条线路</small></span>
+              <ChevronLeft className="flip" size={17} />
+            </button>
+          ))}
+        </div>
+        {!favMovies.length && !favChannels.length && <Empty text="还没有收藏内容" />}
       </Page>
     );
   }
 
   if (tab === 'history') {
-    const historyMovies = history.map((item) => movies.find((movie) => movie.contentId === item.targetId)).filter(Boolean);
-    return <Page><Header title="播放历史" /><MovieGrid movies={historyMovies} onMovie={onMovie} />{!historyMovies.length && <Empty text="还没有播放历史" />}</Page>;
+    const historyMovies = history
+      .filter((item) => item.targetType === 'content')
+      .map((item) => movies.find((movie) => movie.contentId === item.targetId))
+      .filter(Boolean);
+    const historyChannels = history
+      .filter((item) => item.targetType === 'channel')
+      .map((item) => channels.find((channel) => channel.channelId === item.targetId))
+      .filter(Boolean);
+    return (
+      <Page>
+        <Header title="播放历史" />
+        <MovieGrid movies={historyMovies} onMovie={onMovie} />
+        {!!historyChannels.length && <SectionTitle title="Live" />}
+        <div className="channel-list">
+          {historyChannels.map((channel) => (
+            <button className="menu" key={channel.channelId} onClick={() => onLiveChannel(channel)}>
+              <Radio size={18} />
+              <span>{channel.name}<small>{channel.category}</small></span>
+              <ChevronLeft className="flip" size={17} />
+            </button>
+          ))}
+        </div>
+        {!historyMovies.length && !historyChannels.length && <Empty text="还没有播放历史" />}
+      </Page>
+    );
   }
 
   if (tab === 'search-history') {
@@ -171,13 +237,13 @@ function Main({ tab, movies, channels, favorites, history, toggleFav, sources, s
   return (
     <Page>
       <Header title="我的" />
-      <div className="profile"><div className="avatar">T</div><div><b>TVBox 用户</b><span>本地数据独立存储 · 影视业务迁移版</span></div></div>
+      <div className="profile"><div className="avatar">T</div><div><b>TVBox 用户</b><span>本地数据独立存储 · Live 业务迁移版</span></div></div>
       <Menu icon={Clock3} title="播放历史" onClick={() => onTab('history')} badge={history.length} />
       <Menu icon={Search} title="搜索历史" onClick={() => onTab('search-history')} badge={searches.length} />
       <Menu icon={Server} title="源管理" onClick={() => onTab('sources')} badge={sources.length} />
       <Menu icon={Settings} title="设置" onClick={() => onTab('settings')} />
       <Menu icon={Database} title="数据管理" onClick={() => onTab('settings')} />
-      <Menu icon={Info} title="关于" onClick={() => alert('TVBox React v0.3.0\n影视页面业务迁移版')} />
+      <Menu icon={Info} title="关于" onClick={() => alert('TVBox React v0.3.0\nLive 页面业务迁移版')} />
     </Page>
   );
 }
@@ -191,6 +257,7 @@ function PlaybackView({ request, kind, onBack }) {
   const [error, setError] = useState('');
   const videoRef = React.useRef(null);
   const task = useMemo(() => playbackService.createTask(request), [request]);
+
   const core = useMemo(() => createPlaybackCore(task, {
     onEvent: (event) => {
       if (event.event === 'error') setError(event.error || '播放候选失败');
@@ -243,7 +310,7 @@ function PlaybackView({ request, kind, onBack }) {
 
   return (
     <div className="player-page">
-      <button className="back player-back" onClick={onBack}><ChevronLeft />退出直播</button>
+      <button className="back player-back" onClick={onBack}><ChevronLeft />退出{kind === 'live' ? '直播' : '播放'}</button>
       <div className="video-wrap">
         <video ref={videoRef} controls playsInline poster={request?.metadata?.poster} />
         {!resolvedInput && candidate && status !== 'error' && <div className="video-overlay">正在解析播放地址…</div>}
@@ -260,9 +327,13 @@ function PlaybackView({ request, kind, onBack }) {
   );
 }
 
-function LivePlayer({ request, onBack }) { return <PlaybackView request={request} kind="live" onBack={onBack} />; }
+function LivePlayer({ request, onBack }) {
+  return <PlaybackView request={request} kind="live" onBack={onBack} />;
+}
+
 const Page = ({ children }) => <main className="page">{children}</main>;
 const Header = ({ title }) => <header><div><span className="eyebrow">TVBOX REACT</span><h2>{title}</h2></div></header>;
+const SectionTitle = ({ title }) => <div className="section-title"><h3>{title}</h3></div>;
 const InfoCard = ({ title, text }) => <div className="info-card"><Info size={18} /><div><b>{title}</b><span>{text}</span></div></div>;
 const Empty = ({ text }) => <div className="empty"><Film size={22} /><span>{text}</span></div>;
 const MovieGrid = ({ movies: items, onMovie }) => <div className="movie-grid">{items.map((movie) => <article className="movie-card" key={movie.contentId} onClick={() => onMovie(movie)}><img src={movie.poster} /><div><b>{movie.title}</b><span>{movie.year} · {movie.category}</span></div></article>)}</div>;
