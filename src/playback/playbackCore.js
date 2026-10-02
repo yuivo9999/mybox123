@@ -1,199 +1,139 @@
 import { PlaybackFailureCode, PlaybackKind } from '../models/playback.js';
 import { parserService } from '../parsers/parserService.js';
 import { createHtml5PlayerAdapter } from '../player/html5PlayerAdapter.js';
+import { createNativePlayerAdapter } from '../player/nativePlayerAdapter.js';
 import { PlayerState } from '../player/playerInterface.js';
 import { createPlaybackEventBus } from './playbackEventBus.js';
 import { createPlaybackStateMachine } from './playbackStateMachine.js';
 import { createPlaybackNetworkPolicy } from './playbackNetworkPolicy.js';
 import { classifyPlaybackError } from './playbackErrorPolicy.js';
 import { playbackResourceManager } from './playbackResourceManager.js';
+import { playbackTaskRegistry } from './playbackTaskRegistry.js';
+import { playbackSessionManager } from './playbackSessionManager.js';
 import { ErrorCode } from '../models/errors.js';
 import { errorService } from '../services/errorService.js';
 
-export function createPlaybackCore(task, hooks = {}) {
-  let active = false;
-  let player = null;
-  let playerElement = null;
-  let resourceRelease = null;
-  const eventBus = createPlaybackEventBus();
-  const stateMachine = createPlaybackStateMachine(task.request.kind ?? PlaybackKind.VOD);
-  const networkPolicy = createPlaybackNetworkPolicy(hooks.networkPolicy);
-  const unsubscribe = task.subscribe((event) => {
-    eventBus.emit(event);
-    hooks.onEvent?.(event);
-  });
+function nativeAvailable() {
+  if (typeof window === 'undefined') return false;
+  const bridge=[window.TVBoxAndroidBridge,window.Android,window.tvboxBridge].find(x=>x&&typeof x==='object');
+  return Boolean(bridge && typeof bridge.loadMedia==='function');
+}
 
-  const transition = (next) => {
-    try {
-      stateMachine.transition(next);
-    } catch {
-      stateMachine.reset();
-      if (next !== PlayerState.IDLE) stateMachine.transition(next);
-    }
-    hooks.onStateChange?.(stateMachine.state);
-    return stateMachine.state;
-  };
+export function createPlaybackCore(task,hooks={}) {
+ let player=null,playerElement=null,resourceRelease=null,sessionId=null,released=false;
+ const eventBus=createPlaybackEventBus();
+ const stateMachine=createPlaybackStateMachine(task.request.kind??PlaybackKind.VOD);
+ const networkPolicy=createPlaybackNetworkPolicy(hooks.networkPolicy);
+ const unsubscribe=task.subscribe(e=>{eventBus.emit(e);hooks.onEvent?.(e);});
 
-  const handlePlayerEvent = (event) => {
-    if (event.event === 'loading') transition(PlayerState.LOADING);
-    if (event.event === 'prepared') transition(PlayerState.PREPARING);
-    if (event.event === 'playing') transition(PlayerState.PLAYING);
-    if (event.event === 'paused') transition(PlayerState.PAUSED);
-    if (event.event === 'buffering') transition(PlayerState.BUFFERING);
-    if (event.event === 'completed') {
-      if (task.request.kind === PlaybackKind.VOD) transition(PlayerState.COMPLETED);
-    }
-    if (event.event === 'stopped') transition(PlayerState.STOPPED);
-    if (event.event === 'released') transition(PlayerState.RELEASED);
-    if (event.event === 'progress') {
-      eventBus.emit({
-        event: 'progress',
-        requestId: task.request.requestId,
-        taskId: task.request.taskId,
-        currentTime: event.currentTime,
-        duration: event.duration,
-      });
-    }
-    if (event.event === 'error') {
-      const code = classifyPlaybackError(event.nativeError, { code: event.nativeError?.message });
-      const normalized = errorService.normalize(event.nativeError ?? new Error('MEDIA_LOAD_ERROR'), {
-        code: code === PlaybackFailureCode.NETWORK ? ErrorCode.NETWORK : ErrorCode.PLAYBACK,
-        context: { scope: 'playback', taskId: task.request.taskId, requestId: task.request.requestId, candidateId: task.currentCandidateId },
-        retryable: code === PlaybackFailureCode.NETWORK,
-      });
-      transition(PlayerState.ERROR);
-      const next = failAndResolve(normalized, code);
-      if (!next) hooks.onExhausted?.(task);
-    }
-    if (event.event === 'requestContextIgnored') hooks.onPlayerWarning?.(event);
-  };
+ const transition=(next)=>{try{stateMachine.transition(next);}catch{stateMachine.reset();if(next!==PlayerState.IDLE)try{stateMachine.transition(next);}catch{}}hooks.onStateChange?.(stateMachine.state);return stateMachine.state;};
+ const emit=(event,data={})=>eventBus.emit({event,requestId:task.request.requestId,taskId:task.request.taskId,...data});
 
-  const attachPlayer = (element) => {
-    if (player) player.release();
-    playerElement = element;
-    if (!element) return null;
-    player = createHtml5PlayerAdapter(element, { onEvent: handlePlayerEvent });
-    return player;
-  };
+ const handlePlayerEvent=(event)=>{
+  if(event.event==='loading')transition(PlayerState.LOADING);
+  if(event.event==='prepared')transition(PlayerState.PREPARING);
+  if(event.event==='playing'){transition(PlayerState.PLAYING);networkPolicy.resetRetry();}
+  if(event.event==='paused')transition(PlayerState.PAUSED);
+  if(event.event==='bufferingStart'){transition(PlayerState.BUFFERING);emit('bufferingStart');}
+  if(event.event==='bufferingEnd'){if(task.request.kind===PlaybackKind.LIVE)transition(PlayerState.PLAYING);else if(stateMachine.state===PlayerState.BUFFERING)transition(PlayerState.PLAYING);emit('bufferingEnd');}
+  if(event.event==='buffering')transition(PlayerState.BUFFERING);
+  if(event.event==='qualityChanged')emit('qualityChanged',event);
+  if(event.event==='episodeChanged')emit('episodeChanged',event);
+  if(event.event==='reconnecting')transition(PlayerState.RECONNECTING);
+  if(event.event==='completed'&&task.request.kind===PlaybackKind.VOD)transition(PlayerState.COMPLETED);
+  if(event.event==='stopped')transition(PlayerState.STOPPED);
+  if(event.event==='released')transition(PlayerState.RELEASED);
+  if(event.event==='progress'&&task.request.kind===PlaybackKind.VOD)emit('progress',{currentTime:event.currentTime,duration:event.duration});
+  if(event.event==='sourceChanged')emit('sourceChanged',{candidate:event.candidate});
+  if(event.event==='error'){
+   const code=classifyPlaybackError(event.nativeError,{code:event.nativeError?.message});
+   const normalized=errorService.normalize(event.nativeError??new Error('MEDIA_LOAD_ERROR'),{code:code===PlaybackFailureCode.NETWORK?ErrorCode.NETWORK:ErrorCode.PLAYBACK,context:{scope:'playback',taskId:task.request.taskId,requestId:task.request.requestId,candidateId:task.currentCandidateId},retryable:code===PlaybackFailureCode.NETWORK});
+   void recover(normalized,code);
+  }
+  if(event.event==='requestContextIgnored')hooks.onPlayerWarning?.(event);
+ };
 
-  const resolve = async (candidate = task.currentCandidate, options = {}) => {
-    if (!candidate) return null;
-    try {
-      const resolved = await parserService.resolve(candidate, options);
-      hooks.onResolvedInput?.(resolved);
-      return resolved;
-    } catch (error) {
-      const code = classifyPlaybackError(error, { code: error?.message, fromParser: true });
-      const normalized = errorService.normalize(error, {
-        code: ErrorCode.PARSE,
-        context: { scope: 'parser', taskId: task.request.taskId, requestId: task.request.requestId, candidateId: candidate.candidateId },
-      });
-      hooks.onParserError?.({ candidate, error: normalized, code });
-      eventBus.emit({ event: 'error', requestId: task.request.requestId, taskId: task.request.taskId, candidateId: candidate.candidateId, code, error: normalized.message });
-      return null;
-    }
-  };
+ const attachPlayer=(element)=>{
+  player?.release?.(); playerElement=element;
+  if(nativeAvailable()) player=createNativePlayerAdapter({onEvent:handlePlayerEvent});
+  else if(element) player=createHtml5PlayerAdapter(element,{onEvent:handlePlayerEvent});
+  else return null;
+  return player;
+ };
 
-  const playResolved = async (input) => {
-    if (!player) throw new Error('PLAYER_ADAPTER_NOT_ATTACHED');
-    player.load(input);
-    player.prepare();
-    const startPosition = Number(task.request.metadata?.startPositionSeconds ?? 0);
-    if (task.request.kind === PlaybackKind.VOD && startPosition > 0) player.seek(startPosition);
-    if (input.playerHint?.autoplay) await player.play();
-    return input;
-  };
+ const resolve=async(candidate=task.currentCandidate,options={})=>{
+  if(!candidate)return null;
+  if(sessionId)playbackSessionManager.clear(sessionId);
+  sessionId=playbackSessionManager.create(candidate);
+  try{
+   const resolved=await parserService.resolve({...candidate,session:{sessionId}}, {...options,sessionManager:playbackSessionManager});
+   hooks.onResolvedInput?.(resolved);
+   return resolved;
+  }catch(error){
+   const code=classifyPlaybackError(error,{code:error?.message,fromParser:true});
+   const normalized=errorService.normalize(error,{code:error?.message?.includes('SessionExpired')?ErrorCode.PLAYBACK:ErrorCode.PARSE,context:{scope:'parser',taskId:task.request.taskId,requestId:task.request.requestId,candidateId:candidate.candidateId}});
+   hooks.onParserError?.({candidate,error:normalized,code});
+   emit('error',{candidateId:candidate.candidateId,code,error:normalized.message});
+   return null;
+  }
+ };
 
-  const resolveAndLoad = async (candidate = task.currentCandidate, options = {}) => {
-    const input = await resolve(candidate, options);
-    if (!input) return null;
-    await playResolved(input);
-    return input;
-  };
+ const playResolved=async(input)=>{
+  if(!player)throw new Error('PLAYER_ADAPTER_NOT_ATTACHED');
+  player.load(input);player.prepare();
+  const startPosition=Number(task.request.metadata?.startPositionSeconds??0);
+  if(task.request.kind===PlaybackKind.VOD&&startPosition>0)player.seek(startPosition);
+  if(input.playerHint?.autoplay||task.request.kind===PlaybackKind.LIVE)await player.play();
+  return input;
+ };
 
-  const failAndResolve = (error, code = PlaybackFailureCode.UNKNOWN) => {
-    const classified = classifyPlaybackError(error, { code });
-    const next = task.fail(error, classified);
-    hooks.onCandidateChange?.(next);
-    networkPolicy.reset();
-    if (!next) return null;
-    void resolveAndLoad(next).catch((playerError) => {
-      hooks.onPlayerError?.({ error: errorService.normalize(playerError, { code: ErrorCode.PLAYBACK, context: { scope: 'player', taskId: task.request.taskId, requestId: task.request.requestId, candidateId: next.candidateId } }), candidate: next });
-    });
-    return next;
-  };
+ const resolveAndLoad=async(candidate=task.currentCandidate,options={})=>{const input=await resolve(candidate,options);if(!input){return null;}await playResolved(input);networkPolicy.resetRetry();return input;};
 
-  return {
-    get request() { return task.request; },
-    get task() { return task; },
-    get state() { return stateMachine.state; },
-    get capabilities() { return player?.capabilities ?? {}; },
-    get currentPlayer() { return player; },
-    subscribe(listener) { return eventBus.subscribe(listener); },
-    attachPlayer,
-    start() {
-      if (!player && playerElement) attachPlayer(playerElement);
-      active = true;
-      resourceRelease?.();
-      resourceRelease = (hooks.resourceManager ?? playbackResourceManager).acquire(task.request.taskId, (previousTaskId) => hooks.onResourceReplaced?.(previousTaskId));
-      const initial = task.start();
-      if (initial) transition(PlayerState.LOADING);
-      return initial;
-    },
-    async resolveAndLoad(candidate = task.currentCandidate, options = {}) {
-      return resolveAndLoad(candidate, options);
-    },
-    resolve,
-    async play() {
-      if (!player) throw new Error('PLAYER_ADAPTER_NOT_ATTACHED');
-      await player.play();
-    },
-    pause() {
-      return player?.pause();
-    },
-    seek(seconds) {
-      return player?.seek(seconds);
-    },
-    setVolume(value) {
-      return player?.setVolume(value);
-    },
-    markPlaying() {
-      return task.markPlaying();
-    },
-    retry(options) {
-      if (!networkPolicy.shouldRetry({ code: options?.code ?? 'network' })) return null;
-      const candidate = task.retry(options);
-      if (candidate) void resolveAndLoad(candidate).catch((error) => hooks.onPlayerError?.({ error, candidate }));
-      return candidate;
-    },
-    fail(error, code = PlaybackFailureCode.UNKNOWN) {
-      return failAndResolve(error, code);
-    },
-    switchCandidate(candidateId) {
-      const next = task.switchCandidate(candidateId);
-      hooks.onCandidateChange?.(next);
-      if (next) {
-        transition(PlayerState.LOADING);
-        void resolveAndLoad(next).catch((error) => hooks.onPlayerError?.({ error, candidate: next }));
-      }
-      return next;
-    },
-    stop() {
-      active = false;
-      player?.stop();
-      task.stop();
-      resourceRelease?.();
-      resourceRelease = null;
-    },
-    release() {
-      active = false;
-      player?.release();
-      player = null;
-      resourceRelease?.();
-      resourceRelease = null;
-      unsubscribe();
-      eventBus.clear();
-      task.release();
-    },
-  };
+ const failAndResolve=(error,code=PlaybackFailureCode.UNKNOWN)=>{
+  const classified=classifyPlaybackError(error,{code});const next=task.fail(error,classified);hooks.onCandidateChange?.(next);networkPolicy.resetRetry();
+  if(!next){hooks.onExhausted?.(task);return null;}
+  transition(PlayerState.LOADING);void resolveAndLoad(next).catch(e=>hooks.onPlayerError?.({error:e,candidate:next}));return next;
+ };
+
+ async function recover(error,code){
+  if(task.request.kind===PlaybackKind.LIVE && networkPolicy.shouldReconnect({code})){
+   transition(PlayerState.RECONNECTING);emit('reconnecting',{candidate:task.currentCandidate,reconnectCount:networkPolicy.reconnectCount});
+   await new Promise(r=>setTimeout(r,networkPolicy.getReconnectDelay()));
+   try{await resolveAndLoad(task.currentCandidate);return true;}catch{}
+  }
+  if(networkPolicy.shouldRetry({code})){
+   const candidate=task.retry({maxRetries:networkPolicy.retryCount+1});
+   if(candidate){emit('retry',{candidate,retryCount:networkPolicy.retryCount});try{await resolveAndLoad(candidate);return true;}catch{}}
+  }
+  failAndResolve(error,code);return false;
+ }
+
+ return {
+  get request(){return task.request;},get task(){return task;},get state(){return stateMachine.state;},get capabilities(){return player?.capabilities??{};},get currentPlayer(){return player;},
+  subscribe(listener){return eventBus.subscribe(listener);},attachPlayer,
+  start(){
+   if(released)throw new Error('PLAYBACK_CORE_RELEASED');
+   active=true;
+   playbackTaskRegistry.register({request:task.request,stop:()=>{try{player?.stop?.();}finally{task.stop?.();}},release:()=>{try{player?.release?.();}finally{task.release?.();}}});
+   resourceRelease?.();
+   resourceRelease=playbackResourceManager.acquire(task.request.taskId,(previous)=>hooks.onResourceReplaced?.(previous));
+   const initial=task.start();if(initial)transition(PlayerState.LOADING);return initial;
+  },
+  async resolveAndLoad(candidate=task.currentCandidate,options={}){return resolveAndLoad(candidate,options);},
+  resolve,
+  async play(){if(!player)throw new Error('PLAYER_ADAPTER_NOT_ATTACHED');return player.play();},
+  pause(){return player?.pause();},seek(s){return player?.seek(s);},setVolume(v){return player?.setVolume(v);},
+  getAudioTracks(){return player?.getAudioTracks?.()??[];},getSubtitleTracks(){return player?.getSubtitleTracks?.()??[];},selectAudioTrack(id){return player?.selectAudioTrack?.(id)??false;},selectSubtitleTrack(id){return player?.selectSubtitleTrack?.(id)??false;},getQualities(){return player?.getQualities?.()??[];},selectQuality(id){return player?.selectQuality?.(id)??false;},
+  markPlaying(){return task.markPlaying();},
+  retry(options={}){if(!networkPolicy.shouldRetry({code:options.code??'network'}))return null;const candidate=task.retry(options);if(candidate)void resolveAndLoad(candidate);return candidate;},
+  fail(error,code=PlaybackFailureCode.UNKNOWN){return failAndResolve(error,code);},
+  switchCandidate(candidateId){const next=task.switchCandidate(candidateId);hooks.onCandidateChange?.(next);if(next){networkPolicy.reset();transition(PlayerState.LOADING);void resolveAndLoad(next).catch(e=>hooks.onPlayerError?.({error:e,candidate:next}));}return next;},
+  switchEpisode(episodeId){emit('episodeChanged',{episodeId});return episodeId;},
+  async handleAppState(state){
+   if(state==='background'){if(task.request.kind===PlaybackKind.VOD){await player?.pause?.();}else{player?.pause?.();}}
+   if(state==='foreground'&&task.request.kind===PlaybackKind.LIVE&&task.currentCandidate){try{await resolveAndLoad(task.currentCandidate);}catch(e){void recover(e,PlaybackFailureCode.NETWORK);}}
+  },
+  stop(){player?.stop?.();task.stop();resourceRelease?.();resourceRelease=null;playbackTaskRegistry.unregister(task.request.taskId);},
+  release(){if(released)return;released=true;try{player?.release?.();}finally{player=null;resourceRelease?.();resourceRelease=null;playbackSessionManager.clear(sessionId);sessionId=null;unsubscribe();eventBus.clear();task.release();playbackTaskRegistry.unregister(task.request.taskId);}}
+ };
 }
