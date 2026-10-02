@@ -33,6 +33,24 @@ function sortItems(items, sort = 'default') {
     return 0;
   });
 }
+function getContinueWatching({ movies = [], history = [], progress = [], limit = 4 } = {}) {
+  const progressById = new Map(progress.map(item => [item.progressId, item]));
+  return [...history]
+    .filter(item => item.targetType === 'content')
+    .sort((a, b) => Number(b.lastPlayedAt ?? 0) - Number(a.lastPlayedAt ?? 0))
+    .map(item => {
+      const movie = cachedDetail(movies, item.targetId);
+      if (!movie) return null;
+      const progressId = `progress:${item.targetId}:${item.episodeId || 'content'}`;
+      const currentProgress = progressById.get(progressId);
+      const merged = { ...item, ...(currentProgress ?? {}) };
+      if (merged.completed) return null;
+      const episodeIndex = Math.max(0, movie.episodes?.findIndex(episode => episode.episodeId === item.episodeId) ?? 0);
+      return { movie, episodeIndex, history: merged, progress: currentProgress ?? null };
+    })
+    .filter(Boolean)
+    .slice(0, limit);
+}
 export const movieService = {
   list({ movies = [], category = '全部', page = 1, pageSize = 50, filters = {}, sort = 'default' } = {}) {
     const safePage = Math.max(1, Number(page) || 1), safePageSize = Math.max(1, Number(pageSize) || 50);
@@ -66,12 +84,8 @@ export const movieService = {
     if (!movie) return [];
     return movies.filter((item) => item.contentId !== movie.contentId && item.category === movie.category).slice(0, limit);
   },
-  getHome({ movies = [], history = [], limit = 4 } = {}) {
-    const continueWatching = history.map((item) => {
-      const movie = cachedDetail(movies, item.targetId); if (!movie) return null;
-      const episodeIndex = Math.max(0, movie.episodes?.findIndex((episode) => episode.episodeId === item.episodeId) ?? 0);
-      return { movie, episodeIndex, history: item };
-    }).filter(Boolean).slice(0, limit);
+  getHome({ movies = [], history = [], progress = [], limit = 4 } = {}) {
+    const continueWatching = getContinueWatching({ movies, history, progress, limit });
     const categories = [...new Set(movies.map((movie) => movie.category).filter(Boolean))];
     const regions = [...new Set(movies.map((movie) => movie.region).filter(Boolean))];
     const years = [...new Set(movies.map((movie) => movie.year).filter(Boolean))].sort((a,b) => Number(b)-Number(a));
