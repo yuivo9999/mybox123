@@ -18,7 +18,6 @@ const channels = liveService.getChannels(normalizedChannels);
 function App() {
   const session = useSessionState();
   const persistent = usePersistentState();
-  const [query, setQuery] = useState('');
   const { tab, route, selected } = session;
 
   const openMovie = (movie) => sessionStateStore.patch({ selected: movie, route: 'detail' });
@@ -36,7 +35,6 @@ function App() {
   };
 
   const nav = (key) => {
-    setQuery('');
     sessionStateStore.patch({ tab: key, route: null, selected: null });
   };
 
@@ -64,8 +62,6 @@ function App() {
             channels={channels}
             history={persistent.history}
             favorites={persistent.favorites}
-            query={query}
-            setQuery={setQuery}
             onMovie={openMovie}
             onPlay={playMovie}
             onTab={nav}
