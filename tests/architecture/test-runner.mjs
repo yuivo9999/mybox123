@@ -39,6 +39,22 @@ expectNo('src/services/userDataService.js', [/sourceRepository/, /getSourceConfi
 expectNo('src/repositories/userDataRepository.js', [/getSourceConfig/, /saveSourceConfig/]);
 expectNo('src/state/persistentStateStore.js', [/sourceRepository/, /saveSources\(/, /setSourceEnabled/, /setSourceActive/, /removeSource/]);
 expect('src/features/movie/MoviePlaybackPage.jsx', [/playbackService\.createController/, /recordProgress/]);
+expect('src/runtime/nativeHttpBridge.js', [
+  /CapacitorHttp\.request/,
+  /isNativeHttpAvailable/,
+  /ALLOWED_METHODS/,
+  /ALLOWED_RESPONSE_TYPES/,
+  /connectTimeout/,
+  /readTimeout/,
+  /signal/,
+  /UNSUPPORTED_PROTOCOL/,
+  /NETWORK_ERROR/,
+  /TIMEOUT/,
+  /headers/,
+]);
+expect('src/runtime/webViewRuntime.js', [/nativeHttp/, /nativeHttpRequest/]);
+expectNo('src/runtime/nativeHttpBridge.js', [/window\.Android/, /eval\\(/, /Function\\(/]);
+
 
 // Settings completeness: every user-facing setting must be backed by persistent state and a real event path.
 expect('src/models/userData.js', [/defaultSettings/, /normalizeSettings/, /autoplayResume/, /defaultMovieSource/, /defaultLiveSource/, /theme/, /fontSize/, /cardStyle/, /density/]);
