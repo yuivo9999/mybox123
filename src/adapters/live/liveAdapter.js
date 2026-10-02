@@ -8,9 +8,9 @@ export function createLiveAdapter(config, transport = fetch) {
   let snapshot = [];
   let lastError = null;
 
-  const load = async () => {
+  const load = async (options = {}) => {
     try {
-      const response = await transport(config.sourceRef, { headers: config.headers ?? {} });
+      const response = await transport(config.sourceRef, { headers: config.headers ?? {}, signal: options.signal });
       if (!response.ok) throw new Error(`HTTP_${response.status}`);
       const body = await response.text();
       const format = detectFormat(config.format, response.headers.get('content-type'), body);
