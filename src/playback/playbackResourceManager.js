@@ -3,22 +3,24 @@ export function createPlaybackResourceManager() {
   let ownerRelease = null;
 
   return {
-    acquire(taskId, releasePrevious = () => {}) {
+    acquire(taskId, onReplaced = () => {}) {
       if (ownerTaskId && ownerTaskId !== taskId) {
         ownerRelease?.();
-        releasePrevious();
+        onReplaced(ownerTaskId);
       }
       ownerTaskId = taskId;
-      ownerRelease = releasePrevious;
-      return () => {
+      ownerRelease = () => {
         if (ownerTaskId === taskId) {
           ownerTaskId = null;
           ownerRelease = null;
         }
       };
+      return ownerRelease;
     },
     get ownerTaskId() {
       return ownerTaskId;
     },
   };
 }
+
+export const playbackResourceManager = createPlaybackResourceManager();
