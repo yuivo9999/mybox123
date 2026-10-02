@@ -53,4 +53,5 @@ export const persistentStateStore = {
   clearUserData() { userDataService.clearUserData(); return refresh(); },
   clearCache() { return cacheService.clearAll(); },
   saveSettings(settings) { userDataService.saveSettings(settings); return refresh(); },
+  updateSettings(patch) { userDataService.updateSettings(patch); return refresh(); },
 };
