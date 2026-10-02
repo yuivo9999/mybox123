@@ -4,32 +4,28 @@ import { sourceRepository } from '../repositories/sourceRepository.js';
 const listeners = new Set();
 let snapshot = null;
 
-function refresh() {
+function buildSnapshot() {
   const user = userDataService.getSnapshot();
-  snapshot = Object.freeze({
+  return Object.freeze({
     favorites: user.favorites,
     history: user.history,
     progress: user.progress,
     searches: user.searches,
     settings: user.settings,
+    selectedSources: user.selectedSources,
+    migration: user.migration,
     sources: sourceRepository.getAll(),
   });
+}
+
+function refresh() {
+  snapshot = buildSnapshot();
   listeners.forEach((listener) => listener());
   return snapshot;
 }
 
 function getSnapshot() {
-  if (!snapshot) {
-    const user = userDataService.getSnapshot();
-    snapshot = Object.freeze({
-      favorites: user.favorites,
-      history: user.history,
-      progress: user.progress,
-      searches: user.searches,
-      settings: userDataService.getSettings(),
-      sources: sourceRepository.getAll(),
-    });
-  }
+  if (!snapshot) snapshot = buildSnapshot();
   return snapshot;
 }
 
@@ -41,36 +37,14 @@ export const persistentStateStore = {
   },
   getSnapshot,
   reload: refresh,
-  toggleFavorite(targetType, targetId) {
-    userDataService.toggleFavorite(targetType, targetId);
-    return refresh();
-  },
-  recordMoviePlay(movie, episodeIndex = 0) {
-    userDataService.recordMoviePlay(movie, episodeIndex);
-    return refresh();
-  },
-  recordLivePlay(channel, streamId = null) {
-    userDataService.recordLivePlay(channel, streamId);
-    return refresh();
-  },
+  toggleFavorite(targetType, targetId) { userDataService.toggleFavorite(targetType, targetId); return refresh(); },
+  recordMoviePlay(movie, episodeIndex = 0) { userDataService.recordMoviePlay(movie, episodeIndex); return refresh(); },
+  recordLivePlay(channel, streamId = null) { userDataService.recordLivePlay(channel, streamId); return refresh(); },
   recordProgress(contentId, episodeId, positionSeconds, durationSeconds = null, completed = false) {
-    userDataService.recordProgress(contentId, episodeId, positionSeconds, durationSeconds, completed);
-    return refresh();
+    userDataService.recordProgress(contentId, episodeId, positionSeconds, durationSeconds, completed); return refresh();
   },
-  recordSearch(keyword) {
-    userDataService.recordSearch(keyword);
-    return refresh();
-  },
-  clearUserData() {
-    userDataService.clearUserData();
-    return refresh();
-  },
-  saveSources(sources) {
-    sourceRepository.saveAll(sources);
-    return refresh();
-  },
-  saveSettings(settings) {
-    userDataService.saveSettings(settings);
-    return refresh();
-  },
+  recordSearch(keyword) { userDataService.recordSearch(keyword); return refresh(); },
+  clearUserData() { userDataService.clearUserData(); return refresh(); },
+  saveSources(sources) { sourceRepository.saveAll(sources); return refresh(); },
+  saveSettings(settings) { userDataService.saveSettings(settings); return refresh(); },
 };
