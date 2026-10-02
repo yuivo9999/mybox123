@@ -8,14 +8,6 @@ function shouldWriteProgress(previous, next) {
   return next.updatedAt >= previous.updatedAt;
 }
 
-function touchSource(sourceId) {
-  if (!sourceId) return;
-  const sources = userDataRepository.getSourceConfig();
-  if (!sources.length) return;
-  const now = Date.now();
-  userDataRepository.saveSourceConfig(sources.map(source => source.sourceId === sourceId ? { ...source, lastUsedAt: now } : source));
-}
-
 export const userDataService = {
   getSettings() { return userDataRepository.getSettings(); },
   saveSettings(value) { userDataRepository.saveSettings(value); return value; },
@@ -144,7 +136,6 @@ export const userDataService = {
     };
     const history = [historyItem, ...userDataRepository.getHistory().filter(item => item.historyId !== historyItem.historyId)].slice(0, 50);
     userDataRepository.saveHistory(history);
-    touchSource(historyItem.sourceId);
     return history;
   },
   recordLivePlay(channel, streamId = null) {
@@ -164,7 +155,6 @@ export const userDataService = {
     };
     const history = [historyItem, ...userDataRepository.getHistory().filter(item => item.historyId !== historyItem.historyId)].slice(0, 50);
     userDataRepository.saveHistory(history);
-    touchSource(sourceId);
     return history;
   },
   recordProgress(contentId, episodeId, positionSeconds, durationSeconds = null, completed = false) {
