@@ -6,7 +6,7 @@ export function normalizeMovieSourceDefinition(source = {}) {
     sourceId,
     name: String(source.name ?? sourceId).trim() || sourceId,
     type: 'movie',
-    endpoint: String(source.sourceRef || source.url || '').trim(),
+    endpoint: String(source.sourceRef || source.url || source.endpoint || '').trim(),
     enabled: source.enabled !== false,
     priority: Number.isFinite(Number(source.priority)) ? Number(source.priority) : 0,
     capabilities: Array.isArray(source.capabilities) ? [...new Set(source.capabilities.filter(Boolean))] : [],
@@ -17,40 +17,38 @@ export function normalizeMovieSourceDefinition(source = {}) {
 
 export function createMovieRegistry() {
   const adapters = new Map();
-  const definitions = new Map();
 
   return {
     register(adapter) {
       if (!adapter?.sourceId) throw new Error('MOVIE_ADAPTER_SOURCE_ID_REQUIRED');
       adapters.set(adapter.sourceId, adapter);
-      definitions.set(adapter.sourceId, normalizeMovieSourceDefinition({
-        ...adapter.getDefinition?.(),
-        capabilities: adapter.getCapabilities?.(),
-      }));
       return adapter;
     },
     unregister(sourceId) {
       adapters.delete(sourceId);
-      definitions.delete(sourceId);
     },
     get(sourceId) {
       return adapters.get(sourceId) ?? null;
     },
     getDefinition(sourceId) {
-      return definitions.get(sourceId) ?? null;
+      const adapter = adapters.get(sourceId);
+      return adapter ? normalizeMovieSourceDefinition(adapter.getDefinition?.() ?? adapter.definition) : null;
     },
     getCapabilities(sourceId) {
-      return [...(definitions.get(sourceId)?.capabilities ?? [])];
+      return [...(adapters.get(sourceId)?.getCapabilities?.() ?? [])];
     },
     list() {
-      return [...adapters.values()].sort((a, b) => (a.getDefinition?.().priority ?? 0) - (b.getDefinition?.().priority ?? 0));
+      return [...adapters.values()].sort((a, b) =>
+        (a.getDefinition?.().priority ?? 0) - (b.getDefinition?.().priority ?? 0)
+      );
     },
     listDefinitions() {
-      return [...definitions.values()];
+      return [...adapters.values()].map(adapter =>
+        normalizeMovieSourceDefinition(adapter.getDefinition?.() ?? adapter.definition)
+      );
     },
     clear() {
       adapters.clear();
-      definitions.clear();
     },
   };
 }
