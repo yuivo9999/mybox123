@@ -20,6 +20,7 @@ export function createNativePlayerAdapter(hooks={}) {
  });
  const emit=(event,data={})=>{if(event==='playing')state=PlayerState.PLAYING;if(event==='paused')state=PlayerState.PAUSED;if(event==='bufferingStart')state=PlayerState.BUFFERING;if(event==='reconnecting')state=PlayerState.RECONNECTING;if(event==='stopped')state=PlayerState.STOPPED;if(event==='released')state=PlayerState.RELEASED;hooks.onEvent?.({event,...data});};
  const eventHandler=(payload)=>{try{const value=typeof payload==='string'?JSON.parse(payload):payload;if(value?.event)emit(value.event,value.data??value);}catch{}};
+ const previousEventHandler=typeof window!=='undefined'?window.TVBoxWebView?.onPlayerEvent:null;
  if(typeof window!=='undefined'){window.TVBoxWebView=window.TVBoxWebView||{};window.TVBoxWebView.onPlayerEvent=eventHandler;}
  const adapter={
   get capabilities(){return capabilities;},
