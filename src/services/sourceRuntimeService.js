@@ -1,5 +1,5 @@
 import { sourceRepository } from '../repositories/sourceRepository.js';
-import { syncMovieSources, testMovieSource } from './movieSourceService.js';
+import { testMovieSource } from './movieSourceService.js';
 import { liveService } from './liveService.js';
 import { sourceRegistryService } from './sourceRegistryService.js';
 import { userDataService } from './userDataService.js';
@@ -20,7 +20,7 @@ export async function testSource(source, options = {}) {
 
 export async function syncAllSources() {
   const sources = sourceRepository.getAll().filter(source => source.enabled !== false);
-  const movieResult = await syncMovieSources(sources);
+  const movieResult = await sourceRegistryService.syncMovieSources(sources);
 
   sourceRegistryService.clear();
   sources
