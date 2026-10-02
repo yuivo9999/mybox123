@@ -7,6 +7,8 @@ import { createPlaybackStateMachine } from './playbackStateMachine.js';
 import { createPlaybackNetworkPolicy } from './playbackNetworkPolicy.js';
 import { classifyPlaybackError } from './playbackErrorPolicy.js';
 import { playbackResourceManager } from './playbackResourceManager.js';
+import { ErrorCode } from '../models/errors.js';
+import { errorService } from '../services/errorService.js';
 
 export function createPlaybackCore(task, hooks = {}) {
   let active = false;
@@ -54,8 +56,13 @@ export function createPlaybackCore(task, hooks = {}) {
     }
     if (event.event === 'error') {
       const code = classifyPlaybackError(event.nativeError, { code: event.nativeError?.message });
+      const normalized = errorService.normalize(event.nativeError ?? new Error('MEDIA_LOAD_ERROR'), {
+        code: code === PlaybackFailureCode.NETWORK ? ErrorCode.NETWORK : ErrorCode.PLAYBACK,
+        context: { scope: 'playback', taskId: task.request.taskId, requestId: task.request.requestId, candidateId: task.currentCandidateId },
+        retryable: code === PlaybackFailureCode.NETWORK,
+      });
       transition(PlayerState.ERROR);
-      const next = failAndResolve(event.nativeError ?? new Error('MEDIA_LOAD_ERROR'), code);
+      const next = failAndResolve(normalized, code);
       if (!next) hooks.onExhausted?.(task);
     }
     if (event.event === 'requestContextIgnored') hooks.onPlayerWarning?.(event);
@@ -77,8 +84,12 @@ export function createPlaybackCore(task, hooks = {}) {
       return resolved;
     } catch (error) {
       const code = classifyPlaybackError(error, { code: error?.message, fromParser: true });
-      hooks.onParserError?.({ candidate, error, code });
-      eventBus.emit({ event: 'error', requestId: task.request.requestId, taskId: task.request.taskId, candidateId: candidate.candidateId, code });
+      const normalized = errorService.normalize(error, {
+        code: ErrorCode.PARSE,
+        context: { scope: 'parser', taskId: task.request.taskId, requestId: task.request.requestId, candidateId: candidate.candidateId },
+      });
+      hooks.onParserError?.({ candidate, error: normalized, code });
+      eventBus.emit({ event: 'error', requestId: task.request.requestId, taskId: task.request.taskId, candidateId: candidate.candidateId, code, error: normalized.message });
       return null;
     }
   };
@@ -105,7 +116,7 @@ export function createPlaybackCore(task, hooks = {}) {
     networkPolicy.reset();
     if (!next) return null;
     void resolveAndLoad(next).catch((playerError) => {
-      hooks.onPlayerError?.({ error: playerError, candidate: next });
+      hooks.onPlayerError?.({ error: errorService.normalize(playerError, { code: ErrorCode.PLAYBACK, context: { scope: 'player', taskId: task.request.taskId, requestId: task.request.requestId, candidateId: next.candidateId } }), candidate: next });
     });
     return next;
   };
