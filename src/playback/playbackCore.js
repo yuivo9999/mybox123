@@ -113,7 +113,6 @@ export function createPlaybackCore(task,hooks={}) {
   subscribe(listener){return eventBus.subscribe(listener);},attachPlayer,
   start(){
    if(released)throw new Error('PLAYBACK_CORE_RELEASED');
-   active=true;
    playbackTaskRegistry.register({request:task.request,stop:()=>{try{player?.stop?.();}finally{task.stop?.();}},release:()=>{try{player?.release?.();}finally{task.release?.();}}});
    resourceRelease?.();
    resourceRelease=playbackResourceManager.acquire(task.request.taskId,(previous)=>hooks.onResourceReplaced?.(previous));
