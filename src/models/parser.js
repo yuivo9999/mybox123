@@ -32,6 +32,8 @@ export function createResolvedMediaInput(input = {}) {
     session: input.session ? { ...input.session } : undefined,
     playerHint: input.playerHint ?? undefined,
     parserHint: input.parserHint ?? undefined,
+    manifest: input.manifest ? { ...input.manifest, variants: [...(input.manifest.variants ?? [])] } : undefined,
+    redirectChain: [...(input.redirectChain ?? [])],
     metadata: { ...(input.metadata ?? {}) },
   };
 }
