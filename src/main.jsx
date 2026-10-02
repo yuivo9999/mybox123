@@ -269,7 +269,15 @@ function PlaybackView({ request, kind, onBack }) {
   const core = useMemo(() => createPlaybackCore(task, {
     onEvent: (event) => {
       if (event.event === 'error') setError(event.error || '播放候选失败');
-      if (event.event === 'progress') {\n        const currentTime = event.currentTime ?? 0;\n        const duration = event.duration ?? null;\n        progressRef.current = { ...progressRef.current, currentTime, duration };\n        if (kind === 'vod' && request?.contentId && request?.episodeId && currentTime > 0 && currentTime - progressRef.current.persistedAt >= 15) {\n          persistent.recordProgress(request.contentId, request.episodeId, currentTime, duration, false);\n          progressRef.current.persistedAt = currentTime;\n        }\n      }
+      if (event.event === 'progress') {
+        const currentTime = event.currentTime ?? 0;
+        const duration = event.duration ?? null;
+        progressRef.current = { ...progressRef.current, currentTime, duration };
+        if (kind === 'vod' && request?.contentId && request?.episodeId && currentTime > 0 && currentTime - progressRef.current.persistedAt >= 15) {
+          persistent.recordProgress(request.contentId, request.episodeId, currentTime, duration, false);
+          progressRef.current.persistedAt = currentTime;
+        }
+      }
       if (event.event === 'completed' && kind === 'vod' && request?.contentId && request?.episodeId) {
         const progress = progressRef.current;
         persistent.recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, true);
