@@ -1,5 +1,6 @@
 import { createMovieRegistry } from '../adapters/movie/movieRegistry.js';
 import { createMovieAdapter } from '../adapters/movie/movieAdapter.js';
+import { contentService } from './contentService.js';
 import { cacheStorage, CacheNamespace, createCacheKey } from '../storage/cache.js';
 import { requestManager } from './requestManager.js';
 import { errorService } from './errorService.js';
@@ -41,7 +42,7 @@ export async function syncMovieSources(sourceConfigs = []) {
     }
   }));
   return {
-    movies: settled.flatMap(result => result.status === 'fulfilled' ? result.value : []),
+    movies: contentService.getMovies(settled.flatMap(result => result.status === 'fulfilled' ? result.value : [])),
     results: settled,
   };
 }
