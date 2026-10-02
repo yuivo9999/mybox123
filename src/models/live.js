@@ -3,10 +3,9 @@ function cleanIdentity(value) {
 }
 
 export function createChannelIdentity({ canonicalId = '', channelKey = '', name = '', category = '' } = {}) {
-  const canonical = cleanIdentity(canonicalId || channelKey);
+  const canonical = cleanIdentity(canonicalId);
   if (canonical) return `canonical:${canonical}`;
-  // No stable cross-source identity: keep the channel source-qualified.
-  return `unresolved:${cleanIdentity(name)}|${cleanIdentity(category)}`;
+  return '';
 }
 
 export function createChannelId(sourceId, sourceItemId, identity = '') {
