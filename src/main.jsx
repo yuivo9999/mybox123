@@ -5,34 +5,22 @@ import './styles/app.css';
 import { movies as normalizedMovies, channels as normalizedChannels, sourceConfigs } from './data/demoData';
 import { contentService } from './services/contentService';
 import { liveService } from './services/liveService';
-import { userDataService } from './services/userDataService';
-import { sourceRepository } from './repositories/sourceRepository';
 import { playbackService } from './services/playbackService';
 import { createPlaybackCore } from './playback/playbackCore';
+import { usePersistentState } from './state/usePersistentState.js';
+import { useSessionState } from './state/useSessionState.js';
+import { sessionStateStore } from './state/sessionStateStore.js';
 
 const movies = contentService.getMovies(normalizedMovies);
 const channels = liveService.getChannels(normalizedChannels);
 
-function useUserData() {
-  const [data, setData] = useState(() => userDataService.getSnapshot());
-  const refresh = (next) => setData(next);
-  return {
-    ...data,
-    toggleFavorite: (targetType, targetId) => refresh({ ...data, favorites: userDataService.toggleFavorite(targetType, targetId) }),
-    recordMoviePlay: (movie, episodeIndex) => refresh({ ...data, history: userDataService.recordMoviePlay(movie, episodeIndex) }),
-    recordSearch: (keyword) => refresh({ ...data, searches: userDataService.recordSearch(keyword) }),
-    clear: () => refresh(userDataService.clearUserData()),
-  };
-}
 
 function App() {
-  const [tab, setTab] = useState('home');
-  const [route, setRoute] = useState(null);
-  const [selected, setSelected] = useState(null);
+  const session = useSessionState();
+  const persistent = usePersistentState();
   const [query, setQuery] = useState('');
-  const userData = useUserData();
-  const [sources, setSources] = useState(() => sourceRepository.getAll(sourceConfigs));
-  const openMovie = (movie) => { setSelected(movie); setRoute('detail'); };
+  const { tab, route, selected } = session;
+  const openMovie = (movie) => sessionStateStore.patch({ selected: movie, route: 'detail' });
   const playMovie = (movie, episodeIndex = 0) => {
     const episode = movie.episodes[episodeIndex] ?? movie.episodes[0];
     const request = playbackService.createVODRequest({
@@ -41,17 +29,19 @@ function App() {
       episodeIndex,
       metadata: { title: movie.title, poster: movie.poster, episodeTitle: episode?.title ?? '' },
     });
-    setSelected(request);
-    setRoute('movie-play');
-    userData.recordMoviePlay(movie, episodeIndex);
+    sessionStateStore.patch({ selected: request, route: 'movie-play' });
+    persistent.recordMoviePlay(movie, episodeIndex);
   };
-  const nav = (key) => { setTab(key); setRoute(null); setSelected(null); };
-  const updateSources = (next) => { setSources(next); sourceRepository.saveAll(next); };
+  const nav = (key) => {
+    setQuery('');
+    sessionStateStore.patch({ tab: key, route: null, selected: null });
+  };
+  const updateSources = (next) => persistent.saveSources(next);
   return <div className="app-shell"><div className="screen">
-    {route === 'detail' ? <Detail movie={selected} onBack={() => setRoute(null)} onPlay={playMovie} fav={userData.favorites.some((x) => x.targetType === 'content' && x.targetId === selected.contentId)} onFav={() => userData.toggleFavorite('content', selected.contentId)} />
-      : route === 'movie-play' ? <Player request={selected} onBack={() => setRoute('detail')} />
-      : route === 'live-play' ? <LivePlayer request={selected} onBack={() => setRoute(null)} />
-      : <Main tab={tab} movies={movies} channels={channels} query={query} setQuery={setQuery} onMovie={openMovie} onPlay={playMovie} favorites={userData.favorites} history={userData.history} progress={userData.progress} toggleFav={userData.toggleFavorite} sources={sources} setSources={updateSources} searches={userData.searches} recordSearch={userData.recordSearch} onLive={(channel) => { setSelected(playbackService.createLiveRequest({ channel, metadata: { title: channel.name, category: channel.category } })); setRoute('live-play'); }} onTab={nav} onClearData={userData.clear} />}
+    {route === 'detail' ? <Detail movie={selected} onBack={() => sessionStateStore.patch({ route: null })} onPlay={playMovie} fav={persistent.favorites.some((x) => x.targetType === 'content' && x.targetId === selected.contentId)} onFav={() => persistent.toggleFavorite('content', selected.contentId)} />
+      : route === 'movie-play' ? <Player request={selected} onBack={() => sessionStateStore.patch({ route: 'detail' })} />
+      : route === 'live-play' ? <LivePlayer request={selected} onBack={() => sessionStateStore.patch({ route: null })} />
+      : <Main tab={tab} movies={movies} channels={channels} query={query} setQuery={setQuery} onMovie={openMovie} onPlay={playMovie} favorites={persistent.favorites} history={persistent.history} progress={persistent.progress} toggleFav={persistent.toggleFavorite} sources={persistent.sources} setSources={updateSources} searches={persistent.searches} recordSearch={persistent.recordSearch} onLive={(channel) => { sessionStateStore.patch({ selected: playbackService.createLiveRequest({ channel, metadata: { title: channel.name, category: channel.category } }), route: 'live-play' }); }} onTab={nav} onClearData={persistent.clearUserData} />}
     {!route && <BottomNav tab={tab} onTab={nav} />}
   </div></div>;
 }
