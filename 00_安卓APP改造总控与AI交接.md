@@ -133,12 +133,12 @@ React → requestManager → Android 请求适配器 → Native HTTP → 第三�
 |---|---|---|---|
 | 0 | 本文 | 总控、状态、交接规则 | AI 知道整个任务 |
 | 1 | `01_Android容器与Capacitor实施.md` | 建立 Android 工程 | **已完成：仓库具备 Android 容器** |
-| 2 | `02_原生网络与CORS解决方案实施.md` | 建立 Native HTTP 通道 | CORS 敏感请求具备原生通路 |
+| 2 | `02_原生网络与CORS解决方案实施.md` | 建立 Native HTTP 通道 | **已完成：具备受限 Native HTTP 原生通路** |
 | 3 | `03_React请求层Android适配实施.md` | 接入现有 requestManager | 业务请求可按运行环境选择通路 |
 | 4 | `04_GitHub_Actions_APK构建实施.md` | GitHub 自动构建 APK | push 后可获得 APK Artifact |
 | 5 | `05_最终验收与AI交接实施.md` | 全面静态/CI/设备验收 | 明确是否真正完成 |
 
-**执行顺序必须遵守：1 → 2 → 3 → 4 → 5。当前已完成阶段 1，下一阶段只能进入阶段 2。**
+**执行顺序必须遵守：1 → 2 → 3 → 4 → 5。当前已完成阶段 2，下一阶段进入阶段 3。**
 
 如果某阶段发现前置阶段存在缺陷，不允许直接跳到后面的阶段掩盖问题。
 
@@ -280,12 +280,15 @@ React → requestManager → Android 请求适配器 → Native HTTP → 第三�
 - webDir 已确定为 dist。
 - appId 已确定为 com.yuivo9999.mybox123。
 - GitHub Actions 已真实执行 npm run build 与 npx cap sync android。
-- requestManager、webViewRuntime 尚未完成 Native HTTP / bridge 兼容接入。
-- npm install 日志存在 3 个 moderate severity vulnerabilities，下一阶段必须先定位依赖链。
-- CORS 尚未解决。
+- 阶段 2 已完成：已建立受限 Native HTTP 通道，基于 Capacitor 8 官方 `CapacitorHttp.request()`。
+- `src/runtime/webViewRuntime.js` 已暴露 `capabilities.nativeHttp` 与统一 `nativeHttpRequest()` 入口。
+- `src/services/requestManager.js` 尚未接入 Native adapter，这是阶段 3 的明确任务。
+- npm install 日志仍存在 3 个 moderate severity vulnerabilities；本阶段没有盲目执行 `audit fix --force`，下一阶段仍需定位依赖链。
+- Android 明文 HTTP 没有全局放开；运行时 HTTP 源需真实域名后再决定最小策略。
 - APK 构建工作流尚未建立。
+- Android 真机/模拟器真实第三方请求尚未验证。
 
-下一 AI 入口：02_原生网络与CORS解决方案实施.md。第一件事是核对真实网络请求入口、动态 source 配置、3 个 moderate vulnerabilities，并设计受限 Native HTTP 通道。
+下一 AI 入口：03_React请求层Android适配实施.md。第一件事是核对 `nativeHttpBridge.js`、`webViewRuntime.capabilities.nativeHttp`，再逐项接入 requestManager，并确保 Browser / Android 契约统一、HLS/播放链路不被机械替换。
 
 ---
 
