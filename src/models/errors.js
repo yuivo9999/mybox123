@@ -48,7 +48,7 @@ export function toAppError(error, options = {}) {
 
   const rawCode = String(error?.code ?? error?.message ?? '').toLowerCase();
   let code = options.code ?? ErrorCode.UNKNOWN;
-  if (rawCode.includes('network') || rawCode.includes('timeout')) code = ErrorCode.NETWORK;
+  if (rawCode.includes('network') || rawCode.includes('timeout') || rawCode.includes('failed to fetch') || rawCode.includes('fetch failed') || rawCode.includes('networkerror') || rawCode.includes('connection')) code = ErrorCode.NETWORK;
   else if (rawCode.includes('parser') || rawCode.includes('manifest') || rawCode.includes('sessionexpired')) code = ErrorCode.PARSE;
   else if (rawCode.includes('storage') || rawCode.includes('serialize') || rawCode.includes('quota')) code = ErrorCode.STORAGE;
   else if (rawCode.includes('player') || rawCode.includes('media_load') || rawCode.includes('unsupported')) code = ErrorCode.PLAYBACK;
