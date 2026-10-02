@@ -17,7 +17,7 @@ export function normalizeMovie({ sourceId, item, index = 0 }) {
   return normalizeContent({
     sourceId,
     sourceItemId: item.sourceItemId ?? item.id ?? `item-${index + 1}`,
-    canonicalId: item.canonicalId ?? item.contentId ?? item.externalId ?? item.tmdbId ?? item.imdbId ?? '',
+    canonicalId: item.canonicalId ?? item.globalId ?? item.externalId ?? item.tmdbId ?? item.imdbId ?? '',
     title: item.title,
     type: item.type,
     poster: item.poster,
