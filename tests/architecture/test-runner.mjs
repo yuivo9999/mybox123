@@ -52,7 +52,7 @@ expect('src/runtime/nativeHttpBridge.js', [
   /TIMEOUT/,
   /headers/,
 ]);
-expect('src/runtime/webViewRuntime.js', [/nativeHttp/, /nativeHttpRequest/]);
+expect('src/runtime/webViewRuntime.js', [/nativeHttp/, /nativeHttpRequest/, /ALLOWED_BRIDGE_METHODS/, /BRIDGE_METHOD_NOT_ALLOWED/]);
 expectNo('src/runtime/nativeHttpBridge.js', [/window\.Android/, /eval\\(/, /Function\\(/]);
 
 
