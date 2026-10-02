@@ -1,4 +1,5 @@
 import { userDataRepository } from '../repositories/userDataRepository.js';
+import { createContentId } from '../models/content.js';
 function shouldWriteProgress(previous, next) {
   if (!previous) return true;
   if (previous.completed && !next.completed && next.positionSeconds <= previous.positionSeconds) return false;
@@ -13,15 +14,18 @@ export const userDataService = {
     const contentMap = new Map();
     const episodeMap = new Map();
     contents.forEach(content => {
-      if (content?.legacyContentId && content.legacyContentId !== content.contentId) {
-        contentMap.set(content.legacyContentId, content.contentId);
-        (content.episodes ?? []).forEach(episode => {
-          const ref = episode.sourceRefs?.[0];
-          if (!ref) return;
-          const legacyEpisodeId = `episode:${content.legacyContentId}:${ref.sourceId}:${ref.sourceItemId}`;
-          episodeMap.set(legacyEpisodeId, episode.episodeId);
-        });
+      if (!content?.contentId) return;
+      for (const ref of content.sourceRefs ?? []) {
+        const legacyContentId = createContentId(ref.sourceId, ref.sourceItemId);
+        if (legacyContentId !== content.contentId) contentMap.set(legacyContentId, content.contentId);
       }
+      (content.episodes ?? []).forEach(episode => {
+        for (const ref of episode.sourceRefs ?? []) {
+          const legacyContentId = createContentId(ref.sourceId, ref.sourceItemId);
+          const legacyEpisodeId = `episode:${legacyContentId}:${ref.sourceId}:${ref.sourceItemId}`;
+          episodeMap.set(legacyEpisodeId, episode.episodeId);
+        }
+      });
     });
     if (!contentMap.size) return false;
     const favorites = [...new Map(userDataRepository.getFavorites().map(item => {
