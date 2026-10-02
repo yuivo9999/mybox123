@@ -190,6 +190,6 @@ export const liveService = {
   },
 
   clearEPGCache() { cacheStorage.clear(CacheNamespace.EPG); },
-  clearCache() { cacheStorage.clear(CacheNamespace.SOURCE); cacheStorage.clear(CacheNamespace.LIVE_CHANNEL); cacheStorage.clear(CacheNamespace.EPG); },
+  clearCache() { cacheStorage.clear(CacheNamespace.LIVE_SOURCE); cacheStorage.clear(CacheNamespace.SOURCE); cacheStorage.clear(CacheNamespace.LIVE_CHANNEL); cacheStorage.clear(CacheNamespace.EPG); },
   async healthCheck() { return (await Promise.allSettled(liveRegistry.list().map((adapter) => adapter.healthCheck()))).flatMap((result) => result.status === 'fulfilled' ? [result.value] : []); },
 };
