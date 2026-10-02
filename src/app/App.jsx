@@ -8,6 +8,7 @@ import { cacheService } from '../services/cacheService.js';
 import { usePersistentState } from '../state/usePersistentState.js';
 import { useSessionState } from '../state/useSessionState.js';
 import { sessionStateStore } from '../state/sessionStateStore.js';
+import { pageStateStore } from '../state/pageStateStore.js';
 import { MovieFeature } from '../features/movie/MovieFeature.jsx';
 import { LiveFeature, LiveChannelPanel } from '../features/live/LiveFeature.jsx';
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
@@ -20,7 +21,7 @@ const channels=liveService.getChannels(normalizedChannels);
 
 export function App(){
  const session=useSessionState(); const persistent=usePersistentState(); const {tab,route,selected}=session;
- useEffect(()=>{cacheService.prune();if(!persistent.settings?.initialized)persistent.saveSettings({...persistent.settings,initialized:true,initializedAt:Date.now()})},[]);
+ useEffect(()=>{cacheService.prune();},[]);
  useEffect(()=>webViewRuntime.mount({onBack:()=>{
    if(typeof document!=='undefined'&&document.fullscreenElement){void webViewRuntime.setFullscreen(false);return true}
    if(route==='movie-play'||route==='live-play'){sessionStateStore.patch({route:route==='movie-play'?'detail':'live-channel'});return true}
@@ -46,6 +47,7 @@ export function App(){
    persistent.recordMoviePlay(movie,episodeIndex);
  };
  const nav=(key)=>sessionStateStore.patch({tab:key,route:null,selected:null});
+ const openSearchHistory=(keyword)=>{pageStateStore.patch('search',{query:keyword});sessionStateStore.patch({tab:'movies',route:'search',selected:null});};
  const openLiveChannel=(channel)=>{if(!channel)return;sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
  const playLive=(channel,streamId=null)=>{
    if(!channel)return;
@@ -58,7 +60,7 @@ export function App(){
   {movieActive?<MovieFeature route={route} tab={tab} selected={selected} movies={movies} channels={channels} history={persistent.history} favorites={persistent.favorites} onMovie={openMovie} onPlay={playMovie} onTab={nav} onBack={()=>sessionStateStore.patch({route:route==='movie-play'?'detail':null,selected:route==='movie-play'?selected:null})} onLive={playLive} recordSearch={persistent.recordSearch} toggleFavorite={persistent.toggleFavorite}/>
    :route==='live-channel'?<LiveChannelPanel channel={selected} channels={channels} favorites={persistent.favorites} onBack={()=>sessionStateStore.patch({route:null,selected:null,tab:'live'})} onPlay={playLive} onChannel={openLiveChannel} toggleFavorite={persistent.toggleFavorite}/>
    :route==='live-play'?<PlaybackPage request={selected} kind="live" channels={channels} favorites={persistent.favorites} onChannel={openLiveChannel} onPlay={playLive} toggleFavorite={persistent.toggleFavorite} onBack={()=>sessionStateStore.patch({route:'live-channel',selected:channels.find(c=>c.channelId===selected?.channelId)??null})}/>
-   :<MainPage tab={tab} movies={movies} channels={channels} favorites={persistent.favorites} history={persistent.history} sources={persistent.sources} searches={persistent.searches} onTab={nav} onMovie={openMovie} onLive={playLive} onLiveChannel={openLiveChannel} toggleFavorite={persistent.toggleFavorite} onClearData={persistent.clearUserData} onClearCache={persistent.clearCache}/>
+   :<MainPage tab={tab} movies={movies} channels={channels} favorites={persistent.favorites} history={persistent.history} progress={persistent.progress} sources={persistent.sources} searches={persistent.searches} onTab={nav} onMovie={openMovie} onLive={playLive} onLiveChannel={openLiveChannel} onSearchHistory={openSearchHistory} toggleFavorite={persistent.toggleFavorite} onClearData={persistent.clearUserData} onClearSearches={persistent.clearSearches} onRemoveSearch={persistent.removeSearch} onClearCache={persistent.clearCache} onSourceEnabled={persistent.setSourceEnabled} onRemoveSource={persistent.removeSource}/>
   }
   {!route&&<BottomNav tab={tab} onTab={nav}/>}
  </div></div>;
