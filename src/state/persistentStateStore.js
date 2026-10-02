@@ -5,17 +5,6 @@ import { sourceConfigs } from '../data/demoData.js';
 const listeners = new Set();
 let snapshot = null;
 
-function loadSnapshot() {
-  return Object.freeze({
-    favorites: userDataService.getSnapshot().favorites,
-    history: userDataService.getSnapshot().history,
-    progress: userDataService.getSnapshot().progress,
-    searches: userDataService.getSnapshot().searches,
-    settings: userDataService.getSettings(),
-    sources: sourceRepository.getAll(sourceConfigs),
-  });
-}
-
 function refresh() {
   const user = userDataService.getSnapshot();
   snapshot = Object.freeze({
