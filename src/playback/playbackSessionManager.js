@@ -49,5 +49,4 @@ export function createPlaybackSessionManager() {
 
   return { create, get, isExpired, requestContext, clear, clearAll };
 }
-
 export const playbackSessionManager = createPlaybackSessionManager();
