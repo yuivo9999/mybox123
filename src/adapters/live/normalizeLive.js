@@ -2,7 +2,7 @@ import { createChannelIdentity, createChannelId, createEpgProgramId, createSourc
 
 export function normalizeLiveChannel({ sourceId, item, index = 0 }) {
   const sourceItemId = String(item.sourceItemId ?? item.id ?? `item-${index + 1}`);
-  const canonicalId = item.canonicalId ?? item.channelId ?? item.externalId ?? '';
+  const canonicalId = item.canonicalId ?? item.globalId ?? item.externalId ?? '';
   const channelKey = item.channelKey || '';
   const identity = createChannelIdentity({ canonicalId, channelKey, name: item.name, category: item.category });
   const sourceChannelId = createSourceChannelId(sourceId, sourceItemId);
