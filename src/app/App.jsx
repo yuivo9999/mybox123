@@ -60,7 +60,7 @@ export function App(){
  const testSource=async(source)=>{
    if(!source?.sourceId)return;
    const current=persistent.sources;
-   const mark=(status)=>persistent.saveSources(current.map(s=>s.sourceId===source.sourceId?{...s,status}:s));
+   const mark=(status)=>sourceManagementService.updateStatus(source.sourceId,status);
    mark('测试中');
    try{
      const result=await sourceManagementService.test(source);
