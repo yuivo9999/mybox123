@@ -28,6 +28,7 @@ export const CacheTTL = Object.freeze({
 
 const MAX_ENTRIES_PER_NAMESPACE = 100;
 const MAX_SERIALIZED_BYTES_PER_ENTRY = 512 * 1024;
+const ACCESS_WRITE_INTERVAL = 30 * 1000;
 
 function stable(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -72,7 +73,7 @@ function prune(namespace) {
   entries.filter((entry) => entry.expiresAt > 0 && entry.expiresAt <= now).forEach((entry) => removeStorageKey(entry.key));
   const remaining = entries
     .filter((entry) => !(entry.expiresAt > 0 && entry.expiresAt <= now))
-    .sort((a, b) => a.createdAt - b.createdAt);
+    .sort((a, b) => (a.lastAccessedAt || a.createdAt) - (b.lastAccessedAt || b.createdAt));
 
   while (remaining.length > MAX_ENTRIES_PER_NAMESPACE) {
     removeStorageKey(remaining.shift().key);
@@ -108,13 +109,16 @@ function get(namespace, key, { allowStale = false } = {}) {
 
   try {
     const entry = JSON.parse(raw);
-    const stale = entry.expiresAt > 0 && entry.expiresAt <= Date.now();
+    const now = Date.now();
+    const stale = entry.expiresAt > 0 && entry.expiresAt <= now;
     if (stale && !allowStale) {
       removeStorageKey(storageKey(key));
       return { value: null, hit: false, stale: true };
     }
-    entry.lastAccessedAt = Date.now();
-    window.localStorage.setItem(storageKey(key), JSON.stringify(entry));
+    if (now - (Number(entry.lastAccessedAt) || 0) >= ACCESS_WRITE_INTERVAL) {
+      entry.lastAccessedAt = now;
+      window.localStorage.setItem(storageKey(key), JSON.stringify(entry));
+    }
     return { value: entry.value, hit: true, stale };
   } catch {
     removeStorageKey(storageKey(key));
