@@ -8,6 +8,12 @@ import { usePersistentState } from '../../state/usePersistentState.js';
 const MOVIE_CATEGORIES = ['全部', '电影', '电视剧', '动漫', '综艺', '纪录片'];
 
 export function MovieFeature(props) {
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    if (tab !== 'movies') setQuery('');
+  }, [tab]);
+
   const {
     route,
     tab,
@@ -16,8 +22,6 @@ export function MovieFeature(props) {
     channels = [],
     history,
     favorites,
-    query,
-    setQuery,
     onMovie,
     onPlay,
     onTab,
