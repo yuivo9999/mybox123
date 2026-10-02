@@ -16,7 +16,8 @@
     "test": "npm run test:cache && npm run test:errors && npm run test:live && npm run test:playback && npm run test:parser && npm run test:player && npm run test:state && npm run test:movie && npm run test:webview-runtime",
     "test:cache": "node scripts-test-cache.mjs",
     "test:errors": "node scripts-test-errors.mjs",
-    "test:webview-runtime": "node scripts-test-webview-runtime.mjs"
+    "test:webview-runtime": "node scripts-test-webview-runtime.mjs",
+    "test:performance": "node scripts-test-performance.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
