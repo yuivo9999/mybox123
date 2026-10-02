@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -23,10 +23,20 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
       - name: Install dependencies
         run: npm install
+      - name: Generate Android platform and persist scaffold
+        run: |
+          npx cap add android
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json capacitor.config.ts android
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(android): generate Capacitor Android project"
+            git push
+          fi
       - name: Build
         run: npm run build
       - name: Setup Pages
