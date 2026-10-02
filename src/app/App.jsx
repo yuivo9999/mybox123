@@ -36,6 +36,12 @@ export function App(){
  useEffect(()=>{
    if(persistent.settings?.initialized) void reloadSources();
  },[persistent.settings?.initialized]);
+ useEffect(()=>{
+   if(tab==='live'&&contentState.channels.length===0&&contentState.status!=='loading'){
+     const hasLive=persistent.sources?.some(s=>s.sourceType==='live'&&s.enabled!==false);
+     if(hasLive) void reloadSources();
+   }
+ },[tab,contentState.channels.length,contentState.status,persistent.sources]);
  useEffect(()=>webViewRuntime.mount({onBack:()=>{
    if(typeof document!=='undefined'&&document.fullscreenElement){void webViewRuntime.setFullscreen(false);return true}
    if(route==='movie-play'||route==='live-play'){sessionStateStore.patch({route:route==='movie-play'?'detail':'live-channel'});return true}
@@ -66,14 +72,15 @@ export function App(){
    try{
      const result=await sourceManagementService.test(source);
      mark(result.ok?'可用':'不可用');
+     if(result.ok) void reloadSources();
    }catch{
      mark('不可用');
    }
  };
- const saveSources=async(next)=>{const validIds=new Set(next.map(source=>source.sourceId));const current=persistent.settings||{};const patch={};if(current.defaultMovieSource&&!validIds.has(current.defaultMovieSource))patch.defaultMovieSource=null;if(current.defaultLiveSource&&!validIds.has(current.defaultLiveSource))patch.defaultLiveSource=null;await sourceManagementService.save(next);if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();};
- const setSourceEnabled=async(id,enabled)=>{await sourceManagementService.setEnabled(id,enabled);const source=persistent.sources.find(item=>item.sourceId===id);const patch={};if(!enabled&&source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;if(!enabled&&source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();};
- const setSourceActive=async(id)=>{await sourceManagementService.setActive(id);persistent.reload?.();};
- const removeSource=async(id)=>{const source=persistent.sources.find(item=>item.sourceId===id);await sourceManagementService.remove(id);const patch={};if(source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;if(source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();};
+ const saveSources=async(next)=>{const validIds=new Set(next.map(source=>source.sourceId));const current=persistent.settings||{};const patch={};if(current.defaultMovieSource&&!validIds.has(current.defaultMovieSource))patch.defaultMovieSource=null;if(current.defaultLiveSource&&!validIds.has(current.defaultLiveSource))patch.defaultLiveSource=null;await sourceManagementService.save(next);if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.(); void reloadSources();};
+ const setSourceEnabled=async(id,enabled)=>{await sourceManagementService.setEnabled(id,enabled);const source=persistent.sources.find(item=>item.sourceId===id);const patch={};if(!enabled&&source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;if(!enabled&&source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.(); void reloadSources();};
+ const setSourceActive=async(id)=>{await sourceManagementService.setActive(id);persistent.reload?.(); void reloadSources();};
+ const removeSource=async(id)=>{const source=persistent.sources.find(item=>item.sourceId===id);await sourceManagementService.remove(id);const patch={};if(source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;if(source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.(); void reloadSources();};
  const nav=(key)=>sessionStateStore.patch({tab:key,route:null,selected:null});
  const openSearchHistory=(keyword)=>{pageStateStore.patch('search',{query:keyword});sessionStateStore.patch({tab:'movies',route:'search',selected:null});};
  const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};

@@ -1,13 +1,13 @@
 /**
  * Parser for TVBox / DIYP / IPTV `#genre#` TXT live channel format.
- * Format sample:
+ * Format samples supported:
  * 
  * 📺央视频道,#genre#
- * CCTV-1,http://example.com/cctv1_1.m3u8
- * CCTV-1,http://example.com/cctv1_2.m3u8
- * CCTV-2,http://example.com/cctv2.m3u8#http://example.com/cctv2_backup.m3u8
+ * CCTV-1,http://example.com/cctv1_1.m3u8$超清#http://example.com/cctv1_2.m3u8$高清
+ * CCTV-2 http://example.com/cctv2.m3u8
+ * CCTV-3，http://example.com/cctv3.m3u8
  * 
- * 📡卫视频道,#genre#
+ * [📡卫视频道]
  * 广东卫视,http://example.com/gdws.m3u8
  */
 
@@ -40,16 +40,27 @@ export function parseTXTLive(text) {
       continue;
     }
 
-    // 3. Find separator between channel name and stream URL (support English ',' and Chinese '，')
-    const commaIndex = line.search(/[,，]/);
-    if (commaIndex === -1) continue;
+    // 3. Extract channel name and stream URL(s)
+    let name = '';
+    let rawUrls = '';
 
-    const name = line.slice(0, commaIndex).trim();
-    const rawUrls = line.slice(commaIndex + 1).trim();
+    const commaIndex = line.search(/[,，]/);
+    if (commaIndex !== -1) {
+      name = line.slice(0, commaIndex).trim();
+      rawUrls = line.slice(commaIndex + 1).trim();
+    } else {
+      // Support space or tab separation between name and URL
+      const match = line.match(/^([^\s]+)\s+((?:https?|rtmp|rtsp|p2p|mitv|mms):\/\/.+)$/i);
+      if (match) {
+        name = match[1].trim();
+        rawUrls = match[2].trim();
+      } else {
+        continue;
+      }
+    }
 
     if (!name || !rawUrls) continue;
 
-    // Check if URL has valid protocol or structure
     // A single line may have multiple URLs separated by '#' (e.g., url1#url2)
     const urlCandidates = rawUrls.split('#').map(u => u.trim()).filter(Boolean);
 
@@ -76,13 +87,25 @@ export function parseTXTLive(text) {
       channelsList.push(channel);
     }
 
-    for (const url of urlCandidates) {
+    for (const cand of urlCandidates) {
+      let streamUrl = cand;
+      const streamIndex = channel.streams.length + 1;
+      let streamLabel = `线路 ${streamIndex}`;
+
+      // Handle stream label after '$' (e.g. http://live.com/1.m3u8$超清)
+      if (streamUrl.includes('$')) {
+        const parts = streamUrl.split('$');
+        streamUrl = parts[0].trim();
+        if (parts[1]?.trim()) {
+          streamLabel = parts[1].trim();
+        }
+      }
+
       // Filter valid video streaming links
-      if (/^(?:https?|rtmp|rtsp|p2p|mitv|mms):\/\//i.test(url) || url.includes('.m3u8') || url.includes('.flv') || url.includes('.mp4')) {
-        const streamIndex = channel.streams.length + 1;
+      if (/^(?:https?|rtmp|rtsp|p2p|mitv|mms):\/\//i.test(streamUrl) || streamUrl.includes('.m3u8') || streamUrl.includes('.flv') || streamUrl.includes('.mp4')) {
         channel.streams.push({
-          url: url,
-          label: `线路 ${streamIndex}`,
+          url: streamUrl,
+          label: streamLabel,
           quality: '',
           resolution: '',
         });
@@ -97,10 +120,12 @@ export function isTXTGenreFormat(text) {
   if (!text || typeof text !== 'string') return false;
   if (/#genre#/i.test(text)) return true;
   
-  const sampleLines = text.split(/\r?\n/).slice(0, 20).filter(Boolean);
+  const sampleLines = text.split(/\r?\n/).slice(0, 30).filter(Boolean);
   let matchCount = 0;
   for (const line of sampleLines) {
     if (/[^,，\r\n]+[,，]\s*(?:https?|rtmp|rtsp):\/\//i.test(line)) {
+      matchCount++;
+    } else if (/^[^\s]+\s+(?:https?|rtmp|rtsp):\/\//i.test(line)) {
       matchCount++;
     }
   }

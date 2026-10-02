@@ -196,12 +196,17 @@ export const sourceConfigService = {
     }
   },
   async readFileAsDataURL(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = (e) => reject(e);
-      reader.readAsDataURL(file);
-    });
+    try {
+      const text = await file.text();
+      return `data:text/plain;charset=utf-8,${encodeURIComponent(text)}`;
+    } catch {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(file);
+      });
+    }
   },
   exportText(sources) {
     return JSON.stringify(Array.isArray(sources) ? sources : sourceRepository.getAll(), null, 2);
