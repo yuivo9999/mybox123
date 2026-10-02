@@ -29,6 +29,7 @@ export function createMovieFeature({movies=[],history=[]}={}){return{
 
 function MovieHome({feature,channels,onTab,onMovie,onPlay,onLive,onSearch}){
  const home=feature.getHome();
+ if(!feature.getHome().categories.length) return <Page><header className="top-header"><div><span className="eyebrow">TVBOX REACT</span><h2>首页</h2></div><button className="icon-button" aria-label="搜索" onClick={onSearch}><Search/></button></header><div className="empty state-view"><Film size={24}/><b>暂无影视内容</b><span>当前还没有配置内容源</span><button className="primary" onClick={()=>onTab('me')}>去源管理</button><button className="secondary" onClick={()=>onTab('home')}>稍后设置</button></div></Page>;
  return <Page><header className="top-header"><div><span className="eyebrow">TVBOX REACT</span><h2>首页</h2></div><button className="icon-button" aria-label="搜索" onClick={onSearch}><Search/></button></header>
  {home.banner&&<section className="hero recommendation-banner"><SmartImage src={home.banner.image} alt={home.banner.title}/><div><span className="eyebrow">推荐</span><h1>{home.banner.title}</h1><p>{home.banner.description}</p><button className="primary" onClick={()=>home.banner.movie&&onMovie(home.banner.movie)}><Play size={16}/>立即观看</button></div></section>}
  <SectionTitle title="分类快捷入口"/><div className="chips">{home.categories.map(item=><button key={item} onClick={()=>{pageStateStore.patch('movies',{category:item,page:1});onTab('movies')}}>{item}</button>)}</div>
