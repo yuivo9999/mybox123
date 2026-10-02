@@ -29,13 +29,13 @@ export function createPlaybackSessionManager() {
 
   const get = (sessionId) => sessions.get(sessionId) ?? null;
   const isExpired = (sessionId) => {
-    const session = get(sessionId);
+    const session = getRaw(sessionId);
     if (!session?.expiresAt) return false;
     const at = typeof session.expiresAt === 'number' ? session.expiresAt : Date.parse(session.expiresAt);
     return Number.isFinite(at) && at <= Date.now();
   };
   const requestContext = (sessionId) => {
-    const session = get(sessionId);
+    const session = getRaw(sessionId);
     if (!session) return null;
     if (isExpired(sessionId)) return null;
     const headers = { ...session.headers };
