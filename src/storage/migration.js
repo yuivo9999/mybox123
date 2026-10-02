@@ -1,6 +1,7 @@
 import { createFavoriteId, createHistoryId, createProgressId, createSearchId, emptyUserData } from '../models/userData';
 import { storage } from './storage';
 
+const MIGRATION_VERSION = 2;
 const LEGACY_KEYS = {
   favorites: 'tvbox:favorites',
   history: 'tvbox:history',
@@ -18,16 +19,18 @@ function legacyRead(key, fallback) {
 }
 
 function migrateFavorites(items) {
+  const seen = new Set();
   return items.map((item) => ({
     favoriteId: createFavoriteId(item.kind === 'live' ? 'channel' : 'content', item.id),
     targetType: item.kind === 'live' ? 'channel' : 'content',
     targetId: item.id,
     createdAt: item.at ?? Date.now(),
     lastAccessedAt: item.at ?? Date.now(),
-  }));
+  })).filter((item) => item.targetId != null && !seen.has(item.favoriteId) && seen.add(item.favoriteId));
 }
 
 function migrateHistory(items) {
+  const seen = new Set();
   return items.map((item) => {
     const targetType = item.kind === 'live' ? 'channel' : 'content';
     const episodeId = targetType === 'content' && Number.isInteger(item.episode)
@@ -43,31 +46,43 @@ function migrateHistory(items) {
       lastPlayedAt: item.at ?? Date.now(),
       completed: Boolean(item.completed),
     };
-  });
+  }).filter((item) => item.targetId != null && !seen.has(item.historyId) && seen.add(item.historyId));
 }
 
 function migrateProgress(items) {
+  const seen = new Set();
   return items.filter((item) => item.kind === 'movie').map((item) => ({
     progressId: createProgressId(item.id, Number.isInteger(item.episode) ? `legacy-episode:${item.id}:${item.episode}` : ''),
     contentId: item.id,
     episodeId: Number.isInteger(item.episode) ? `legacy-episode:${item.id}:${item.episode}` : '',
-    positionSeconds: Number(item.progress) || 0,
+    positionSeconds: Math.max(0, Number(item.progress) || 0),
     durationSeconds: null,
     updatedAt: item.at ?? Date.now(),
     completed: false,
-  }));
+  })).filter((item) => item.contentId != null && !seen.has(item.progressId) && seen.add(item.progressId));
+}
+
+function validateMigratedData(data) {
+  return data && Array.isArray(data.favorites) && Array.isArray(data.history)
+    && Array.isArray(data.progress) && Array.isArray(data.searches);
+}
+
+function backupLegacyData() {
+  Object.entries(LEGACY_KEYS).forEach(([name, key]) => {
+    const raw = window.localStorage.getItem(key);
+    if (raw !== null) storage.backup(`legacy-v1:${name}`, JSON.parse(raw));
+  });
 }
 
 export function migrateLegacyData() {
-  const marker = storage.read('migration:legacy-v1', null);
-  if (marker) return marker;
+  const marker = storage.read('migration:legacy-v2', null);
+  if (marker?.completed && marker.version === MIGRATION_VERSION) return marker;
 
-  const base = emptyUserData();
   const legacyFavorites = legacyRead(LEGACY_KEYS.favorites, []);
   const legacyHistory = legacyRead(LEGACY_KEYS.history, []);
   const legacySearches = legacyRead(LEGACY_KEYS.searches, []);
   const legacySources = legacyRead(LEGACY_KEYS.sources, null);
-
+  const base = emptyUserData();
   const migrated = {
     ...base,
     favorites: migrateFavorites(Array.isArray(legacyFavorites) ? legacyFavorites : []),
@@ -77,12 +92,7 @@ export function migrateLegacyData() {
       searchId: createSearchId(String(keyword)), keyword: String(keyword), searchedAt: Date.now(), count: 1,
     })),
   };
-
-  storage.write('favorites', migrated.favorites);
-  storage.write('history', migrated.history);
-  storage.write('progress', migrated.progress);
-  storage.write('searches', migrated.searches);
-  if (Array.isArray(legacySources)) storage.write('sources', legacySources.map((source, index) => ({
+  if (Array.isArray(legacySources)) migrated.sources = legacySources.map((source, index) => ({
     sourceId: source.sourceId ?? source.id ?? `legacy-source:${index + 1}`,
     name: source.name ?? `旧源 ${index + 1}`,
     sourceType: source.sourceType ?? source.type ?? 'movie',
@@ -91,9 +101,35 @@ export function migrateLegacyData() {
     status: source.status ?? 'unknown',
     order: source.order ?? index + 1,
     lastUsedAt: source.lastUsedAt ?? null,
-  })));
+  }));
 
-  const result = { completedAt: Date.now(), migrated: true };
-  storage.write('migration:legacy-v1', result);
+  backupLegacyData();
+  const previous = {
+    favorites: storage.read('favorites', []),
+    history: storage.read('history', []),
+    progress: storage.read('progress', []),
+    searches: storage.read('searches', []),
+  };
+  try {
+    storage.write('favorites', migrated.favorites);
+    storage.write('history', migrated.history);
+    storage.write('progress', migrated.progress);
+    storage.write('searches', migrated.searches);
+    if (migrated.sources) storage.write('sources', migrated.sources);
+    const check = {
+      favorites: storage.read('favorites', null), history: storage.read('history', null),
+      progress: storage.read('progress', null), searches: storage.read('searches', null),
+    };
+    if (!validateMigratedData(check)) throw new Error('USER_DATA_MIGRATION_VALIDATION_FAILED');
+  } catch (error) {
+    storage.write('favorites', previous.favorites);
+    storage.write('history', previous.history);
+    storage.write('progress', previous.progress);
+    storage.write('searches', previous.searches);
+    throw error;
+  }
+
+  const result = { version: MIGRATION_VERSION, completed: true, completedAt: Date.now(), migrated: true };
+  storage.write('migration:legacy-v2', result);
   return result;
 }
