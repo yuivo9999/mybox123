@@ -134,7 +134,9 @@ export const liveService = {
     ));
     const streams = results.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
     if (streams.length) {
-      cacheStorage.set(CacheNamespace.LIVE_CHANNEL, cacheKey, { streams });
+      const expiries = streams.map(stream => typeof stream.expiresAt === 'number' ? stream.expiresAt : Date.parse(stream.expiresAt ?? '')).filter(Number.isFinite);
+      const ttl = expiries.length ? Math.max(1000, Math.min(5 * 60 * 1000, Math.min(...expiries) - Date.now())) : undefined;
+      cacheStorage.set(CacheNamespace.LIVE_CHANNEL, cacheKey, { streams }, ttl === undefined ? {} : { ttl });
       return streams;
     }
     if (cached.hit) return cached.value?.streams ?? [];
@@ -162,7 +164,7 @@ export const liveService = {
   },
 
   getPlaybackCandidates(channelRef, streams = null) {
-    const sourceStreams = (streams ?? channelRef?.streams ?? []).filter((stream) => !stream.expiresAt || Date.parse(stream.expiresAt) > Date.now());
+    const sourceStreams = (streams ?? channelRef?.streams ?? []).filter((stream) => { const expiresAt = typeof stream.expiresAt === 'number' ? stream.expiresAt : Date.parse(stream.expiresAt ?? ''); return !stream.expiresAt || !Number.isFinite(expiresAt) || expiresAt > Date.now(); });
     return sourceStreams
       .filter((stream) => stream?.url && stream.status !== 'failed')
       .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
