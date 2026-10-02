@@ -64,6 +64,8 @@ function Main(p) {
 
 function Detail({ movie, onBack, onPlay, fav, onFav }) { return <Page><button className="back" onClick={onBack}><ChevronLeft />返回</button><div className="detail-hero"><img src={movie.poster} /><div><span className="eyebrow">{movie.category} · {movie.year}</span><h1>{movie.title}</h1><p>{movie.description}</p><div className="actions"><button className="primary" onClick={() => onPlay(movie, 0)}><Play size={16} />播放</button><button className={fav ? 'secondary active-fav' : 'secondary'} onClick={onFav}><Heart size={16} fill={fav ? 'currentColor' : 'none'} />{fav ? '已收藏' : '收藏'}</button></div></div></div><SectionTitle title="剧集" /><div className="episode-grid">{movie.episodes.map((e, i) => <button key={e.episodeId} onClick={() => onPlay(movie, i)}>{e.title}</button>)}</div><InfoCard title="来源关系" text={`标准内容身份：${movie.contentId} · 来源数量：${movie.sourceRefs.length} · 播放时再选择具体来源。`} /></Page>; }
 function PlaybackView({ request, kind, onBack }) {
+  const persistent = usePersistentState();
+  const progressRef = React.useRef({ currentTime: 0, duration: null });
   const [status, setStatus] = useState('idle');
   const [candidate, setCandidate] = useState(request?.candidates?.[0] ?? null);
   const [resolvedInput, setResolvedInput] = useState(null);
@@ -73,6 +75,15 @@ function PlaybackView({ request, kind, onBack }) {
   const core = useMemo(() => createPlaybackCore(task, {
     onEvent: (event) => {
       if (event.event === 'error') setError(event.error || '播放候选失败');
+      if (event.event === 'progress') {
+        progressRef.current = { currentTime: event.currentTime ?? 0, duration: event.duration ?? null };
+      }
+      if (event.event === 'completed') {
+        if (kind === 'vod' && request?.contentId && request?.episodeId) {
+          const progress = progressRef.current;
+          persistent.recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, true);
+        }
+      }
       if (event.event === 'released') setStatus('released');
       if (event.event === 'stopped') setStatus('stopped');
     },
@@ -104,6 +115,10 @@ function PlaybackView({ request, kind, onBack }) {
       });
     }
     return () => {
+      if (kind === 'vod' && request?.contentId && request?.episodeId) {
+        const progress = progressRef.current;
+        if (progress.currentTime > 0) persistent.recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, false);
+      }
       core.stop();
       core.release();
       void player;
