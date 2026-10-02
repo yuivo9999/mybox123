@@ -12,6 +12,7 @@ import { playbackTaskRegistry } from './playbackTaskRegistry.js';
 import { playbackSessionManager } from './playbackSessionManager.js';
 import { ErrorCode } from '../models/errors.js';
 import { errorService } from '../services/errorService.js';
+import { normalizePlaybackEvent } from './playbackEventProtocol.js';
 
 function nativeAvailable() {
   if (typeof window === 'undefined') return false;
@@ -24,10 +25,10 @@ export function createPlaybackCore(task,hooks={}) {
  const eventBus=createPlaybackEventBus();
  const stateMachine=createPlaybackStateMachine(task.request.kind??PlaybackKind.VOD);
  const networkPolicy=createPlaybackNetworkPolicy(hooks.networkPolicy);
- const unsubscribe=task.subscribe(e=>{eventBus.emit(e);hooks.onEvent?.(e);});
+ const unsubscribe=task.subscribe(e=>{const normalized=normalizePlaybackEvent(e);eventBus.emit(normalized);hooks.onEvent?.(normalized);});
 
  const transition=(next)=>{try{stateMachine.transition(next);}catch{stateMachine.reset();if(next!==PlayerState.IDLE)try{stateMachine.transition(next);}catch{}}hooks.onStateChange?.(stateMachine.state);return stateMachine.state;};
- const emit=(event,data={})=>eventBus.emit({event,requestId:task.request.requestId,taskId:task.request.taskId,...data});
+ const emit=(event,data={})=>{const normalized=normalizePlaybackEvent({event,requestId:task.request.requestId,taskId:task.request.taskId,...data});return eventBus.emit(normalized);};
 
  const handlePlayerEvent=(event)=>{
   if(event.event==='loading')transition(PlayerState.LOADING);
