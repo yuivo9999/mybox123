@@ -6,6 +6,8 @@ import {
   normalizePlaybackCandidate,
   isPlaybackCandidateExpired,
 } from '../models/playback.js';
+import { createPlaybackCore } from '../playback/playbackCore.js';
+import { createPlaybackLifecyclePolicy } from '../playback/playbackLifecyclePolicy.js';
 
 function sortCandidates(candidates) {
   return [...candidates].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
@@ -60,6 +62,25 @@ export const playbackService = {
 
   createTask(request) {
     return createPlaybackTask(request);
+  },
+
+  createController(request, hooks = {}) {
+    const task = createPlaybackTask(request);
+    const core = createPlaybackCore(task, hooks);
+    const policy = createPlaybackLifecyclePolicy({ kind: request?.kind });
+    return Object.freeze({
+      task,
+      core,
+      policy,
+      attachPlayer: element => core.attachPlayer(element),
+      start: () => core.start(),
+      resolveAndLoad: (candidate, options) => core.resolveAndLoad(candidate, options),
+      subscribe: listener => core.subscribe(listener),
+      leave: () => {
+        if (policy.onPageLeave === 'release') core.release();
+        else core.stop();
+      },
+    });
   },
 };
 
