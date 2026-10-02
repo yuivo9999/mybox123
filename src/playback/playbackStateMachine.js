@@ -1,7 +1,7 @@
 import { PlaybackKind } from '../models/playback.js';
 import { PlayerState } from '../player/playerInterface.js';
 
-const common = new Set([PlayerState.IDLE, PlayerState.LOADING, PlayerState.PREPARING, PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.ERROR, PlayerState.STOPPED, PlayerState.RELEASED]);
+const common = new Set([PlayerState.IDLE, PlayerState.LOADING, PlayerState.PREPARING, PlayerState.PLAYING, PlayerState.PAUSED, PlayerState.BUFFERING, PlayerState.COMPLETED, PlayerState.ERROR, PlayerState.STOPPED, PlayerState.RELEASED]);
 
 const vodTransitions = new Map([
   [PlayerState.IDLE, new Set([PlayerState.LOADING, PlayerState.RELEASED])],
