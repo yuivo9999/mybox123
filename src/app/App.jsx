@@ -20,7 +20,7 @@ const channels=liveService.getChannels(normalizedChannels);
 
 export function App(){
  const session=useSessionState(); const persistent=usePersistentState(); const {tab,route,selected}=session;
- useEffect(()=>{cacheService.prune()},[]);
+ useEffect(()=>{cacheService.prune();if(!persistent.settings?.initialized)persistent.saveSettings({...persistent.settings,initialized:true,initializedAt:Date.now()})},[]);
  useEffect(()=>webViewRuntime.mount({onBack:()=>{
    if(typeof document!=='undefined'&&document.fullscreenElement){void webViewRuntime.setFullscreen(false);return true}
    if(route==='movie-play'||route==='live-play'){sessionStateStore.patch({route:route==='movie-play'?'detail':'live-channel'});return true}
