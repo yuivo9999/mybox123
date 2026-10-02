@@ -9,10 +9,11 @@
     "preview": "vite preview",
     "test:live": "node scripts-test-live.mjs",
     "test:playback": "node scripts-test-playback.mjs",
-    "test": "npm run test:live && npm run test:playback && npm run test:parser && npm run test:player && npm run test:state",
     "test:parser": "node scripts-test-parser.mjs",
     "test:player": "node scripts-test-player-core.mjs",
-    "test:state": "node scripts-test-state.mjs"
+    "test:state": "node scripts-test-state.mjs",
+    "test:movie": "node scripts-test-movie-feature.mjs",
+    "test": "npm run test:live && npm run test:playback && npm run test:parser && npm run test:player && npm run test:state && npm run test:movie"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
