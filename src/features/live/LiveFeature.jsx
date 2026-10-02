@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Hls from 'hls.js';
 import { ChevronLeft, Heart, Play, Radio } from 'lucide-react';
 import { liveService } from '../../services/liveService.js';
 import { requestManager } from '../../services/requestManager.js';
@@ -40,10 +41,38 @@ export function LiveFeature({ channels = [], favorites = [], onChannel, onPlay, 
   }, [activeChannel, activeStreamIndex]);
 
   useEffect(() => {
-    if (videoRef.current && activeStream?.url) {
-      videoRef.current.src = activeStream.url;
-      videoRef.current.play?.().catch(() => {});
+    const video = videoRef.current;
+    if (!video || !activeStream?.url) return;
+
+    const url = activeStream.url;
+    let hls = null;
+
+    if (Hls.isSupported() && (url.includes('.m3u8') || activeStream.protocol === 'hls' || url.includes('m3u8'))) {
+      try {
+        hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+        hls.attachMedia(video);
+        hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+          hls.loadSource(url);
+        });
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          video.play().catch(() => {});
+        });
+      } catch {
+        video.src = url;
+        video.play().catch(() => {});
+      }
+    } else {
+      video.src = url;
+      video.play().catch(() => {});
     }
+
+    return () => {
+      if (hls) {
+        try {
+          hls.destroy();
+        } catch {}
+      }
+    };
   }, [activeStream?.url]);
 
   useEffect(() => {
