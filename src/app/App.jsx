@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Home, Film, Radio, Heart, User } from 'lucide-react';
 import { movies as normalizedMovies, channels as normalizedChannels } from '../data/demoData';
 import { contentService } from '../services/contentService';
