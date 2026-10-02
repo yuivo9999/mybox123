@@ -19,6 +19,8 @@ function applyFilters(items, filters = {}) {
   return items.filter((movie) => {
     if (filters.year && String(movie.year) !== String(filters.year)) return false;
     if (filters.type && filters.type !== '全部' && movie.category !== filters.type) return false;
+    if (filters.region && filters.region !== '全部' && movie.region !== filters.region) return false;
+    if (filters.status && filters.status !== '全部' && movie.status !== filters.status) return false;
     return true;
   });
 }
@@ -26,6 +28,8 @@ function sortItems(items, sort = 'default') {
   return [...items].sort((a, b) => {
     if (sort === 'latest') return Number(b.year || 0) - Number(a.year || 0) || String(b.title).localeCompare(String(a.title));
     if (sort === 'title') return String(a.title).localeCompare(String(b.title), 'zh-Hans');
+    if (sort === 'popular') return Number(b.popularity ?? b.rating ?? 0) - Number(a.popularity ?? a.rating ?? 0);
+    if (sort === 'time') return Number(b.updatedAt ?? b.year ?? 0) - Number(a.updatedAt ?? a.year ?? 0);
     return 0;
   });
 }
@@ -68,7 +72,11 @@ export const movieService = {
       const episodeIndex = Math.max(0, movie.episodes?.findIndex((episode) => episode.episodeId === item.episodeId) ?? 0);
       return { movie, episodeIndex, history: item };
     }).filter(Boolean).slice(0, limit);
-    return { continueWatching, recommended: movies.slice(0, limit), popular: movies.slice(0, limit), latest: [...movies].sort((a,b)=>Number(b.year||0)-Number(a.year||0)).slice(0, limit), categories: [...new Set(movies.map((movie)=>movie.category).filter(Boolean))] };
+    const categories = [...new Set(movies.map((movie) => movie.category).filter(Boolean))];
+    const regions = [...new Set(movies.map((movie) => movie.region).filter(Boolean))];
+    const years = [...new Set(movies.map((movie) => movie.year).filter(Boolean))].sort((a,b) => Number(b)-Number(a));
+    const statuses = [...new Set(movies.map((movie) => movie.status).filter(Boolean))];
+    return { continueWatching, recommended: movies.slice(0, limit), popular: movies.slice(0, limit), latest: [...movies].sort((a,b)=>Number(b.year||0)-Number(a.year||0)).slice(0, limit), categories, filters: { regions, years, statuses } };
   },
   clearCache() { cacheStorage.clear(CacheNamespace.MOVIE); cacheStorage.clear(CacheNamespace.DETAIL); cacheStorage.clear(CacheNamespace.EPISODE); },
 };
