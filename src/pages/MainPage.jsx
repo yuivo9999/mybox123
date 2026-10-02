@@ -36,7 +36,7 @@ const InfoCard=({title,text})=><div className="info-card"><Info size={18}/><div>
 const Empty=({text})=><div className="empty"><Film size={22}/><span>{text}</span></div>;
 const MovieGrid=React.memo(function MovieGrid({movies,onMovie}){return <div className="movie-grid">{movies.map(movie=><article className="movie-card" key={movie.contentId} onClick={()=>onMovie(movie)}><SmartImage src={movie.poster} alt={movie.title}/><div><b>{movie.title}</b><span>{movie.year} · {movie.category}</span></div></article>)}</div>});
 const cycle=(value,values)=>{const index=values.indexOf(value);return values[(index+1)%values.length]};
-const nextSource=(sources,type,current)=>{const list=sources.filter(source=>source.sourceType===type&&source.enabled!==false);if(!list.length)return null;const index=list.findIndex(source=>source.sourceId===current);return list[(index+1)%list.length]?.sourceId??null};
+const nextSource=(sources,type,current)=>{const list=sources.filter(source=>source.sourceType===type&&source.enabled!==false);if(!list.length)return null;const ids=[null,...list.map(source=>source.sourceId)];const index=Math.max(0,ids.indexOf(current));return ids[(index+1)%ids.length]??null};
 const Menu=({icon:Icon,title,onClick,badge})=><button className="menu" onClick={onClick}><Icon size={19}/><span>{title}</span>{badge>0&&<em>{badge}</em>}<ChevronLeft className="flip" size={17}/></button>;
 const SettingMenu=({icon:Icon,title,value,onClick})=><button className="menu setting-menu" onClick={onClick}><Icon size={19}/><span>{title}<small>{value}</small></span><ChevronLeft className="flip" size={17}/></button>;
 export {Main as MainPage};
