@@ -1,51 +1,130 @@
+function episodeMergeKey(episode) {
+  if (episode?.episodeIdentity) return episode.episodeIdentity;
+  const number = Number(episode?.episodeNumber);
+  const title = String(episode?.title ?? '').trim().toLowerCase();
+  return Number.isFinite(number) && number > 0 && title ? `number:${number}|title:${title}` : episode?.episodeId;
+}
+
+function mergeSourceRelations(existing = [], incoming = []) {
+  const result = [...existing];
+  for (const relation of incoming) {
+    if (!relation?.sourceId) continue;
+    if (!result.some(item => item.sourceId === relation.sourceId && item.sourceItemId === relation.sourceItemId)) result.push(relation);
+  }
+  return result;
+}
+
 function mergeEpisodes(existing, incoming) {
-  const byKey = new Map(existing.map(episode => [episode.episodeIdentity || episode.episodeId, episode]));
+  const byKey = new Map(existing.map(episode => [episodeMergeKey(episode), episode]));
+
   for (const episode of incoming) {
-    const key = episode.episodeIdentity || episode.episodeId;
+    const key = episodeMergeKey(episode);
     const current = byKey.get(key);
+
     if (!current) {
-      byKey.set(key, { ...episode, sourceRefs: [...(episode.sourceRefs ?? [])], playbackCandidates: [...(episode.playbackCandidates ?? [])] });
+      const sourceRelations = mergeSourceRelations(episode.sourceRelations ?? episode.sourceRefs ?? [], []);
+      byKey.set(key, {
+        ...episode,
+        sourceRefs: sourceRelations,
+        sourceRelations,
+        playbackCandidates: [...(episode.playbackCandidates ?? [])],
+      });
       continue;
     }
-    current.sourceRefs.push(...(episode.sourceRefs ?? []).filter(ref => !current.sourceRefs.some(item => item.sourceId === ref.sourceId && item.sourceItemId === ref.sourceItemId)));
-    current.playbackCandidates.push(...(episode.playbackCandidates ?? []).filter(candidate => !current.playbackCandidates.some(item => item.candidateId && item.candidateId === candidate.candidateId)));
+
+    const sourceRelations = mergeSourceRelations(
+      current.sourceRelations ?? current.sourceRefs ?? [],
+      episode.sourceRelations ?? episode.sourceRefs ?? [],
+    );
+    current.sourceRefs = sourceRelations;
+    current.sourceRelations = sourceRelations;
+    current.playbackCandidates = [
+      ...(current.playbackCandidates ?? []),
+      ...(episode.playbackCandidates ?? []).filter(candidate =>
+        !current.playbackCandidates.some(item =>
+          (item.candidateId && item.candidateId === candidate.candidateId) ||
+          (item.sourceId && item.sourceId === candidate.sourceId && item.mediaUrl === candidate.mediaUrl)
+        )
+      ),
+    ];
+    if (!current.description && episode.description) current.description = episode.description;
   }
+
   return [...byKey.values()];
+}
+
+function mergeContentInto(current, item) {
+  const sourceRelations = mergeSourceRelations(
+    current.sourceRelations ?? current.sourceRefs ?? [],
+    item.sourceRelations ?? item.sourceRefs ?? [],
+  );
+
+  current.sourceRefs = sourceRelations;
+  current.sourceRelations = sourceRelations;
+  current.episodes = mergeEpisodes(current.episodes ?? [], item.episodes ?? []);
+
+  if (!current.poster && item.poster) current.poster = item.poster;
+  if (!current.backdrop && item.backdrop) current.backdrop = item.backdrop;
+  if (!current.background && item.background) current.background = item.background;
+  if (!current.description && item.description) current.description = item.description;
+  if (!current.subtitle && item.subtitle) current.subtitle = item.subtitle;
+  if (!current.director && item.director) current.director = item.director;
+  if (!(current.cast?.length) && item.cast?.length) current.cast = [...item.cast];
+  if (!(current.actors?.length) && item.actors?.length) current.actors = [...item.actors];
+  if (!current.updateInfo && item.updateInfo) current.updateInfo = item.updateInfo;
+  current.updateStatus = current.updateInfo ?? current.updateStatus ?? '';
+  current.status = current.updateInfo ?? current.status ?? '';
+  current.episodeCount = Math.max(current.episodeCount ?? 0, item.episodeCount ?? 0, current.episodes.length);
+  current.totalEpisodes = current.episodeCount;
+  current.currentEpisode = Math.max(current.currentEpisode ?? 0, item.currentEpisode ?? 0);
+  current.availableSourceCount = new Set(sourceRelations.map(ref => ref.sourceId).filter(Boolean)).size;
+  current.createdAt = current.createdAt ?? item.createdAt ?? null;
+  current.updatedAt = Math.max(current.updatedAt ?? 0, item.updatedAt ?? 0) || null;
+  current.popularity = Math.max(current.popularity ?? 0, item.popularity ?? 0);
+  current.syncAt = Math.max(current.syncAt ?? 0, item.syncAt ?? 0);
+  return current;
+}
+
+function identityKeys(item) {
+  return [
+    item?.contentIdentity,
+    item?.contentMatchKey,
+    item?.contentId,
+  ].filter(Boolean);
 }
 
 export function mergeContents(items = []) {
   const byIdentity = new Map();
+
   for (const item of items) {
     if (!item?.contentId) continue;
-    // contentIdentity is only populated for an explicit stable external identity.
-    // Otherwise contentId remains source-qualified and must not be merged by display metadata.
-    const key = item.contentIdentity || item.contentId;
+
+    const keys = identityKeys(item);
+    let key = keys.find(candidate => byIdentity.has(candidate)) ?? keys[0];
     const current = byIdentity.get(key);
+
     if (!current) {
-      byIdentity.set(key, {
+      const sourceRelations = [...(item.sourceRelations ?? item.sourceRefs ?? [])];
+      const copy = {
         ...item,
-        sourceRefs: [...(item.sourceRefs ?? [])],
-        episodes: [...(item.episodes ?? [])],
-        availableSourceCount: Math.max(1, new Set((item.sourceRefs ?? []).map(ref => ref.sourceId).filter(Boolean)).size),
-      });
+        sourceRefs: sourceRelations,
+        sourceRelations,
+        episodes: mergeEpisodes([], item.episodes ?? []),
+        availableSourceCount: Math.max(1, new Set(sourceRelations.map(ref => ref.sourceId).filter(Boolean)).size),
+      };
+      byIdentity.set(key, copy);
+
+      // Once a metadata identity resolves two source-qualified records, keep all aliases
+      // pointing at the same canonical object so later sources join the same record.
+      for (const alias of keys) byIdentity.set(alias, copy);
       continue;
     }
-    current.sourceRefs.push(...(item.sourceRefs ?? []).filter(ref => !current.sourceRefs.some(x => x.sourceId === ref.sourceId && x.sourceItemId === ref.sourceItemId)));
-    current.episodes = mergeEpisodes(current.episodes, item.episodes ?? []);
-    if (!current.poster && item.poster) current.poster = item.poster;
-    if (!current.backdrop && item.backdrop) current.backdrop = item.backdrop;
-    if (!current.description && item.description) current.description = item.description;
-    if (!current.updateStatus && item.updateStatus) current.updateStatus = item.updateStatus;
-    if (!current.status && item.status) current.status = item.status;
-    current.totalEpisodes = Math.max(current.totalEpisodes ?? 0, item.totalEpisodes ?? 0, current.episodes.length);
-    current.currentEpisode = Math.max(current.currentEpisode ?? 0, item.currentEpisode ?? 0);
-    current.availableSourceCount = new Set(current.sourceRefs.map(ref => ref.sourceId).filter(Boolean)).size;
-    current.createdAt = current.createdAt ?? item.createdAt ?? null;
-    current.updatedAt = Math.max(current.updatedAt ?? 0, item.updatedAt ?? 0) || null;
-    current.popularity = Math.max(current.popularity ?? 0, item.popularity ?? 0);
-    current.syncAt = Math.max(current.syncAt ?? 0, item.syncAt ?? 0);
+
+    const merged = mergeContentInto(current, item);
+    for (const alias of keys) byIdentity.set(alias, merged);
   }
-  return [...byIdentity.values()];
+
+  return [...new Set(byIdentity.values())];
 }
 
 export const contentService = {
