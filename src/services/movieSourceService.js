@@ -8,41 +8,98 @@ import { errorService } from './errorService.js';
 export const movieRegistry = createMovieRegistry();
 
 function cacheKey(sourceId) {
-  return createCacheKey({ namespace: CacheNamespace.SOURCE, sourceId, contentId: 'movies', params: { type: 'movies' } });
+  return createCacheKey({
+    namespace: CacheNamespace.SOURCE,
+    sourceId,
+    contentId: 'movies',
+    params: { type: 'movies' },
+  });
 }
 
 async function load(adapter) {
   const key = cacheKey(adapter.sourceId);
   const cached = cacheStorage.get(CacheNamespace.SOURCE, key, { allowStale: true });
+
   try {
-    const value = await requestManager.run(`movie:source:${adapter.sourceId}`, signal => adapter.getMovies({ signal }));
+    const value = await requestManager.run(
+      `movie:source:${adapter.sourceId}`,
+      signal => adapter.getMovies({ signal }),
+    );
+
     if (Array.isArray(value) && value.length) {
       cacheStorage.set(CacheNamespace.SOURCE, key, value);
       return { value, stale: false };
     }
+
     if (cached.hit) return { value: cached.value, stale: true };
     return { value: [], stale: false };
   } catch (error) {
-    if (cached.hit) return { value: cached.value, stale: true, error };
+    if (cached.hit) {
+      return {
+        value: cached.value,
+        stale: true,
+        error: errorService.classifySource(error, {
+          scope: 'movie-source-cache-fallback',
+          sourceId: adapter.sourceId,
+        }),
+      };
+    }
     throw error;
   }
 }
 
+export async function testMovieSource(source, options = {}) {
+  const adapter = createMovieAdapter({
+    ...source,
+    sourceRef: source?.sourceRef || source?.url,
+  }, options.transport ?? fetch);
+
+  return adapter.healthCheck({ signal: options.signal });
+}
+
 export async function syncMovieSources(sourceConfigs = []) {
   movieRegistry.clear();
-  sourceConfigs.filter(source => source.enabled !== false && source.sourceType === 'movie' && (source.sourceRef || source.url)).forEach(source => {
-    movieRegistry.register(createMovieAdapter({ ...source, sourceRef: source.sourceRef || source.url }));
-  });
+
+  sourceConfigs
+    .filter(source => source.enabled !== false && source.sourceType === 'movie' && (source.sourceRef || source.url))
+    .forEach(source => {
+      movieRegistry.register(createMovieAdapter({
+        ...source,
+        sourceRef: source.sourceRef || source.url,
+      }));
+    });
+
   const settled = await Promise.all(movieRegistry.list().map(async adapter => {
     try {
       const result = await load(adapter);
-      return { status: 'fulfilled', sourceId: adapter.sourceId, value: result.value, stale: result.stale };
+      return {
+        status: 'fulfilled',
+        sourceId: adapter.sourceId,
+        value: result.value,
+        stale: result.stale,
+        capabilities: adapter.getCapabilities(),
+        definition: adapter.getDefinition(),
+        adapterStatus: adapter.getStatus(),
+      };
     } catch (reason) {
-      return { status: 'rejected', sourceId: adapter.sourceId, reason: errorService.classifySource(reason, { scope: 'movie-source', sourceId: adapter.sourceId }) };
+      return {
+        status: 'rejected',
+        sourceId: adapter.sourceId,
+        reason: errorService.classifySource(reason, {
+          scope: 'movie-source',
+          sourceId: adapter.sourceId,
+        }),
+        capabilities: adapter.getCapabilities(),
+        definition: adapter.getDefinition(),
+        adapterStatus: adapter.getStatus(),
+      };
     }
   }));
+
   return {
-    movies: contentService.getMovies(settled.flatMap(result => result.status === 'fulfilled' ? result.value : [])),
+    movies: contentService.getMovies(
+      settled.flatMap(result => result.status === 'fulfilled' ? result.value : []),
+    ),
     results: settled,
   };
 }
