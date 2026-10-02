@@ -30,7 +30,7 @@ export function MoviePlaybackPage({ request, movies = [], favorites = [], toggle
       }
       if (event.event === 'completed' && request?.contentId && request?.episodeId) {
         const progress = progressRef.current;
-        if (progress.currentTime > 0) persistent.recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, true);
+        if (progress.currentTime > 0) recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, true);
       }
     },
     onStateChange: setStatus,
