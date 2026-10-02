@@ -3,6 +3,7 @@ import { createLiveRegistry } from '../adapters/live/liveRegistry.js';
 import { cacheStorage, CacheNamespace, createCacheKey } from '../storage/cache.js';
 import { errorService } from './errorService.js';
 import { requestManager } from './requestManager.js';
+import { getEpgProgramStatus } from '../models/live.js';
 
 export const liveRegistry = createLiveRegistry();
 
@@ -88,6 +89,8 @@ export const liveService = {
 
   getChannels: (items = []) => mergeLiveChannels(items),
 
+  getCurrentEPG: (channel, now = Date.now()) => (channel?.epg ?? []).map(program => ({ ...program, status: getEpgProgramStatus(program, now) })),
+
   getCategories: (items = []) => [
     '全部',
     ...new Set(items.map((channel) => channel.category).filter(Boolean)),
@@ -131,14 +134,15 @@ export const liveService = {
     const results = await Promise.allSettled(adapters.map((adapter) => requestManager.run(`live:epg:${adapter.sourceId}:${channelRef?.channelId ?? ''}:${normalizedRange.startAt ?? ''}:${normalizedRange.endAt ?? ''}`, (signal) => adapter.getEPG(channelRef, normalizedRange, { signal }))));
     const epg = results.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
     if (epg.length) {
-      cacheStorage.set(CacheNamespace.EPG, key, epg);
-      return epg;
+      const normalized = epg.map(program => ({ ...program, status: getEpgProgramStatus(program) }));
+      cacheStorage.set(CacheNamespace.EPG, key, normalized);
+      return normalized;
     }
 
     // Refresh failure/empty response never overwrites a usable stale value.
-    if (cached.hit) return cached.value;
+    if (cached.hit) return cached.value.map(program => ({ ...program, status: getEpgProgramStatus(program) }));
 
-    return filterEPG(channelRef?.epg ?? [], normalizedRange);
+    return filterEPG(channelRef?.epg ?? [], normalizedRange).map(program => ({ ...program, status: getEpgProgramStatus(program) }));
   },
 
   clearEPGCache() {
