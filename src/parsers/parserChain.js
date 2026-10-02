@@ -1,4 +1,6 @@
 import { ParserErrorCode, createResolvedMediaInput } from '../models/parser.js';
+import { ErrorCode } from '../models/errors.js';
+import { errorService } from '../services/errorService.js';
 
 export function createParserChain(parsers = []) {
   const ordered = [...parsers].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
@@ -14,7 +16,15 @@ export function createParserChain(parsers = []) {
 
       if (candidate?.expiresAt) {\n        const expiresAt = typeof candidate.expiresAt === 'number' ? candidate.expiresAt : Date.parse(candidate.expiresAt);\n        if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) throw new Error(ParserErrorCode.SESSION_EXPIRED);\n      }\n\n      for (const parser of ordered) {
         if (!(await parser.matches(candidate, context))) continue;
-        const result = await parser.resolve(candidate, context);
+        let result;
+        try {
+          result = await parser.resolve(candidate, context);
+        } catch (error) {
+          throw errorService.normalize(error, {
+            code: ErrorCode.PARSE,
+            context: { scope: 'parser', parser: parser.name ?? 'anonymous', candidateId: candidate.candidateId, sourceId: candidate.sourceId },
+          });
+        }
         if (!result) throw new Error(ParserErrorCode.PARSER_NOT_MATCHED);
         return createResolvedMediaInput(result);
       }
