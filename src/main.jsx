@@ -6,6 +6,7 @@ import { movies as normalizedMovies, channels as normalizedChannels } from './da
 import { contentService } from './services/contentService';
 import { liveService } from './services/liveService';
 import { playbackService } from './services/playbackService';
+import { cacheService } from './services/cacheService.js';
 import { createPlaybackCore } from './playback/playbackCore';
 import { usePersistentState } from './state/usePersistentState.js';
 import { useSessionState } from './state/useSessionState.js';
@@ -20,6 +21,10 @@ function App() {
   const session = useSessionState();
   const persistent = usePersistentState();
   const { tab, route, selected } = session;
+
+  useEffect(() => {
+    cacheService.prune();
+  }, []);
 
   const openMovie = (movie) => sessionStateStore.patch({ selected: movie, route: 'detail' });
 
@@ -133,6 +138,7 @@ function Main({
   onLiveChannel,
   toggleFavorite,
   onClearData,
+  onClearCache,
 }) {
   if (tab === 'live') {
     return (
