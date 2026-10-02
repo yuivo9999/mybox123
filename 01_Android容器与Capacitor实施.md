@@ -141,6 +141,26 @@ npx cap sync
 
 ## 7. 阶段交接记录
 
+### 已完成交接（2026-10-03）
+
+- 阶段结论：阶段 1 已完成，下一阶段为 02_原生网络与CORS解决方案实施.md。
+- Capacitor：8.5.2；Android Gradle Plugin：8.13.0；Gradle Wrapper：8.14.3；compileSdk/targetSdk：36；minSdk：24；Java source/target：21。
+- Capacitor 配置：webDir=dist；appId=com.yuivo9999.mybox123；appName=TVBox React。
+- package.json 与 package-lock.json 的 root dependencies、devDependencies、engines 已逐项核对一致。
+- GitHub Actions 已真实执行 npm install、npm run build、npx cap sync android，run 37068061377 成功。
+- Android 关键文件已落库：android/settings.gradle、android/build.gradle、android/app/build.gradle、android/capacitor.settings.gradle、android/app/capacitor.build.gradle、MainActivity.java、Manifest 等。
+- src/runtime/webViewRuntime.js 保留；尚未声称 Capacitor 自动实现 TVBoxAndroidBridge。具体 bridge 兼容层留给后续阶段。
+- npm install 日志报告 3 个 moderate severity vulnerabilities，并报告 uuid@7.0.3 deprecated；本阶段未执行 audit fix --force，下一阶段必须先定位具体依赖链。
+- 固定 http/https URL 的 GitHub 代码搜索未返回结果；这不能证明运行时 source 配置没有 HTTP/HTTPS，下一阶段必须继续审计动态源配置及 service/parser/playback/HLS 入口。
+- Native HTTP/CORS、requestManager Android 适配、APK 专用 Actions、真机验收均未完成。
+- 一次性 android-scaffold-once.yml 已删除；deploy.yml 已恢复 contents: read，保留 Node 22。
+
+下一 AI 第一件事：先读取总控文档、本文件、02_原生网络与CORS解决方案实施.md，然后定位 3 个 moderate vulnerabilities 的具体依赖链，再开始 Native HTTP 设计。
+
+不要重复做：不要再次 npx cap add android，不要再次创建一次性 scaffold workflow，不要把“Android 工程存在”当成“CORS 已解决”或“APK 已完成”。
+
+验证证据：Android scaffold/sync commit cffd5ed3afa90611b88c6d75c8f597c0c23ced2b；Actions run 37068061377；cleanup commit 94aa2c62423abd477cee911d602e4a36ecb680b0。
+
 实施 AI 完成后必须填写：
 
 - 阶段：
