@@ -20,7 +20,8 @@
     "test:performance": "node scripts-test-performance.mjs",
     "test:data-contract": "node scripts-test-data-contract.mjs",
     "test:acceptance": "node scripts-test-acceptance.mjs",
-    "test:architecture": "node scripts-test-architecture-freeze.mjs"
+    "test:architecture": "node scripts-test-architecture-freeze.mjs",
+    "test:execution": "node scripts-test-execution-checklist.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
