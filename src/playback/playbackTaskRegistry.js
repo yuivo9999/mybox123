@@ -14,4 +14,4 @@ export function createPlaybackTaskRegistry() {
     ids() { return [...tasks.keys()]; },
   };
 }
-export const playbackTaskRegistry = createPlaybackTaskRegistry();
+export const playbackTaskRegistry=createPlaybackTaskRegistry();
