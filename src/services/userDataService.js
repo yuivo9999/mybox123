@@ -41,6 +41,8 @@ export const userDataService = {
     const history=userDataRepository.getHistory().map((item)=>item.targetType==='content'&&item.targetId===contentId&&item.episodeId===(episodeId??'')?{...item,positionSeconds:position,durationSeconds:duration,completed:Boolean(completed),lastPlayedAt:Date.now()}:item);
     userDataRepository.saveHistory(history); return progress;
   },
+  removeSearch(searchId) { const next = userDataRepository.getSearches().filter((item) => item.searchId !== searchId); userDataRepository.saveSearches(next); return next; },
+  clearSearches() { userDataRepository.saveSearches([]); return []; },
   recordSearch(keyword) {
     const clean=String(keyword??'').trim(); if(!clean)return userDataRepository.getSearches();
     const existing=userDataRepository.getSearches().find((item)=>item.keyword.toLowerCase()===clean.toLowerCase());
