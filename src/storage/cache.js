@@ -63,7 +63,7 @@ function prune(namespace) {
   const entries = listKeys(namespace).map((key) => {
     try {
       const value = JSON.parse(window.localStorage.getItem(key));
-      return { key, createdAt: Number(value?.createdAt) || 0, expiresAt: Number(value?.expiresAt) || 0, size: String(window.localStorage.getItem(key) ?? '').length };
+      return { key, createdAt: Number(value?.createdAt) || 0, lastAccessedAt: Number(value?.lastAccessedAt) || 0, expiresAt: Number(value?.expiresAt) || 0, size: String(window.localStorage.getItem(key) ?? '').length };
     } catch {
       return { key, createdAt: 0, expiresAt: 0, size: 0 };
     }
