@@ -18,7 +18,9 @@ export function createNativePlayerAdapter(hooks={}) {
   [PlayerCapability.TRACK_SELECTION]:true,[PlayerCapability.QUALITY_SELECTION]:true,
   [PlayerCapability.LIVE_RECONNECT]:true,
  });
- const emit=(event,data={})=>hooks.onEvent?.({event,...data});
+ const emit=(event,data={})=>{if(event==='playing')state=PlayerState.PLAYING;if(event==='paused')state=PlayerState.PAUSED;if(event==='bufferingStart')state=PlayerState.BUFFERING;if(event==='reconnecting')state=PlayerState.RECONNECTING;if(event==='stopped')state=PlayerState.STOPPED;if(event==='released')state=PlayerState.RELEASED;hooks.onEvent?.({event,...data});};
+ const eventHandler=(payload)=>{try{const value=typeof payload==='string'?JSON.parse(payload):payload;if(value?.event)emit(value.event,value.data??value);}catch{}};
+ if(typeof window!=='undefined'){window.TVBoxWebView=window.TVBoxWebView||{};window.TVBoxWebView.onPlayerEvent=eventHandler;}
  const adapter={
   get capabilities(){return capabilities;},
   load(next){if(released)throw new Error('PLAYER_ADAPTER_RELEASED');input=next;state=PlayerState.LOADING;emit('loading');return call('loadMedia',{url:next.url,headers:next.headers??{},cookies:next.cookies??'',referer:next.referer??'',userAgent:next.userAgent??'',token:next.token,protocol:next.protocol,playerHint:next.playerHint}).then(()=>input);},
@@ -35,7 +37,7 @@ export function createNativePlayerAdapter(hooks={}) {
   selectSubtitleTrack(trackId){return call('selectSubtitleTrack',{trackId});},
   getQualities(){return call('getQualities',{});},
   selectQuality(qualityId){return call('selectQuality',{qualityId});},
-  release(){if(released)return;released=true;state=PlayerState.RELEASED;emit('released');return call('releaseMedia',{}).catch(()=>undefined);},
+  release(){if(released)return;released=true;state=PlayerState.RELEASED;emit('released');if(typeof window!=='undefined'&&window.TVBoxWebView?.onPlayerEvent===eventHandler)delete window.TVBoxWebView.onPlayerEvent;return call('releaseMedia',{}).catch(()=>undefined);},
  };
  return createPlayerAdapterContract(adapter);
 }
