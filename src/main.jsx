@@ -76,6 +76,7 @@ function Detail({ movie, onBack, onPlay, fav, onFav }) { return <Page><button cl
 function PlaybackView({ request, kind, onBack }) {
   const [status, setStatus] = useState('idle');
   const [candidate, setCandidate] = useState(request?.candidates?.[0] ?? null);
+  const [resolvedInput, setResolvedInput] = useState(null);
   const [error, setError] = useState('');
   const task = useMemo(() => playbackService.createTask(request), [request]);
   const core = useMemo(() => createPlaybackCore(task, {
@@ -88,19 +89,31 @@ function PlaybackView({ request, kind, onBack }) {
     },
     onCandidateChange: (next) => {
       setCandidate(next);
+      setResolvedInput(null);
       if (next) setError('');
+    },
+    onResolvedInput: (input) => setResolvedInput(input),
+    onParserError: ({ code }) => {
+      setResolvedInput(null);
+      setError(`解析失败：${code}`);
     },
     onExhausted: () => setStatus('error'),
   }), [task]);
 
   useEffect(() => {
+    let disposed = false;
     const initial = core.start();
     setCandidate(initial);
     if (!initial) {
       setStatus('error');
       setError('没有可用的播放候选');
+    } else {
+      core.resolve(initial).then((input) => {
+        if (!disposed && input) setResolvedInput(input);
+      });
     }
     return () => {
+      disposed = true;
       core.stop();
       core.release();
     };
@@ -110,7 +123,9 @@ function PlaybackView({ request, kind, onBack }) {
     const next = core.switchCandidate(candidateId);
     if (next) {
       setCandidate(next);
+      setResolvedInput(null);
       setStatus('loading');
+      core.resolve(next);
     }
   };
 
@@ -123,7 +138,7 @@ function PlaybackView({ request, kind, onBack }) {
   return <div className="player-page">
     <button className="back player-back" onClick={onBack}><ChevronLeft />退出{kind === 'live' ? '直播' : '播放'}</button>
     <div className="video-wrap">
-      {candidate ? <video key={candidate.candidateId} controls autoPlay={kind === 'live'} playsInline poster={request?.metadata?.poster} onLoadStart={() => setStatus('loading')} onCanPlay={() => { core.markPlaying(); setStatus('playing'); }} onError={() => { const next = core.fail(new Error('MEDIA_LOAD_ERROR')); if (!next) setStatus('error'); }}><source src={candidate.mediaUrl} type={mediaType} /></video> : null}
+      {resolvedInput ? <video key={candidate?.candidateId} controls autoPlay={kind === 'live'} playsInline poster={request?.metadata?.poster} onLoadStart={() => setStatus('loading')} onCanPlay={() => { core.markPlaying(); setStatus('playing'); }} onError={() => { const next = core.fail(new Error('MEDIA_LOAD_ERROR')); if (!next) setStatus('error'); }}><source src={resolvedInput.url} type={mediaType} /></video> : candidate ? <div className="video-error">正在解析播放地址…</div> : null}
       {status === 'error' && <div className="video-error">{error || '当前播放链路没有可用候选。'}</div>}
     </div>
     <div className="player-info">
