@@ -39,6 +39,7 @@ export const persistentStateStore = {
   getSnapshot,
   reload: refresh,
   toggleFavorite(targetType, targetId) { userDataService.toggleFavorite(targetType, targetId); return refresh(); },
+  touchFavorite(targetType, targetId) { userDataService.touchFavorite(targetType, targetId); return refresh(); },
   recordMoviePlay(movie, episodeIndex = 0, sourceId = null) { userDataService.recordMoviePlay(movie, episodeIndex, sourceId); return refresh(); },
   recordLivePlay(channel, streamId = null) { userDataService.recordLivePlay(channel, streamId); return refresh(); },
   recordProgress(contentId, episodeId, positionSeconds, durationSeconds = null, completed = false) {
