@@ -16,10 +16,10 @@
 - 已有 GitHub Actions，但当前主要用于 GitHub Pages 部署。
 - 已有 `src/runtime/webViewRuntime.js`。
 - 已有 `src/services/requestManager.js`。
-- 当前没有完整 Android 原生工程。
-- 当前没有 Capacitor Android 平台目录。
-- 当前没有 Android Manifest / Gradle Android App 工程。
-- 当前没有专门生成 APK 的 GitHub Actions 工作流。
+- 阶段 1 已完成：Android 原生工程已经存在并纳入 Git。
+- Capacitor Android 8.5.2 已安装并同步。
+- Android Manifest / Gradle Android App 工程已经由 Capacitor CLI 实际生成。
+- 当前仍没有正式的 Android APK 专用 GitHub Actions 工作流；阶段 4 才建立。
 - 当前 WebView bridge 只是“桥接抽象”，不是已经存在的 Android 原生实现。
 
 ### 已有 WebView 能力
@@ -132,13 +132,13 @@ React → requestManager → Android 请求适配器 → Native HTTP → 第三�
 | 阶段 | 文档 | 目标 | 完成后状态 |
 |---|---|---|---|
 | 0 | 本文 | 总控、状态、交接规则 | AI 知道整个任务 |
-| 1 | `01_Android容器与Capacitor实施.md` | 建立 Android 工程 | 仓库具备 Android 容器 |
+| 1 | `01_Android容器与Capacitor实施.md` | 建立 Android 工程 | **已完成：仓库具备 Android 容器** |
 | 2 | `02_原生网络与CORS解决方案实施.md` | 建立 Native HTTP 通道 | CORS 敏感请求具备原生通路 |
 | 3 | `03_React请求层Android适配实施.md` | 接入现有 requestManager | 业务请求可按运行环境选择通路 |
 | 4 | `04_GitHub_Actions_APK构建实施.md` | GitHub 自动构建 APK | push 后可获得 APK Artifact |
 | 5 | `05_最终验收与AI交接实施.md` | 全面静态/CI/设备验收 | 明确是否真正完成 |
 
-**执行顺序必须遵守：1 → 2 → 3 → 4 → 5。**
+**执行顺序必须遵守：1 → 2 → 3 → 4 → 5。当前已完成阶段 1，下一阶段只能进入阶段 2。**
 
 如果某阶段发现前置阶段存在缺陷，不允许直接跳到后面的阶段掩盖问题。
 
@@ -272,7 +272,24 @@ React → requestManager → Android 请求适配器 → Native HTTP → 第三�
 
 ---
 
-## 9. 最终完成定义
+## 9. 阶段 1 已完成后的当前状态
+
+截至 2026-10-03，Android 容器阶段已经完成，但整个 Android APK 改造远未完成。
+
+- Capacitor 8.5.2 + Android 工程已落库。
+- webDir 已确定为 dist。
+- appId 已确定为 com.yuivo9999.mybox123。
+- GitHub Actions 已真实执行 npm run build 与 npx cap sync android。
+- requestManager、webViewRuntime 尚未完成 Native HTTP / bridge 兼容接入。
+- npm install 日志存在 3 个 moderate severity vulnerabilities，下一阶段必须先定位依赖链。
+- CORS 尚未解决。
+- APK 构建工作流尚未建立。
+
+下一 AI 入口：02_原生网络与CORS解决方案实施.md。第一件事是核对真实网络请求入口、动态 source 配置、3 个 moderate vulnerabilities，并设计受限 Native HTTP 通道。
+
+---
+
+## 10. 最终完成定义
 
 只有同时满足以下条件，才可以说“Android APK 改造完成”：
 
