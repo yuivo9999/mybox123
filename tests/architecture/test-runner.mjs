@@ -40,6 +40,16 @@ expectNo('src/repositories/userDataRepository.js', [/getSourceConfig/, /saveSour
 expectNo('src/state/persistentStateStore.js', [/sourceRepository/, /saveSources\(/, /setSourceEnabled/, /setSourceActive/, /removeSource/]);
 expect('src/features/movie/MoviePlaybackPage.jsx', [/playbackService\.createController/, /recordProgress/]);
 
+// Settings completeness: every user-facing setting must be backed by persistent state and a real event path.
+expect('src/models/userData.js', [/defaultSettings/, /normalizeSettings/, /autoplayResume/, /defaultMovieSource/, /defaultLiveSource/, /theme/, /fontSize/, /cardStyle/, /density/]);
+expect('src/services/userDataService.js', [/normalizeSettings/, /updateSettings/]);
+expect('src/state/persistentStateStore.js', [/updateSettings/]);
+expect('src/pages/MainPage.jsx', [/自动继续播放/, /默认影视线路/, /默认直播线路/, /主题/, /字体/, /卡片显示/, /显示密度/, /SettingMenu/, /onUpdateSettings/]);
+expect('src/app/App.jsx', [/persistent\.settings/, /defaultMovieSource/, /defaultLiveSource/, /autoplayResume/, /onUpdateSettings/]);
+expect('src/services/playbackService.js', [/preferredSource/, /getVODCandidates/, /createVODRequest/, /createLiveRequest/]);
+expect('src/pages/PlaybackPage.jsx', [/重新播放/, /切换线路/]);
+expectNo('src/pages/MainPage.jsx', [/title="自动继续播放"\/>/, /title="默认播放线路"\/>/, /title="主题"\/>/, /title="字体"\/>/, /title="卡片显示"\/>/, /title="显示密度"\/>/]);
+
 const pageAndFeatureFiles = allSourceFiles.filter(file => file.startsWith('src/pages/') || file.startsWith('src/features/'));
 for (const file of pageAndFeatureFiles) expectNo(file, [/\bcreatePlaybackCore\s*\(/, /\bFileReader\b/, /\bnew Blob\(/, /URL\.createObjectURL/], file);
 for (const file of allSourceFiles) {
