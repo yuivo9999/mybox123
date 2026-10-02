@@ -6,9 +6,12 @@ const DEFAULT_CAPABILITIES = Object.freeze([
   'search',
   'categories',
   'list',
+  'filter',
+  'sort',
   'detail',
   'episodes',
   'playUrl',
+  'recommendations',
 ]);
 
 export function createMovieAdapter(config, transport = fetch) {
@@ -27,7 +30,7 @@ export function createMovieAdapter(config, transport = fetch) {
 
   let lastError = null;
   let lastCheckedAt = null;
-  let status = 'unknown';
+  let status = String(config.status ?? 'unknown');
 
   const request = async (options = {}) => {
     if (!sourceDefinition.endpoint) {
@@ -55,7 +58,7 @@ export function createMovieAdapter(config, transport = fetch) {
 
     if (!response?.ok) {
       throw toAppError(new Error(`HTTP_${response?.status ?? 0}`), {
-        code: ErrorCode.SOURCE,
+        code: ErrorCode.SOURCE_RESPONSE,
         scope: 'movie-source-response',
         context: { sourceId, status: response?.status ?? 0 },
       });
@@ -98,12 +101,18 @@ export function createMovieAdapter(config, transport = fetch) {
 
       const normalized = raw.map((item, index) => {
         try {
+          if (!item || typeof item !== 'object') throw new Error('MOVIE_SOURCE_FIELD_MISSING');
+          if (!(item.sourceItemId ?? item.id) || !(item.title ?? item.name)) throw new Error('MOVIE_SOURCE_FIELD_MISSING');
           return normalizeMovie({ sourceId, item, index });
         } catch (error) {
           throw toAppError(error, {
             code: ErrorCode.NORMALIZE,
             scope: 'movie-source-normalize',
-            context: { sourceId, sourceItemId: item?.sourceItemId ?? item?.id ?? null, index },
+            context: {
+              sourceId,
+              sourceItemId: item?.sourceItemId ?? item?.id ?? null,
+              index,
+            },
           });
         }
       });
@@ -145,18 +154,40 @@ export function createMovieAdapter(config, transport = fetch) {
     return [...new Set(movies.map(item => item.category).filter(Boolean))];
   };
 
+  const filterItems = (movies, params = {}) => {
+    requireCapability('filter');
+    let result = movies;
+    if (params.category) result = result.filter(item => item.category === params.category);
+    if (params.year) result = result.filter(item => String(item.year) === String(params.year));
+    if (params.type) result = result.filter(item => item.type === params.type || item.contentType === params.type);
+    if (params.region) result = result.filter(item => item.region === params.region);
+    return result;
+  };
+
+  const sortItems = (movies, params = {}) => {
+    requireCapability('sort');
+    const sortBy = params.sortBy ?? 'popularity';
+    const direction = params.order === 'asc' ? 1 : -1;
+    return [...movies].sort((a, b) => {
+      const left = a?.[sortBy] ?? '';
+      const right = b?.[sortBy] ?? '';
+      if (left === right) return 0;
+      return left > right ? direction : -direction;
+    });
+  };
+
   const getList = async (params = {}, options = {}) => {
     requireCapability('list');
-    const movies = await ensureMovies(options);
+    let movies = await ensureMovies(options);
+    if (params.category || params.year || params.type || params.region) movies = filterItems(movies, params);
+    if (params.sortBy) movies = sortItems(movies, params);
     const page = Math.max(1, Number(params.page) || 1);
     const pageSize = Math.max(1, Math.min(100, Number(params.pageSize) || 20));
-    const category = String(params.category ?? '').trim();
-    const filtered = category ? movies.filter(item => item.category === category) : movies;
     return {
-      items: filtered.slice((page - 1) * pageSize, page * pageSize),
+      items: movies.slice((page - 1) * pageSize, page * pageSize),
       page,
       pageSize,
-      total: filtered.length,
+      total: movies.length,
     };
   };
 
@@ -165,15 +196,28 @@ export function createMovieAdapter(config, transport = fetch) {
     const query = String(params.query ?? params.keyword ?? '').trim().toLowerCase();
     if (!query) return getList(params, options);
     const movies = await ensureMovies(options);
-    const filtered = movies.filter(item => [item.title, item.subtitle, item.description, item.category].some(value => String(value ?? '').toLowerCase().includes(query)));
-    return { ...await getList({ ...params, page: 1 }, { ...options, items: filtered }), items: filtered.slice(0, Math.max(1, Number(params.pageSize) || 20)), total: filtered.length };
+    const filtered = movies.filter(item =>
+      [item.title, item.subtitle, item.description, item.category]
+        .some(value => String(value ?? '').toLowerCase().includes(query))
+    );
+    return {
+      ...await getList({ ...params, page: 1 }, { ...options, items: filtered }),
+      items: filtered.slice(0, Math.max(1, Number(params.pageSize) || 20)),
+      total: filtered.length,
+    };
   };
 
   const getDetail = async (contentRef, options = {}) => {
     requireCapability('detail');
     const movies = await ensureMovies(options);
-    const ref = typeof contentRef === 'string' ? contentRef : contentRef?.contentId ?? contentRef?.sourceItemId;
-    return movies.find(item => item.contentId === ref || item.legacyContentId === ref || item.sourceRefs?.some(source => source.sourceItemId === ref)) ?? null;
+    const ref = typeof contentRef === 'string'
+      ? contentRef
+      : contentRef?.contentId ?? contentRef?.sourceItemId;
+    return movies.find(item =>
+      item.contentId === ref ||
+      item.legacyContentId === ref ||
+      item.sourceRefs?.some(source => source.sourceItemId === ref)
+    ) ?? null;
   };
 
   const getEpisodes = async (contentRef, options = {}) => {
@@ -186,30 +230,65 @@ export function createMovieAdapter(config, transport = fetch) {
     requireCapability('playUrl');
     const episodeId = typeof episodeRef === 'string' ? episodeRef : episodeRef?.episodeId;
     const movies = await ensureMovies(options);
-    return movies.flatMap(item => item.episodes ?? []).find(episode => episode.episodeId === episodeId)?.playbackCandidates ?? [];
+    return movies
+      .flatMap(item => item.episodes ?? [])
+      .find(episode => episode.episodeId === episodeId)
+      ?.playbackCandidates ?? [];
+  };
+
+  const getRecommendations = async (contentRef, options = {}) => {
+    requireCapability('recommendations');
+    const movies = await ensureMovies(options);
+    const current = await getDetail(contentRef, options);
+    const category = current?.category;
+    return movies
+      .filter(item => item.contentId !== current?.contentId && (!category || item.category === category))
+      .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0))
+      .slice(0, Math.max(1, Math.min(50, Number(options.limit) || 12)));
   };
 
   const healthCheck = async (options = {}) => {
     try {
       await load(options);
-      return { ok: true, sourceId, status: 'healthy', checkedAt: lastCheckedAt, error: null };
+      return {
+        ok: true,
+        sourceId,
+        status: 'healthy',
+        checkedAt: lastCheckedAt,
+        error: null,
+      };
     } catch (error) {
-      return { ok: false, sourceId, status: 'error', checkedAt: lastCheckedAt, error: toAppError(error, { context: { sourceId } }) };
+      return {
+        ok: false,
+        sourceId,
+        status: 'error',
+        checkedAt: lastCheckedAt,
+        error: toAppError(error, { context: { sourceId } }),
+      };
     }
   };
 
+  const getDefinition = () => ({
+    ...sourceDefinition,
+    status,
+    lastCheckedAt,
+  });
+
   return {
     sourceId,
-    definition: sourceDefinition,
-    getDefinition: () => sourceDefinition,
+    definition: getDefinition(),
+    getDefinition,
     getCapabilities: () => [...sourceDefinition.capabilities],
     getMovies: load,
     search,
     getCategories,
     getList,
+    filter: filterItems,
+    sort: sortItems,
     getDetail,
     getEpisodes,
     getPlaybackCandidates,
+    getRecommendations,
     healthCheck,
     getStatus: () => ({ status, lastCheckedAt, error: lastError }),
   };
