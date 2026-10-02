@@ -30,7 +30,7 @@ export function createLiveAdapter(config, transport = fetch) {
         ...item,
         epg: [...(item.epg ?? []), ...epgPrograms.filter((program) => program.channelRef === item.sourceItemId || program.channelRef === item.channelKey)],
       }));
-      const normalized = withEPG.map((item, index) => normalizeLiveChannel({ sourceId, item, index }));
+      const normalized = withEPG.map((item, index) => normalizeLiveChannel({ sourceId, item, index, capabilities }));
       snapshot = normalized;
       lastSuccessfulSnapshot = normalized;
       lastSuccessfulAt = Date.now();
