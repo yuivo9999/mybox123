@@ -11,6 +11,7 @@ export function usePersistentState() {
     ...snapshot,
     reload: persistentStateStore.reload,
     toggleFavorite: persistentStateStore.toggleFavorite,
+    touchFavorite: persistentStateStore.touchFavorite,
     recordMoviePlay: persistentStateStore.recordMoviePlay,
     recordLivePlay: persistentStateStore.recordLivePlay,
     recordProgress: persistentStateStore.recordProgress,
