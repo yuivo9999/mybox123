@@ -74,13 +74,16 @@ export function createPlaybackCore(task,hooks={}) {
    const normalized=errorService.normalize(error,{code:error?.message?.includes('SessionExpired')?ErrorCode.PLAYBACK:ErrorCode.PARSE,context:{scope:'parser',taskId:task.request.taskId,requestId:task.request.requestId,candidateId:candidate.candidateId}});
    hooks.onParserError?.({candidate,error:normalized,code});
    emit('error',{candidateId:candidate.candidateId,code,error:normalized.message});
+   const failureCode=code===PlaybackFailureCode.NETWORK?PlaybackFailureCode.NETWORK:code===PlaybackFailureCode.EXPIRED?PlaybackFailureCode.EXPIRED:PlaybackFailureCode.PARSER;
+   failAndResolve(normalized,failureCode);
    return null;
   }
  };
 
  const playResolved=async(input)=>{
   if(!player)throw new Error('PLAYER_ADAPTER_NOT_ATTACHED');
-  player.load(input);player.prepare();
+  await Promise.resolve(player.load(input));
+  await Promise.resolve(player.prepare());
   const startPosition=Number(task.request.metadata?.startPositionSeconds??0);
   if(task.request.kind===PlaybackKind.VOD&&startPosition>0)player.seek(startPosition);
   if(input.playerHint?.autoplay||task.request.kind===PlaybackKind.LIVE)await player.play();
@@ -127,7 +130,7 @@ export function createPlaybackCore(task,hooks={}) {
   retry(options={}){if(!networkPolicy.shouldRetry({code:options.code??'network'}))return null;const candidate=task.retry(options);if(candidate)void resolveAndLoad(candidate);return candidate;},
   fail(error,code=PlaybackFailureCode.UNKNOWN){return failAndResolve(error,code);},
   switchCandidate(candidateId){const next=task.switchCandidate(candidateId);hooks.onCandidateChange?.(next);if(next){networkPolicy.reset();transition(PlayerState.LOADING);void resolveAndLoad(next).catch(e=>hooks.onPlayerError?.({error:e,candidate:next}));}return next;},
-  switchEpisode(episodeId){emit('episodeChanged',{episodeId});return episodeId;},
+  switchEpisode(episodeId,candidate=null,startPositionSeconds=0){emit('episodeChanged',{episodeId});if(candidate){task.request.episodeId=episodeId;task.request.metadata={...task.request.metadata,startPositionSeconds};return this.switchCandidate(candidate.candidateId);}return episodeId;},
   async handleAppState(state){
    if(state==='background'){if(task.request.kind===PlaybackKind.VOD){await player?.pause?.();}else{player?.pause?.();}}
    if(state==='foreground'&&task.request.kind===PlaybackKind.LIVE&&task.currentCandidate){try{await resolveAndLoad(task.currentCandidate);}catch(e){void recover(e,PlaybackFailureCode.NETWORK);}}
