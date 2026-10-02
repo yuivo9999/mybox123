@@ -43,6 +43,10 @@ export const sourceManagementService = {
     sourceRepository.saveAll(sources.filter(item => item.sourceId !== sourceId));
     return this.reload();
   },
+  updateStatus(sourceId, status) {
+    const sources = sourceRepository.getAll();
+    sourceRepository.saveAll(sources.map(item => item.sourceId === sourceId ? { ...item, status } : item));
+  },
   touchUsage(sourceId) {
     if (!sourceId) return;
     const sources = sourceRepository.getAll();
