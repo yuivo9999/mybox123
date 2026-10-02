@@ -1,0 +1,163 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { Home, Film, Radio, Heart, User } from 'lucide-react';
+import { movies as normalizedMovies, channels as normalizedChannels } from '../data/demoData';
+import { contentService } from '../services/contentService';
+import { liveService } from '../services/liveService';
+import { playbackService } from '../services/playbackService';
+import { cacheService } from '../services/cacheService.js';
+import { usePersistentState } from '../state/usePersistentState.js';
+import { useSessionState } from '../state/useSessionState.js';
+import { sessionStateStore } from '../state/sessionStateStore.js';
+import { MovieFeature } from '../features/movie/MovieFeature.jsx';
+import { LiveFeature, LiveChannelPanel } from '../features/live/LiveFeature.jsx';
+import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
+import { webViewRuntime } from '../runtime/webViewRuntime.js';
+import { MainPage } from '../pages/MainPage.jsx';
+import { PlaybackPage } from '../pages/PlaybackPage.jsx';
+
+const movies = contentService.getMovies(normalizedMovies);
+const channels = liveService.getChannels(normalizedChannels);
+
+export function App() {
+  const session = useSessionState();
+  const persistent = usePersistentState();
+  const { tab, route, selected } = session;
+
+  useEffect(() => {
+    cacheService.prune();
+  }, []);
+
+  useEffect(() => {
+    return webViewRuntime.mount({
+      onBack: () => {
+        if (typeof document !== 'undefined' && document.fullscreenElement) {
+          void webViewRuntime.setFullscreen(false);
+          return true;
+        }
+        if (route === 'movie-play') {
+          sessionStateStore.patch({ route: 'detail' });
+          return true;
+        }
+        if (route === 'live-play') {
+          sessionStateStore.patch({ route: 'live-channel' });
+          return true;
+        }
+        if (route === 'detail' || route === 'live-channel') {
+          sessionStateStore.patch({ route: null, selected: null });
+          return true;
+        }
+        return false;
+      },
+      onAppStateChange: (state) => {
+        if (state === 'foreground' && (route === 'movie-play' || route === 'live-play')) {
+          webViewRuntime.call('getAppState');
+        }
+      },
+    });
+  }, [route]);
+
+  const openMovie = (movie) => sessionStateStore.patch({ selected: movie, route: 'detail' });
+
+  const playMovie = (movie, episodeIndex = 0) => {
+    const episode = movie.episodes[episodeIndex] ?? movie.episodes[0];
+    const request = playbackService.createVODRequest({
+      content: movie,
+      episode,
+      episodeIndex,
+      metadata: { title: movie.title, poster: movie.poster, episodeTitle: episode?.title ?? '' },
+    });
+    sessionStateStore.patch({ selected: request, route: 'movie-play' });
+    persistent.recordMoviePlay(movie, episodeIndex);
+  };
+
+  const nav = (key) => {
+    sessionStateStore.patch({ tab: key, route: null, selected: null });
+  };
+
+  const openLiveChannel = (channel) => {
+    sessionStateStore.patch({ selected: channel, route: 'live-channel', tab: 'live' });
+  };
+
+  const playLive = (channel, streamId = null) => {
+    const request = playbackService.createLiveRequest({
+      channel,
+      metadata: { title: channel.name, category: channel.category },
+    });
+    if (streamId) {
+      const index = request.candidates.findIndex((candidate) => candidate.streamId === streamId);
+      if (index >= 0) {
+        request.candidates = [
+          request.candidates[index],
+          ...request.candidates.filter((_, itemIndex) => itemIndex !== index),
+        ];
+      }
+    }
+    sessionStateStore.patch({ selected: request, route: 'live-play', tab: 'live' });
+    persistent.recordLivePlay(channel, streamId);
+  };
+
+  const movieFeatureActive = route === 'detail' || route === 'movie-play' || tab === 'home' || tab === 'movies';
+
+  return (
+    <div className="app-shell">
+      <div className="screen">
+        {movieFeatureActive ? (
+          <MovieFeature
+            route={route}
+            tab={tab}
+            selected={selected}
+            movies={movies}
+            channels={channels}
+            history={persistent.history}
+            favorites={persistent.favorites}
+            onMovie={openMovie}
+            onPlay={playMovie}
+            onTab={nav}
+            onBack={() => sessionStateStore.patch({ route: route === 'movie-play' ? 'detail' : null })}
+            onLive={playLive}
+            recordSearch={persistent.recordSearch}
+            toggleFavorite={persistent.toggleFavorite}
+          />
+        ) : route === 'live-channel' ? (
+          <LiveChannelPanel
+            channel={selected}
+            channels={channels}
+            favorites={persistent.favorites}
+            onBack={() => sessionStateStore.patch({ route: null, selected: null, tab: 'live' })}
+            onPlay={playLive}
+            onChannel={openLiveChannel}
+            toggleFavorite={persistent.toggleFavorite}
+          />
+        ) : route === 'live-play' ? (
+          <PlaybackPage request={selected} kind="live" onBack={() => sessionStateStore.patch({ route: selected?.channelId ? 'live-channel' : null })} />
+        ) : (
+          <MainPage
+            tab={tab}
+            movies={movies}
+            channels={channels}
+            favorites={persistent.favorites}
+            history={persistent.history}
+            sources={persistent.sources}
+            searches={persistent.searches}
+            onTab={nav}
+            onMovie={openMovie}
+            onLive={playLive}
+            onLiveChannel={openLiveChannel}
+            toggleFavorite={persistent.toggleFavorite}
+            onClearData={persistent.clearUserData}
+            onClearCache={persistent.clearCache}
+          />
+        )}
+        {!route && <BottomNav tab={tab} onTab={nav} />}
+      </div>
+    </div>
+  );
+}
+
+function BottomNav({ tab, onTab }) {
+  return <nav>{[['home', Home, '首页'], ['movies', Film, '影视'], ['live', Radio, '直播'], ['favorites', Heart, '收藏'], ['me', User, '我的']].map(([key, Icon, label]) => <button className={tab === key ? 'active' : ''} onClick={() => onTab(key)} key={key}><Icon size={21} fill={tab === key ? 'currentColor' : 'none'} /><span>{label}</span></button>)}</nav>;
+}
+
+export function AppRoot() {
+  return <ErrorBoundary><App /></ErrorBoundary>;
+}
