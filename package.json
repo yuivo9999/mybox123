@@ -19,7 +19,8 @@
     "test:webview-runtime": "node scripts-test-webview-runtime.mjs",
     "test:performance": "node scripts-test-performance.mjs",
     "test:data-contract": "node scripts-test-data-contract.mjs",
-    "test:acceptance": "node scripts-test-acceptance.mjs"
+    "test:acceptance": "node scripts-test-acceptance.mjs",
+    "test:architecture": "node scripts-test-architecture-freeze.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
