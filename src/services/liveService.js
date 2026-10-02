@@ -1,6 +1,7 @@
 import { mergeLiveChannels } from '../adapters/live/normalizeLive.js';
 import { createLiveRegistry } from '../adapters/live/liveRegistry.js';
 import { cacheStorage, CacheNamespace, createCacheKey } from '../storage/cache.js';
+import { errorService } from './errorService.js';
 
 export const liveRegistry = createLiveRegistry();
 
@@ -77,7 +78,7 @@ export const liveService = {
         const loaded = await loadSourceChannels(adapter);
         return { status: 'fulfilled', value: loaded.value, sourceId: adapter.sourceId, cached: loaded.cached, stale: loaded.stale ?? false };
       } catch (reason) {
-        return { status: 'rejected', reason, sourceId: adapter.sourceId };
+        return { status: 'rejected', reason: errorService.classifySource(reason, { scope: 'live-source', sourceId: adapter.sourceId }), sourceId: adapter.sourceId };
       }
     }));
     const channels = settled.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
