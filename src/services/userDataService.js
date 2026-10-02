@@ -24,9 +24,22 @@ export const userDataService = {
       }
     });
     if (!contentMap.size) return false;
-    const favorites = userDataRepository.getFavorites().map(item => contentMap.has(item.targetId) ? { ...item, targetId: contentMap.get(item.targetId), favoriteId: userDataRepository.ids.createFavoriteId(item.targetType, contentMap.get(item.targetId)) } : item);
-    const history = userDataRepository.getHistory().map(item => contentMap.has(item.targetId) ? { ...item, targetId: contentMap.get(item.targetId), episodeId: episodeMap.get(item.episodeId) ?? item.episodeId, historyId: userDataRepository.ids.createHistoryId(item.targetType, contentMap.get(item.targetId), episodeMap.get(item.episodeId) ?? item.episodeId) } : item);
-    const progress = userDataRepository.getProgress().map(item => contentMap.has(item.contentId) ? { ...item, contentId: contentMap.get(item.contentId), episodeId: episodeMap.get(item.episodeId) ?? item.episodeId, progressId: userDataRepository.ids.createProgressId(contentMap.get(item.contentId), episodeMap.get(item.episodeId) ?? item.episodeId) } : item);
+    const favorites = [...new Map(userDataRepository.getFavorites().map(item => {
+      const targetId = contentMap.get(item.targetId) ?? item.targetId;
+      return [userDataRepository.ids.createFavoriteId(item.targetType, targetId), { ...item, targetId, favoriteId: userDataRepository.ids.createFavoriteId(item.targetType, targetId) }];
+    })).values()];
+    const history = [...new Map(userDataRepository.getHistory().map(item => {
+      if (!contentMap.has(item.targetId)) return [item.historyId, item];
+      const targetId = contentMap.get(item.targetId);
+      const episodeId = episodeMap.get(item.episodeId) ?? item.episodeId;
+      return [userDataRepository.ids.createHistoryId(item.targetType, targetId, episodeId), { ...item, targetId, episodeId, historyId: userDataRepository.ids.createHistoryId(item.targetType, targetId, episodeId) }];
+    })).values()];
+    const progress = [...new Map(userDataRepository.getProgress().map(item => {
+      if (!contentMap.has(item.contentId)) return [item.progressId, item];
+      const contentId = contentMap.get(item.contentId);
+      const episodeId = episodeMap.get(item.episodeId) ?? item.episodeId;
+      return [userDataRepository.ids.createProgressId(contentId, episodeId), { ...item, contentId, episodeId, progressId: userDataRepository.ids.createProgressId(contentId, episodeId) }];
+    })).values()];
     userDataRepository.saveFavorites(favorites);
     userDataRepository.saveHistory(history);
     userDataRepository.saveProgress(progress);
