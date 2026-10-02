@@ -78,15 +78,15 @@ function PlaybackView({ request, kind, onBack }) {
   const [candidate, setCandidate] = useState(request?.candidates?.[0] ?? null);
   const [resolvedInput, setResolvedInput] = useState(null);
   const [error, setError] = useState('');
+  const videoRef = React.useRef(null);
   const task = useMemo(() => playbackService.createTask(request), [request]);
   const core = useMemo(() => createPlaybackCore(task, {
     onEvent: (event) => {
-      if (event.event === 'loading') setStatus('loading');
-      if (event.event === 'playing') setStatus('playing');
-      if (event.event === 'retry') setStatus('retrying');
       if (event.event === 'error') setError(event.error || '播放候选失败');
       if (event.event === 'released') setStatus('released');
+      if (event.event === 'stopped') setStatus('stopped');
     },
+    onStateChange: (next) => setStatus(next),
     onCandidateChange: (next) => {
       setCandidate(next);
       setResolvedInput(null);
@@ -97,25 +97,26 @@ function PlaybackView({ request, kind, onBack }) {
       setResolvedInput(null);
       setError(`解析失败：${code}`);
     },
+    onPlayerError: ({ error: playerError }) => setError(playerError?.message || '播放器加载失败'),
     onExhausted: () => setStatus('error'),
   }), [task]);
 
   useEffect(() => {
-    let disposed = false;
+    const player = core.attachPlayer(videoRef.current);
     const initial = core.start();
     setCandidate(initial);
     if (!initial) {
       setStatus('error');
       setError('没有可用的播放候选');
     } else {
-      core.resolve(initial).then((input) => {
-        if (!disposed && input) setResolvedInput(input);
+      core.resolveAndLoad(initial).catch((loadError) => {
+        setError(loadError?.message || '播放初始化失败');
       });
     }
     return () => {
-      disposed = true;
       core.stop();
       core.release();
+      void player;
     };
   }, [core]);
 
@@ -125,7 +126,6 @@ function PlaybackView({ request, kind, onBack }) {
       setCandidate(next);
       setResolvedInput(null);
       setStatus('loading');
-      core.resolve(next);
     }
   };
 
@@ -133,20 +133,20 @@ function PlaybackView({ request, kind, onBack }) {
   const subtitle = kind === 'live'
     ? `${request?.metadata?.category ?? ''} · ${request?.candidates?.length ?? 0} 条候选`
     : `${request?.metadata?.episodeTitle ?? ''} · ${request?.candidates?.length ?? 0} 条候选`;
-  const mediaType = candidate?.protocol === 'hls' ? 'application/x-mpegURL' : candidate?.protocol === 'dash' ? 'application/dash+xml' : undefined;
 
   return <div className="player-page">
     <button className="back player-back" onClick={onBack}><ChevronLeft />退出{kind === 'live' ? '直播' : '播放'}</button>
     <div className="video-wrap">
-      {resolvedInput ? <video key={candidate?.candidateId} controls autoPlay={kind === 'live'} playsInline poster={request?.metadata?.poster} onLoadStart={() => setStatus('loading')} onCanPlay={() => { core.markPlaying(); setStatus('playing'); }} onError={() => { const next = core.fail(new Error('MEDIA_LOAD_ERROR')); if (!next) setStatus('error'); }}><source src={resolvedInput.url} type={mediaType} /></video> : candidate ? <div className="video-error">正在解析播放地址…</div> : null}
+      <video ref={videoRef} controls playsInline poster={request?.metadata?.poster} />
+      {!resolvedInput && candidate && status !== 'error' && <div className="video-overlay">正在解析播放地址…</div>}
       {status === 'error' && <div className="video-error">{error || '当前播放链路没有可用候选。'}</div>}
     </div>
     <div className="player-info">
-      <span className="eyebrow">{kind === 'live' ? 'LIVE' : 'VOD'} · Playback Request</span>
+      <span className="eyebrow">{kind === 'live' ? 'LIVE' : 'VOD'} · Playback Core</span>
       <h2>{title}</h2>
       <p>{subtitle} · 状态：{status}</p>
       <div className="chips">{request?.candidates?.map((item) => <button key={item.candidateId} className={candidate?.candidateId === item.candidateId ? 'active' : ''} onClick={() => switchCandidate(item.candidateId)}>{item.metadata?.label ?? item.label ?? item.protocol}</button>)}</div>
-      <small>候选身份：{candidate?.candidateId ?? '—'} · 来源：{candidate?.sourceId ?? '—'}</small>
+      <small>候选身份：{candidate?.candidateId ?? '—'} · 来源：{candidate?.sourceId ?? '—'} · 解析结果：{resolvedInput?.protocol ?? '等待'}</small>
     </div>
   </div>;
 }
