@@ -22,13 +22,16 @@ export function createContentId(sourceId, sourceItemId) {
   return `content:${sourceId}:${sourceItemId}`;
 }
 
-export function createEpisodeId(contentId, sourceId, sourceItemId) {
-  return `episode:${contentId}:${sourceId}:${sourceItemId}`;
+export function createEpisodeId(contentId, sourceId, sourceItemId, canonicalEpisodeId = '') {
+  const canonical = cleanIdentity(canonicalEpisodeId);
+  return canonical ? `episode:${contentId}:canonical:${canonical}` : `episode:${contentId}:${sourceId}:${sourceItemId}`;
 }
 
-export function normalizeEpisode({ contentId, sourceId, sourceItemId, number, title, description = '', playbackCandidates = [] }) {
+export function normalizeEpisode({ contentId, sourceId, sourceItemId, canonicalEpisodeId = '', number, title, description = '', playbackCandidates = [] }) {
+  const episodeIdentity = cleanIdentity(canonicalEpisodeId) ? `canonical:${cleanIdentity(canonicalEpisodeId)}` : '';
   return {
-    episodeId: createEpisodeId(contentId, sourceId, sourceItemId),
+    episodeId: createEpisodeId(contentId, sourceId, sourceItemId, canonicalEpisodeId),
+    episodeIdentity,
     contentId,
     episodeNumber: number,
     title,
