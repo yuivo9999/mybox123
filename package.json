@@ -11,7 +11,8 @@
     "test:playback": "node scripts-test-playback.mjs",
     "test": "npm run test:live && npm run test:playback && npm run test:parser && npm run test:player",
     "test:parser": "node scripts-test-parser.mjs",
-    "test:player": "node scripts-test-player-core.mjs"
+    "test:player": "node scripts-test-player-core.mjs",
+    "test:state": "node scripts-test-state.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
