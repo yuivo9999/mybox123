@@ -10,7 +10,6 @@ export const userDataRepository = {
   getSearches: () => loadList('searches'), saveSearches: (items) => storage.write('searches', items),
   getSettings: () => storage.read('settings', {}), saveSettings: (value) => storage.write('settings', value),
   getSelectedSources: () => storage.read('selectedSources', emptyUserData().selectedSources), saveSelectedSources: (value) => storage.write('selectedSources', value),
-  getSourceConfig: () => storage.read('sources', []), saveSourceConfig: (value) => storage.write('sources', value),
   getMigrationState: () => storage.read('migration:legacy-v2', null),
   clearHistory: () => { storage.write('history', []); storage.write('progress', []); },
   clearUserData: () => { storage.write('favorites', []); storage.write('history', []); storage.write('progress', []); storage.write('searches', []); },
