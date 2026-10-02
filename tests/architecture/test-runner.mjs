@@ -26,6 +26,7 @@ expect('src/services/sourceConfigService.js', [/importFile/, /download/]);
 expect('src/services/sourceManagementService.js', [/setEnabled/, /setActive/, /remove/, /touchUsage/]);
 expectNo('src/services/userDataService.js', [/sourceRepository/, /getSourceConfig/, /saveSourceConfig/, /touchSource/]);
 expectNo('src/repositories/userDataRepository.js', [/getSourceConfig/, /saveSourceConfig/]);
+expectNo('src/state/persistentStateStore.js', [/sourceRepository/, /saveSources\(/, /setSourceEnabled/, /setSourceActive/, /removeSource/]);
 expect('src/features/movie/MoviePlaybackPage.jsx', [/playbackService\.createController/, /recordProgress/]);
 
 const packageJson = JSON.parse(read('package.json'));
