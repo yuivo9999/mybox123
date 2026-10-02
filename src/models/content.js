@@ -12,10 +12,23 @@ function cleanIdentity(value) {
   return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+function cleanTitle(value) {
+  return cleanIdentity(value).replace(/[\[\]【】()（）:：,，.!！？?·'"]/g, '').replace(/\s+/g, '');
+}
+
 export function createContentIdentity({ canonicalId = '', title = '', year = '', type = '', region = '' } = {}) {
   const canonical = cleanIdentity(canonicalId);
   if (canonical) return `canonical:${canonical}`;
   return '';
+}
+
+export function createContentMatchKey({ title = '', year = '', type = '', region = '' } = {}) {
+  const normalizedTitle = cleanTitle(title);
+  const normalizedYear = cleanIdentity(year);
+  const normalizedType = cleanIdentity(type);
+  const normalizedRegion = cleanIdentity(region);
+  if (!normalizedTitle || !normalizedYear) return '';
+  return `metadata:${normalizedTitle}|${normalizedYear}|${normalizedType}|${normalizedRegion}`;
 }
 
 export function createContentId(sourceId, sourceItemId) {
@@ -29,6 +42,7 @@ export function createEpisodeId(contentId, sourceId, sourceItemId, canonicalEpis
 
 export function normalizeEpisode({ contentId, sourceId, sourceItemId, canonicalEpisodeId = '', number, title, description = '', playbackCandidates = [] }) {
   const episodeIdentity = cleanIdentity(canonicalEpisodeId) ? `canonical:${cleanIdentity(canonicalEpisodeId)}` : '';
+  const sourceRelations = [{ sourceId, sourceItemId }];
   return {
     episodeId: createEpisodeId(contentId, sourceId, sourceItemId, canonicalEpisodeId),
     episodeIdentity,
@@ -36,7 +50,8 @@ export function normalizeEpisode({ contentId, sourceId, sourceItemId, canonicalE
     episodeNumber: number,
     title,
     description,
-    sourceRefs: [{ sourceId, sourceItemId }],
+    sourceRefs: sourceRelations,
+    sourceRelations,
     playbackCandidates: playbackCandidates.map((candidate) => ({ ...candidate, sourceId: candidate.sourceId ?? sourceId })),
   };
 }
@@ -46,19 +61,24 @@ export function normalizeContent({
   sourceItemId,
   canonicalId = '',
   title,
+  subtitle = '',
   type,
   poster = '',
   backdrop = '',
+  background = backdrop,
   description = '',
   year = '',
   category = '',
   region = '',
   director = '',
   actors = [],
+  cast = actors,
   popularity = 0,
   status = '',
   updateStatus = status,
+  updateInfo = updateStatus,
   totalEpisodes = null,
+  episodeCount = totalEpisodes,
   currentEpisode = null,
   createdAt = null,
   updatedAt = null,
@@ -66,45 +86,54 @@ export function normalizeContent({
 }) {
   const legacyContentId = createContentId(sourceId, sourceItemId);
   const contentIdentity = createContentIdentity({ canonicalId, title, year, type, region });
-  // Without a stable external identity, keep the content source-qualified.
-  // This prevents display-name collisions while still allowing explicit cross-source aggregation.
   const contentId = `content:${contentIdentity || legacyContentId}`;
   const normalizedEpisodes = episodes.map((episode, index) => normalizeEpisode({
     contentId,
     sourceId,
     sourceItemId: episode.sourceItemId ?? `${sourceItemId}:episode:${index + 1}`,
     canonicalEpisodeId: episode.canonicalEpisodeId ?? episode.globalId ?? '',
-    number: index + 1,
+    number: episode.episodeNumber ?? index + 1,
     title: episode.title ?? episode,
     description: episode.description ?? '',
     playbackCandidates: episode.playbackCandidates ?? [],
   }));
-  const episodeCount = totalEpisodes == null ? normalizedEpisodes.length : Math.max(0, Number(totalEpisodes) || 0);
+  const resolvedEpisodeCount = episodeCount == null ? normalizedEpisodes.length : Math.max(0, Number(episodeCount) || 0);
+  const sourceRelations = [{ sourceId, sourceItemId }];
+
   return {
     contentId,
     legacyContentId,
     contentIdentity,
-    contentType: type,
+    contentMatchKey: createContentMatchKey({ title, year, type, region }),
+    sourceId,
+    sourceItemId,
+    type: type || ContentType.OTHER,
+    contentType: type || ContentType.OTHER,
     title,
-    subtitle: '',
+    subtitle,
     poster,
-    backdrop,
+    backdrop: backdrop || background || '',
+    background: background || backdrop || '',
     description,
     year,
     category,
     region,
-    directors: director ? [director] : [],
     director,
-    actors: Array.isArray(actors) ? actors : [],
+    directors: director ? [director] : [],
+    cast: Array.isArray(cast) ? cast : [],
+    actors: Array.isArray(actors) ? actors : (Array.isArray(cast) ? cast : []),
     popularity: Number(popularity) || 0,
-    updateStatus: updateStatus || '',
-    status: updateStatus || '',
-    totalEpisodes: episodeCount,
+    updateInfo: updateInfo || '',
+    updateStatus: updateInfo || '',
+    status: updateInfo || '',
+    episodeCount: resolvedEpisodeCount,
+    totalEpisodes: resolvedEpisodeCount,
     currentEpisode: currentEpisode == null ? (normalizedEpisodes.length || null) : Math.max(0, Number(currentEpisode) || 0),
     availableSourceCount: 1,
     createdAt: createdAt == null ? null : createdAt,
     updatedAt: updatedAt == null ? null : updatedAt,
-    sourceRefs: [{ sourceId, sourceItemId }],
+    sourceRefs: sourceRelations,
+    sourceRelations,
     episodes: normalizedEpisodes,
     syncAt: Date.now(),
   };
