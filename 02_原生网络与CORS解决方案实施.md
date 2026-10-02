@@ -182,7 +182,7 @@ HTTP 非 2xx：
 
 ## 6. Bridge 安全要求
 
-本项目没有新增任意 Java/Kotlin 方法调用桥。
+本项目没有新增任意 Java/Kotlin 方法调用桥。现有 `webViewRuntime.call()` 同样采用固定方法白名单，拒绝任意字符串方法调用。
 
 Native HTTP 采用 Capacitor 官方 Plugin Bridge，业务层只通过：
 
@@ -290,7 +290,7 @@ requestManager
 
 - 阶段：阶段 2：原生网络与 CORS 解决方案实施
 - 完成日期：2026-10-03
-- Commit：`4c942dd9bc7ab0abca42da69030c1d8d9e35705d`（架构检查）；Native bridge 实施 commits：`02a62c4d46fba2427497b67316a6c5863154d3e5`、`f9180c2109c9eecd1650734c3abef9740d4c1add`
+- Commit：`ce712db2ab5b5aa27193f72a21e490bb7a8145f8`（bridge allowlist hardening）；架构检查：`df00d078527e853f79b5de52a7af86ca94b10816`；Native HTTP 实施 commits：`02a62c4d46fba2427497b67316a6c5863154d3e5`、`f9180c2109c9ecd1650734c3abef9740d4c1add`
 - Native HTTP 实现位置：`src/runtime/nativeHttpBridge.js`
 - JS bridge 实现位置：`src/runtime/nativeHttpBridge.js` + `src/runtime/webViewRuntime.js`
 - 支持的 method：GET / POST / PUT / PATCH / DELETE / HEAD / OPTIONS
