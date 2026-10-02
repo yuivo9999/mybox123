@@ -1,5 +1,6 @@
 import { userDataRepository } from '../repositories/userDataRepository.js';
 import { createContentId } from '../models/content.js';
+import { normalizeSettings } from '../models/userData.js';
 
 function shouldWriteProgress(previous, next) {
   if (!previous) return true;
@@ -9,15 +10,16 @@ function shouldWriteProgress(previous, next) {
 }
 
 export const userDataService = {
-  getSettings() { return userDataRepository.getSettings(); },
-  saveSettings(value) { userDataRepository.saveSettings(value); return value; },
+  getSettings() { return normalizeSettings(userDataRepository.getSettings()); },
+  saveSettings(value) { const next = normalizeSettings(value); userDataRepository.saveSettings(next); return next; },
+  updateSettings(patch = {}) { return this.saveSettings({ ...this.getSettings(), ...patch }); },
   getSnapshot() {
     return {
       favorites: userDataRepository.getFavorites(),
       history: userDataRepository.getHistory(),
       progress: userDataRepository.getProgress(),
       searches: userDataRepository.getSearches(),
-      settings: userDataRepository.getSettings(),
+      settings: normalizeSettings(userDataRepository.getSettings()),
       selectedSources: userDataRepository.getSelectedSources(),
       migration: userDataRepository.getMigrationState(),
     };
