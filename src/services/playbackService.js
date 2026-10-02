@@ -69,8 +69,6 @@ export const playbackService = {
     const core = createPlaybackCore(task, hooks);
     const policy = createPlaybackLifecyclePolicy({ kind: request?.kind });
     return Object.freeze({
-      task,
-      core,
       policy,
       attachPlayer: element => core.attachPlayer(element),
       start: () => core.start(),
