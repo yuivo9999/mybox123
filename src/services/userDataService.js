@@ -9,6 +9,29 @@ export const userDataService = {
   getSettings() { return userDataRepository.getSettings(); },
   saveSettings(value) { userDataRepository.saveSettings(value); return value; },
   getSnapshot() { return { favorites:userDataRepository.getFavorites(), history:userDataRepository.getHistory(), progress:userDataRepository.getProgress(), searches:userDataRepository.getSearches(), settings:userDataRepository.getSettings(), selectedSources:userDataRepository.getSelectedSources(), migration:userDataRepository.getMigrationState() }; },
+  migrateContentIdentities(contents = []) {
+    const contentMap = new Map();
+    const episodeMap = new Map();
+    contents.forEach(content => {
+      if (content?.legacyContentId && content.legacyContentId !== content.contentId) {
+        contentMap.set(content.legacyContentId, content.contentId);
+        (content.episodes ?? []).forEach(episode => {
+          const ref = episode.sourceRefs?.[0];
+          if (!ref) return;
+          const legacyEpisodeId = `episode:${content.legacyContentId}:${ref.sourceId}:${ref.sourceItemId}`;
+          episodeMap.set(legacyEpisodeId, episode.episodeId);
+        });
+      }
+    });
+    if (!contentMap.size) return false;
+    const favorites = userDataRepository.getFavorites().map(item => contentMap.has(item.targetId) ? { ...item, targetId: contentMap.get(item.targetId), favoriteId: userDataRepository.ids.createFavoriteId(item.targetType, contentMap.get(item.targetId)) } : item);
+    const history = userDataRepository.getHistory().map(item => contentMap.has(item.targetId) ? { ...item, targetId: contentMap.get(item.targetId), episodeId: episodeMap.get(item.episodeId) ?? item.episodeId, historyId: userDataRepository.ids.createHistoryId(item.targetType, contentMap.get(item.targetId), episodeMap.get(item.episodeId) ?? item.episodeId) } : item);
+    const progress = userDataRepository.getProgress().map(item => contentMap.has(item.contentId) ? { ...item, contentId: contentMap.get(item.contentId), episodeId: episodeMap.get(item.episodeId) ?? item.episodeId, progressId: userDataRepository.ids.createProgressId(contentMap.get(item.contentId), episodeMap.get(item.episodeId) ?? item.episodeId) } : item);
+    userDataRepository.saveFavorites(favorites);
+    userDataRepository.saveHistory(history);
+    userDataRepository.saveProgress(progress);
+    return true;
+  },
   toggleFavorite(targetType, targetId) {
     if (!targetType || targetId == null) return userDataRepository.getFavorites();
     const current=userDataRepository.getFavorites();
