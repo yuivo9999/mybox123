@@ -107,7 +107,7 @@ export const liveService = {
         };
       }
     }));
-    const channels = settled.flatMap((result) => result.status === 'fulfilled' && result.runtimeType !== 'tv1' ? result.value : []);
+    const channels = settled.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
     return { channels: mergeLiveChannels(channels), results: settled };
   },
 
