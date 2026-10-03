@@ -42,7 +42,15 @@ export function createLiveAdapter(config, transport = null) {
       capabilities: {},
       getChannels: async (options = {}) => attachTVBoxPlaybackMetadata(await extensionAdapter.load({}, options)),
       getCategories: async () => [],
-      getStreams: async (channelRef, options = {}) => attachTVBoxPlaybackMetadata(await extensionAdapter.execute('streams', { channelRef }, options)).flatMap(channel => channel?.streams ?? channel ?? []),
+      getStreams: async (channelRef, options = {}) => {
+        const streams = await extensionAdapter.execute('streams', { channelRef }, options);
+        if (!Array.isArray(streams)) return [];
+        return streams.map((stream) => ({
+          ...stream,
+          tvboxIJKProfiles: config.tvboxIJKProfiles ?? {},
+          tvboxParseConfig: config.tvboxParseConfig ?? null,
+        }));
+      },
       getEPG: (channelRef, range = {}, options = {}) => extensionAdapter.execute('epg', { channelRef, range }, options),
       getSnapshotState: () => ({
         lastAttemptAt: null,
