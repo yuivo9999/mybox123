@@ -130,6 +130,7 @@ public final class DrpySandboxRuntime {
             }
             ScriptableObject.putProperty(scope, "console", Context.javaToJS(new SafeConsole(), scope));
             installDomFunctions(cx, scope);
+            installCompatibilityHelpers(cx, scope);
 
             String safePayload = payloadJson == null || payloadJson.trim().isEmpty() ? "{}" : payloadJson;
             Object parsedPayload = cx.evaluateString(
