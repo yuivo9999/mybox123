@@ -33,6 +33,16 @@ export const tv1LiveService = {
 
   async loadMetadata(source, options = {}) {
     if (!isTv1Source(source)) throw new Error('TV1_SOURCE_REQUIRED');
+    const existing = sessions.get(source.sourceId);
+    if (existing && Array.isArray(existing.channels) && existing.channels.length > 0 && !options.force) {
+      if (typeof options.onChannel === 'function') {
+        for (const channel of existing.channels) {
+          options.onChannel(channel);
+        }
+      }
+      return existing.channels;
+    }
+
     const body = await fetchBody(source, options);
     const session = createSession(source, body);
     const capabilities = { search: true, categories: true, multiStream: true, epg: false, currentProgram: false, upcomingProgram: false };
@@ -51,6 +61,7 @@ export const tv1LiveService = {
       if (typeof options.onChannel === 'function') options.onChannel(channel);
       await new Promise(resolve => setTimeout(resolve, 0));
     });
+    session.channels = result;
     return result;
   },
 

@@ -88,11 +88,16 @@ export async function testMovieSource(source, options = {}) {
 export async function syncMovieSources(sourceConfigs = [], selectedSourceId = null, options = {}) {
   movieRegistry.clear();
 
-  const selected = sourceConfigs.filter(source =>
+  const enabledMovieSources = sourceConfigs.filter(source =>
     source.enabled !== false
     && source.sourceType === 'movie'
-    && source.sourceId === selectedSourceId
   );
+
+  const targetSource = (selectedSourceId && enabledMovieSources.find(source => source.sourceId === selectedSourceId))
+    || enabledMovieSources[0]
+    || null;
+
+  const selected = targetSource ? [targetSource] : [];
 
   const adapters = [];
   const unsupported = [];
@@ -137,47 +142,42 @@ export async function syncMovieSources(sourceConfigs = [], selectedSourceId = nu
       if (!cachedCategories.hit && Array.isArray(categories) && categories.length) {
         cacheStorage.set(CacheNamespace.SOURCE, categoryKey, categories);
       }
-      const normalizedCategories = (Array.isArray(categories) ? categories : [])
+      const rawCategories = (Array.isArray(categories) ? categories : [])
         .map((item, index) => ({
           id: String(item?.id ?? item?.type_id ?? '').trim(),
           name: String(item?.name ?? item?.type_name ?? item?.label ?? item ?? '').trim(),
           sourceId: adapter.sourceId,
         }))
-        .filter(item => item.name);
+        .filter(item => item.name && item.name !== '全部');
+
+      const allCategory = { id: 'all', name: '全部', sourceId: adapter.sourceId };
+      const normalizedCategories = [allCategory, ...rawCategories];
 
       const requestedCategoryId = options.categoryId != null ? String(options.categoryId).trim() : '';
       const requestedCategoryName = String(options.categoryName ?? '').trim();
-      const activeCategory = normalizedCategories.find(item =>
-        (requestedCategoryId && item.id === requestedCategoryId)
-        || (requestedCategoryName && item.name === requestedCategoryName)
-      ) || normalizedCategories[0] || null;
 
-      if (!activeCategory) {
-        return {
-          status: 'fulfilled',
-          sourceId: adapter.sourceId,
-          value: [],
-          categories: [],
-          activeCategory: null,
-          stale: false,
-          capabilities: adapter.getCapabilities(),
-          definition: adapter.getDefinition(),
-          adapterStatus: adapter.getStatus(),
-        };
-      }
+      const activeCategory = (requestedCategoryId || requestedCategoryName)
+        ? (normalizedCategories.find(item =>
+            (requestedCategoryId && item.id === requestedCategoryId)
+            || (requestedCategoryName && item.name === requestedCategoryName)
+          ) || allCategory)
+        : allCategory;
+
+      const isAll = !activeCategory || activeCategory.id === 'all' || activeCategory.name === '全部';
 
       const result = await load(adapter, {
-        categoryId: activeCategory.id,
-        categoryName: activeCategory.name,
+        categoryId: isAll ? '' : activeCategory.id,
+        categoryName: isAll ? '' : activeCategory.name,
         page: Number(options.page) || 1,
         pageSize: Number(options.pageSize) || 24,
         timeoutMs: options.timeoutMs,
         signal: options.signal,
       });
+
       const taggedValue = (result.value ?? []).map(item => ({
         ...item,
-        sourceCategoryId: activeCategory.id,
-        sourceCategoryName: activeCategory.name,
+        sourceCategoryId: item.sourceCategoryId || (isAll ? '' : activeCategory.id),
+        sourceCategoryName: item.sourceCategoryName || (isAll ? (item.category || '') : activeCategory.name),
       }));
 
       return {
@@ -236,15 +236,21 @@ export async function searchMovieSources(sourceConfigs = [], keyword = '', optio
   const timeoutMs = Math.max(1000, Number(options.timeoutMs) || 4500);
   const results = [];
   const failed = [];
+  let completedCount = 0;
   const onSourceResult = typeof options.onSourceResult === 'function' ? options.onSourceResult : null;
 
-  for (let index = 0; index < candidates.length; index += 1) {
+  if (!candidates.length) {
+    return { query, results: [], failed: [], completed: 0 };
+  }
+
+  // Concurrent execution across all enabled movie sources
+  const searchTasks = candidates.map(async (source, index) => {
     if (options.signal?.aborted) {
       const error = new Error('Search aborted');
       error.name = 'AbortError';
       throw error;
     }
-    const source = candidates[index];
+
     let entry;
     try {
       const adapter = createSourceAdapter({
@@ -276,8 +282,13 @@ export async function searchMovieSources(sourceConfigs = [], keyword = '', optio
       };
       failed.push(entry);
     }
-    onSourceResult?.(entry, { index: index + 1, total: candidates.length, completed: index + 1 });
-  }
+
+    completedCount += 1;
+    onSourceResult?.(entry, { index: index + 1, total: candidates.length, completed: completedCount });
+    return entry;
+  });
+
+  await Promise.allSettled(searchTasks);
 
   return { query, results, failed, completed: candidates.length };
 }

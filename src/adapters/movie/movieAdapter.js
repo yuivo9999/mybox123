@@ -64,9 +64,14 @@ export function createMovieAdapter(config, transport = null) {
     if (finalUrl.includes('api.php') || finalUrl.includes('provide/vod') || finalUrl.includes('/vod/')) {
       const query = new URLSearchParams();
       const categoryOnly = options.categoryOnly === true;
-      // 分类/列表/搜索统一走 ac=list，避免默认 videolist 把整个资源库拉回本地。
-      if (!/[?&]ac=/.test(finalUrl)) query.set('ac', 'list');
-      else if (categoryOnly) finalUrl = finalUrl.replace(/([?&])ac=[^&]*/i, '$1ac=list');
+      if (categoryOnly) {
+        if (!/[?&]ac=/.test(finalUrl)) query.set('ac', 'list');
+        else finalUrl = finalUrl.replace(/([?&])ac=[^&]*/i, '$1ac=list');
+      } else {
+        // 请求具体内容列表时，必须采用 ac=detail 才能准确抓取到海报图 vod_pic、角标 vod_remarks 和播放线路集数，绝不遗漏内容
+        if (!/[?&]ac=/.test(finalUrl)) query.set('ac', 'detail');
+        else finalUrl = finalUrl.replace(/([?&])ac=[^&]*/i, '$1ac=detail');
+      }
       if (options.categoryId != null && String(options.categoryId).trim() && !/[?&]t=/.test(finalUrl)) query.set('t', String(options.categoryId).trim());
       if (options.page != null && Number(options.page) > 0 && !/[?&]pg=/.test(finalUrl)) query.set('pg', String(Math.max(1, Number(options.page))));
       if (options.keyword != null && String(options.keyword).trim() && !/[?&]wd=/.test(finalUrl)) query.set('wd', String(options.keyword).trim());
@@ -230,23 +235,33 @@ export function createMovieAdapter(config, transport = null) {
 
   const getCategories = async (options = {}) => {
     requireCapability('categories');
-    if (sourceDefinition.categories.length
-      && sourceDefinition.categories.every(item => item && typeof item === 'object'
-        && (item.type_id != null || item.id != null || item.typeId != null || item.value != null))) {
-      return sourceDefinition.categories.map((item, index) => ({
-        id: String(item.type_id ?? item.id ?? item.typeId ?? item.value ?? index + 1),
-        name: String(item.type_name ?? item.name ?? item.label ?? item.title ?? '').trim(),
-      })).filter(item => item.name);
+    try {
+      const response = await request({ ...options, categoryOnly: true, page: 1, limit: 1 });
+      const body = String(await response.text()).replace(/^\uFEFF/, '').trim();
+      const value = JSON.parse(body);
+      const raw = value?.class ?? value?.classes ?? value?.categories ?? value?.type ?? value?.data?.class ?? [];
+      const list = Array.isArray(raw) ? raw : [];
+      if (list.length > 0) {
+        return list.map((item, index) => ({
+          id: String(item?.type_id ?? item?.typeId ?? item?.id ?? item?.value ?? index + 1),
+          name: String(item?.type_name ?? item?.name ?? item?.label ?? item?.title ?? item ?? '').trim(),
+        })).filter(item => item.name);
+      }
+    } catch {
+      // Fallback to static category definition if offline or response lacks class list
     }
-    const response = await request({ ...options, categoryOnly: true, page: 1, limit: 1 });
-    const body = String(await response.text()).replace(/^\\uFEFF/, '').trim();
-    const value = JSON.parse(body);
-    const raw = value?.class ?? value?.classes ?? value?.categories ?? value?.type ?? value?.data?.class ?? [];
-    const list = Array.isArray(raw) ? raw : [];
-    return list.map((item, index) => ({
-      id: String(item?.type_id ?? item?.typeId ?? item?.id ?? item?.value ?? index + 1),
-      name: String(item?.type_name ?? item?.name ?? item?.label ?? item?.title ?? item ?? '').trim(),
-    })).filter(item => item.name);
+    if (Array.isArray(sourceDefinition.categories) && sourceDefinition.categories.length) {
+      return sourceDefinition.categories.map((item, index) => {
+        if (typeof item === 'string') {
+          return { id: String(index + 1), name: item.trim() };
+        }
+        return {
+          id: String(item?.type_id ?? item?.id ?? item?.typeId ?? item?.value ?? index + 1),
+          name: String(item?.type_name ?? item?.name ?? item?.label ?? item?.title ?? '').trim(),
+        };
+      }).filter(item => item.name);
+    }
+    return [];
   };
 
   const filterItems = (movies, params = {}) => {

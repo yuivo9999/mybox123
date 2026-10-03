@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Film, Heart, Play, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, Film, Heart, Play, Search, Server, Sparkles, X, Tv } from 'lucide-react';
 import { movieService } from '../../services/movieService.js';
 import { searchMovieSources } from '../../services/movieSourceService.js';
 import { getCategoryIdByLabel } from '../../config/mediaTaxonomy.js';
 import { usePageState, pageStateStore } from '../../state/pageStateStore.js';
 import { SmartImage, EmptyState } from '../../components/StateViews.jsx';
 import { MovieCarousel } from '../../components/media/MovieCarousel.jsx';
+import { MovieCard } from '../../components/media/MovieCard.jsx';
 import { MoviePlaybackPage } from './MoviePlaybackPage.jsx';
 
 export function MovieFeature(props){
@@ -23,7 +24,7 @@ export function MovieFeature(props){
  if(route==='search') return <MovieSearch movies={movies} sources={sources} initial={page.search.query} recordSearch={recordSearch} onMovie={onMovie} onPlay={onPlay} onBack={onBack} onQuery={query=>pageStateStore.patch('search',{query})}/>;
  if(route==='detail'){const movie=feature.getDetail(selected?.contentId??selected) || (selected?.contentId ? selected : null);if(!movie)return <MovieEmpty text="影视内容不存在" onBack={onBack}/>;return <MovieDetail movie={movie} movies={movies} sources={sources} selectedSourceId={selectedSources?.movie} onMovie={onMovie} favorite={favorites.some(i=>i.targetType==='content'&&i.targetId===movie.contentId)} onBack={onBack} onPlay={onPlay} onFavorite={()=>toggleFavorite('content',movie.contentId)}/>;}
  if(route==='movie-play') return <MoviePlaybackPage request={selected} movies={movies} favorites={favorites} toggleFavorite={toggleFavorite} onBack={onBack} onEpisode={onPlay} onMovie={onMovie} onTab={onTab}/>
- if(tab==='movies') return <MovieCatalog movies={movies} sources={sources} state={movieState} setState={patch=>pageStateStore.patch('movies',patch)} movieCategories={movieCategories} movieActiveCategory={movieActiveCategory} movieCategoryLoading={movieCategoryLoading} onLoadMovieCategory={onLoadMovieCategory} onMovie={onMovie} onPlay={onPlay} onSearch={()=>onMovie(null,'search')} recordSearch={recordSearch}/>;
+ if(tab==='movies') return <MovieCatalog movies={movies} sources={sources} selectedSourceId={selectedSources?.movie} onSelectMovieSource={onSelectMovieSource} state={movieState} setState={patch=>pageStateStore.patch('movies',patch)} movieCategories={movieCategories} movieActiveCategory={movieActiveCategory} movieCategoryLoading={movieCategoryLoading} onLoadMovieCategory={onLoadMovieCategory} onMovie={onMovie} onPlay={onPlay} onSearch={()=>onMovie(null,'search')} recordSearch={recordSearch}/>;
  return <MovieHome feature={feature} movies={movies} channels={channels} sources={sources} selectedSourceId={selectedSources?.movie} movieCategories={movieCategories} movieActiveCategory={movieActiveCategory} movieCategoryLoading={movieCategoryLoading} onLoadMovieCategory={onLoadMovieCategory} onSelectMovieSource={onSelectMovieSource} onTab={onTab} onMovie={onMovie} onPlay={onPlay} onLive={onLive} onSearch={()=>onMovie(null,'search')}/>;
 }
 
@@ -36,68 +37,458 @@ export function createMovieFeature({movies=[],history=[],progress=[]}={}){return
  getRelated:(movie)=>movieService.getRelated({movies,movie}),
 };}
 
-function MovieHome({feature,movies=[],channels,sources=[],selectedSourceId,movieCategories=[],movieActiveCategory,movieCategoryLoading,onLoadMovieCategory,onSelectMovieSource,onTab,onMovie,onPlay,onLive,onSearch}){
+export function moviesForCategory(movies = [], category) {
+  if (!category || category === '全部' || category?.id === 'all' || category?.name === '全部') {
+    return movies;
+  }
+  const catId = String(category?.id ?? '').trim();
+  const catName = String(category?.name ?? category ?? '').trim().toLowerCase();
+
+  return (movies ?? []).filter(movie => {
+    // 1. Direct ID match
+    if (catId && catId !== 'all') {
+      if (String(movie.sourceCategoryId ?? '') === catId) return true;
+      if ((movie.sourceCategoryIds ?? []).map(String).includes(catId)) return true;
+      if ((movie.categoryIds ?? []).map(String).includes(catId)) return true;
+    }
+
+    // 2. Exact category name match
+    const mCat = String(movie.category ?? '').trim().toLowerCase();
+    const mSourceCat = String(movie.sourceCategoryName ?? '').trim().toLowerCase();
+    const mCatNames = (movie.sourceCategoryNames ?? []).map(s => String(s).trim().toLowerCase());
+    const mCatLabels = (movie.categoryLabels ?? []).map(s => String(s).trim().toLowerCase());
+
+    if (catName) {
+      if (mCat === catName || mSourceCat === catName) return true;
+      if (mCatNames.includes(catName) || mCatLabels.includes(catName)) return true;
+
+      // 3. Category family mapping for Chinese VOD taxonomy
+      if (catName === '电影' && (
+        movie.mediaType === 'movie' ||
+        /片$/.test(mCat) ||
+        /动作|爱情|喜剧|科幻|恐怖|剧情|战争|惊悚|悬疑|犯罪|冒险|灾难|奇幻/.test(mCat)
+      )) return true;
+
+      if ((catName === '电视剧' || catName === '剧集') && (
+        movie.mediaType === 'series' ||
+        /剧$/.test(mCat) ||
+        /国产|内地|香港|韩剧|日剧|欧美|台湾|海外|连续剧/.test(mCat)
+      )) return true;
+
+      if (catName === '动漫' && (
+        movie.mediaType === 'anime' ||
+        /动漫|动画/.test(mCat)
+      )) return true;
+
+      if (catName === '综艺' && (
+        movie.mediaType === 'variety' ||
+        /综艺|真人秀|脱口秀|选秀/.test(mCat)
+      )) return true;
+
+      if (catName === '短剧' && (
+        movie.mediaType === 'short-drama' ||
+        /短剧|爽剧|现代都市|古装仙侠|反转爽剧|脑洞悬疑|都市/.test(mCat)
+      )) return true;
+
+      if (mCat.includes(catName) || catName.includes(mCat)) return true;
+    }
+
+    return false;
+  });
+}
+
+function MovieHome({feature,movies=[],channels=[],sources=[],selectedSourceId,movieCategories=[],movieActiveCategory,movieCategoryLoading,onLoadMovieCategory,onSelectMovieSource,onTab,onMovie,onPlay,onLive,onSearch}){
  const home=feature.getHome();
  const movieSources=sources.filter(source=>source.sourceType==='movie'&&source.enabled!==false);
- const sourceSelector=<MovieSourceSelector sources={movieSources} selectedSourceId={selectedSourceId} onChange={onSelectMovieSource}/>;
- const categoryItems=movieCategories.filter(item=>!item.sourceId||item.sourceId===selectedSourceId);
- const active=movieActiveCategory&&(!selectedSourceId||movieActiveCategory.sourceId===selectedSourceId)
+ const selectedSource=sources.find(s=>s.sourceId===selectedSourceId) || movieSources[0] || null;
+
+ // Filter categories for current source
+ const rawCategories = movieCategories.filter(item => !item.sourceId || item.sourceId === selectedSourceId);
+ const categoryItems = rawCategories.some(c => c.name === '全部' || c.id === 'all')
+   ? rawCategories
+   : [{ id: 'all', name: '全部', sourceId: selectedSourceId }, ...rawCategories];
+
+ const active = movieActiveCategory && (!selectedSourceId || movieActiveCategory.sourceId === selectedSourceId)
    ? movieActiveCategory
-   : categoryItems[0] ?? null;
- const currentMovies=active
-   ? moviesForCategory(movies, active)
-   : [];
- if(!movieSources.length) return <Page><header className="top-header"><div><span className="eyebrow">TVBOX REACT</span><h2>首页</h2></div><button className="icon-button" aria-label="搜索" onClick={onSearch}><Search/></button></header><div className="empty state-view"><Film size={24}/><b>暂无影视源</b><span>当前还没有配置影视内容源</span><button className="primary" onClick={()=>onTab('sources')}>去源管理</button></div></Page>;
- return <Page><header className="top-header"><div><span className="eyebrow">TVBOX REACT</span><h2>首页</h2></div><button className="icon-button" aria-label="搜索" onClick={onSearch}><Search/></button></header>{sourceSelector}
-  <SectionTitle title="内容分类" action={movieCategoryLoading?'加载中…':'按需加载'}/>
-  <div className="chips category-lazy-chips">{categoryItems.map(category=><button className={active?.id===category.id?'active':''} key={category.sourceId+':'+category.id+':'+category.name} disabled={movieCategoryLoading} onClick={()=>onLoadMovieCategory?.(category)}>{category.name}</button>)}</div>
-  {!active&&<div className="empty state-view"><Film size={22}/><b>正在读取分类</b><span>只读取分类索引，不下载整库内容。</span></div>}
-  {active&&<><SectionTitle title={active.name} action="更多" onAction={()=>{pageStateStore.patch('movies',{category:active.name,page:1});onTab('movies')}}/>{movieCategoryLoading?<div className="empty compact"><span>正在加载“{active.name}”…</span></div>:currentMovies.length?<MovieCarousel movies={currentMovies} onMovie={onMovie}/>:<MovieEmpty compact text={`“${active.name}”暂无内容或该源暂未返回结果`}/>}</>}
-  <SectionTitle title="继续观看"/><div className="continue-row">{home.continueWatching.length?home.continueWatching.map(({movie,episodeIndex,history:item})=><div className="continue" key={item.historyId} onClick={()=>onPlay(movie,episodeIndex)}><SmartImage src={movie.poster} fallback={<div className="image-placeholder"><Film size={18}/></div>}/><div><b>{movie.title}</b><small>{movie.episodes?.[episodeIndex]?.title??'继续观看'} · {Math.floor((item.positionSeconds??0)/60)} 分钟</small></div></div>):<MovieEmpty compact text="暂无观看记录"/>}</div>
-  <SectionTitle title="Live 快捷入口"/><div className="live-banner" onClick={()=>onTab('live')}><span><b>Live 直播中心</b><small>{channels.length} 个频道</small></span><ChevronLeft className="flip"/></div>{channels[0]&&<button className="movie-live-entry" onClick={()=>onLive(channels[0])}><Play size={15}/>直接播放示例频道</button>}
+   : categoryItems[0] ?? { id: 'all', name: '全部' };
+
+ const isAllCategory = !active || active.id === 'all' || active.name === '全部';
+ const currentMovies = isAllCategory ? movies : moviesForCategory(movies, active);
+
+ const heroMovie = currentMovies[0] || movies[0] || null;
+
+ // Sub-sections when "全部" is active (Ensures no content is omitted)
+ const movieSectionList = useMemo(() => isAllCategory ? moviesForCategory(movies, { name: '电影' }) : [], [movies, isAllCategory]);
+ const seriesSectionList = useMemo(() => isAllCategory ? moviesForCategory(movies, { name: '电视剧' }) : [], [movies, isAllCategory]);
+ const animeSectionList = useMemo(() => isAllCategory ? moviesForCategory(movies, { name: '动漫' }) : [], [movies, isAllCategory]);
+ const varietySectionList = useMemo(() => isAllCategory ? moviesForCategory(movies, { name: '综艺' }) : [], [movies, isAllCategory]);
+ const shortDramaList = useMemo(() => isAllCategory ? moviesForCategory(movies, { name: '短剧' }) : [], [movies, isAllCategory]);
+
+ if(!movieSources.length) return (
+   <Page>
+     <header className="top-header">
+       <div>
+         <span className="eyebrow">TVBOX 4K</span>
+         <h2>首页</h2>
+       </div>
+       <button className="icon-button" aria-label="搜索" onClick={onSearch}><Search size={18}/></button>
+     </header>
+     <div className="empty state-view">
+       <Film size={24}/>
+       <b>暂无影视源</b>
+       <span>请在源管理中配置或启用中国影视源</span>
+       <button className="primary" onClick={()=>onTab('sources')}>去源管理</button>
+     </div>
+   </Page>
+ );
+
+ return <Page>
+  {/* 精致顶部栏：左侧标题与来源，右侧快速切源胶囊与搜索 */}
+  <header className="top-header" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div>
+      <span className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <Sparkles size={11} color="#f59e0b" /> TVBOX 4K 影音
+      </span>
+      <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>精选首页</h2>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <MovieSourcePill
+        sources={movieSources}
+        selectedSource={selectedSource}
+        onChange={onSelectMovieSource}
+      />
+      <button className="icon-button" aria-label="搜索影视" onClick={onSearch} title="全源搜索">
+        <Search size={18}/>
+      </button>
+    </div>
+  </header>
+
+  {/* 焦点精选 Hero Banner */}
+  {heroMovie && (
+    <section className="movie-home-hero" aria-label="本周焦点推荐">
+      <SmartImage
+        src={heroMovie.backdrop || heroMovie.poster}
+        alt={heroMovie.title}
+        className="movie-home-hero-bg"
+        priority
+      />
+      <div className="movie-home-hero-gradient" aria-hidden="true" />
+      <div className="movie-home-hero-content">
+        <div className="movie-home-hero-tags">
+          <span>● 今日焦点</span>
+          <span>·</span>
+          <span>{heroMovie.category || '4K超清'}</span>
+          {heroMovie.year && <><span>·</span><span>{heroMovie.year}</span></>}
+          {heroMovie.updateInfo && <><span>·</span><span>{heroMovie.updateInfo}</span></>}
+        </div>
+        <h3 className="movie-home-hero-title">{heroMovie.title}</h3>
+        {heroMovie.description && <p className="movie-home-hero-desc">{heroMovie.description}</p>}
+        <div className="movie-home-hero-actions">
+          <button className="movie-home-hero-btn-play" type="button" onClick={() => onPlay(heroMovie, 0)}>
+            <Play size={15} fill="currentColor" /> 立即播放
+          </button>
+          <button className="movie-home-hero-btn-detail" type="button" onClick={() => onMovie(heroMovie)}>
+            查看详情
+          </button>
+        </div>
+      </div>
+    </section>
+  )}
+
+  {/* 继续观看 Row */}
+  {home.continueWatching.length > 0 && (
+    <>
+      <SectionTitle title="继续观看" />
+      <div className="continue-row">
+        {home.continueWatching.map(({movie, episodeIndex, history: item}) => (
+          <div className="continue" key={item.historyId} onClick={() => onPlay(movie, episodeIndex)}>
+            <SmartImage src={movie.poster} fallback={<div className="image-placeholder"><Film size={18}/></div>}/>
+            <div>
+              <b>{movie.title}</b>
+              <small>{movie.episodes?.[episodeIndex]?.title ?? '继续观看'} · {Math.floor((item.positionSeconds ?? 0) / 60)} 分钟</small>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  )}
+
+  {/* 分类快捷筛选栏 */}
+  <SectionTitle
+    title="内容专区"
+    action="影视库全览 >"
+    onAction={() => {
+      if (active && active.id !== 'all') pageStateStore.patch('movies', { category: active.name, page: 1 });
+      onTab('movies');
+    }}
+  />
+  <div className="category-chip-bar" role="tablist" aria-label="影视分类">
+    {categoryItems.map(category => {
+      const isSelected = active?.id === category.id || (!active && category.id === 'all');
+      return (
+        <button
+          key={category.sourceId + ':' + category.id + ':' + category.name}
+          className={'category-chip' + (isSelected ? ' active' : '')}
+          disabled={movieCategoryLoading}
+          role="tab"
+          aria-selected={isSelected}
+          onClick={() => onLoadMovieCategory?.(category)}
+        >
+          {category.name}
+        </button>
+      );
+    })}
+  </div>
+
+  {/* 页面内容：分专区有效展示，绝不遗漏内容 */}
+  {movieCategoryLoading ? (
+    <div className="empty compact"><span>正在从影视源抓取“{active?.name || '分类内容'}”…</span></div>
+  ) : isAllCategory ? (
+    <>
+      {/* 热门精选 6张优质卡片 */}
+      <div className="section-title" style={{ marginTop: 8, marginBottom: 8 }}>
+        <h3>🔥 热门精选</h3>
+        <span style={{ fontSize: 12, color: '#8f9aaa' }}>{currentMovies.length} 部内容</span>
+      </div>
+      <div className="movie-grid">
+        {currentMovies.slice(0, 6).map(movie => (
+          <MovieCard key={movie.contentId || movie.title} movie={movie} onClick={onMovie} priority />
+        ))}
+      </div>
+
+      {/* 🎬 电影精选专区 (若有电影) */}
+      {movieSectionList.length > 0 && (
+        <>
+          <SectionTitle
+            title="🎬 院线与高清电影"
+            action="查看全部电影 >"
+            onAction={() => {
+              pageStateStore.patch('movies', { category: '电影', page: 1 });
+              onTab('movies');
+            }}
+          />
+          <MovieCarousel movies={movieSectionList.slice(0, 10)} onMovie={onMovie} ariaLabel="电影精选" />
+        </>
+      )}
+
+      {/* 📺 热门剧集专区 (若有剧集) */}
+      {seriesSectionList.length > 0 && (
+        <>
+          <SectionTitle
+            title="📺 同步热播剧集"
+            action="查看全部剧集 >"
+            onAction={() => {
+              pageStateStore.patch('movies', { category: '电视剧', page: 1 });
+              onTab('movies');
+            }}
+          />
+          <MovieCarousel movies={seriesSectionList.slice(0, 10)} onMovie={onMovie} ariaLabel="热播剧集" />
+        </>
+      )}
+
+      {/* 🎨 动漫天地 (若有动漫) */}
+      {animeSectionList.length > 0 && (
+        <>
+          <SectionTitle
+            title="🎨 热血与国创动漫"
+            action="查看全部动漫 >"
+            onAction={() => {
+              pageStateStore.patch('movies', { category: '动漫', page: 1 });
+              onTab('movies');
+            }}
+          />
+          <MovieCarousel movies={animeSectionList.slice(0, 10)} onMovie={onMovie} ariaLabel="动漫精选" />
+        </>
+      )}
+
+      {/* 🎤 综艺精选 (若有综艺) */}
+      {varietySectionList.length > 0 && (
+        <>
+          <SectionTitle
+            title="🎤 欢笑综艺娱乐"
+            action="查看全部综艺 >"
+            onAction={() => {
+              pageStateStore.patch('movies', { category: '综艺', page: 1 });
+              onTab('movies');
+            }}
+          />
+          <MovieCarousel movies={varietySectionList.slice(0, 10)} onMovie={onMovie} ariaLabel="热播综艺" />
+        </>
+      )}
+
+      {/* ⚡ 爽文短剧 (若有短剧) */}
+      {shortDramaList.length > 0 && (
+        <>
+          <SectionTitle
+            title="⚡ 爆款热门短剧"
+            action="查看全部短剧 >"
+            onAction={() => {
+              pageStateStore.patch('movies', { category: '短剧', page: 1 });
+              onTab('movies');
+            }}
+          />
+          <MovieCarousel movies={shortDramaList.slice(0, 10)} onMovie={onMovie} ariaLabel="爆款短剧" />
+        </>
+      )}
+
+      {/* 全部影片一览 (完整呈现剩余抓取内容，绝不遗漏) */}
+      {currentMovies.length > 6 && (
+        <>
+          <SectionTitle title="✨ 更多内容推荐" />
+          <div className="movie-grid">
+            {currentMovies.slice(6).map(movie => (
+              <MovieCard key={movie.contentId || movie.title} movie={movie} onClick={onMovie} />
+            ))}
+          </div>
+        </>
+      )}
+
+      <div style={{ textAlign: 'center', margin: '12px 0 24px' }}>
+        <button
+          className="secondary"
+          style={{ width: '100%', justifyContent: 'center', padding: '12px 16px' }}
+          onClick={() => {
+            pageStateStore.patch('movies', { category: '全部', page: 1 });
+            onTab('movies');
+          }}
+        >
+          进入影视库查看完整海报墙与分页 ({movies.length} 部)
+        </button>
+      </div>
+    </>
+  ) : currentMovies.length > 0 ? (
+    <>
+      <div className="section-title" style={{ marginTop: 8, marginBottom: 8 }}>
+        <h3>{active?.name}</h3>
+        <span style={{ fontSize: 12, color: '#8f9aaa' }}>{currentMovies.length} 部内容</span>
+      </div>
+      <div className="movie-grid">
+        {currentMovies.map(movie => (
+          <MovieCard key={movie.contentId || movie.title} movie={movie} onClick={onMovie} />
+        ))}
+      </div>
+      <div style={{ textAlign: 'center', margin: '8px 0 24px' }}>
+        <button
+          className="secondary"
+          style={{ width: '100%', justifyContent: 'center' }}
+          onClick={() => {
+            pageStateStore.patch('movies', { category: active.name, page: 1 });
+            onTab('movies');
+          }}
+        >
+          在影视库中按年份与地区筛选“{active.name}”
+        </button>
+      </div>
+    </>
+  ) : (
+    <MovieEmpty compact text={`“${active?.name || '当前分类'}”暂无内容，正在连接影视源`} />
+  )}
+
+  {/* Live 快捷入口 */}
+  <SectionTitle title="Live 直播电视" />
+  <div className="live-banner" onClick={() => onTab('live')}>
+    <span>
+      <b>电视直播中心</b>
+      <small>{channels.length} 个实时直播频道 · 央视卫视全覆盖</small>
+    </span>
+    <ChevronLeft className="flip" />
+  </div>
+  {channels[0] && (
+    <button className="movie-live-entry" onClick={() => onLive(channels[0])}>
+      <Play size={15} /> 快速打开 {channels[0].name}
+    </button>
+  )}
  </Page>;
 }
-function moviesForCategory(movies=[], category){
- const sourceItems=movies??[];
- return sourceItems.filter(movie =>
-   (movie.sourceCategoryIds??[]).map(String).includes(String(category?.id??'')) ||
-   (movie.sourceCategoryNames??[]).includes(String(category?.name??'')) ||
-   String(movie.sourceCategoryId??'')===String(category?.id??'') ||
-   String(movie.sourceCategoryName??'')===String(category?.name??'')
- );
+
+function MovieSourcePill({ sources=[], selectedSource, onChange }){
+  const [open, setOpen] = useState(false);
+  const [draftSourceId, setDraftSourceId] = useState(selectedSource?.sourceId || '');
+  useEffect(() => {
+    if (!open) setDraftSourceId(selectedSource?.sourceId || '');
+  }, [selectedSource, open]);
+
+  const close = () => {
+    setDraftSourceId(selectedSource?.sourceId || '');
+    setOpen(false);
+  };
+
+  const apply = () => {
+    setOpen(false);
+    if (draftSourceId && draftSourceId !== selectedSource?.sourceId) {
+      onChange?.(draftSourceId);
+    }
+  };
+
+  return (
+    <>
+      <button
+        className="movie-source-pill"
+        type="button"
+        onClick={() => setOpen(true)}
+        title="点击切换当前影视源"
+      >
+        <Server size={13} style={{ flexShrink: 0 }} />
+        <span>{selectedSource?.name || '选择影视源'}</span>
+        <ChevronDown size={14} style={{ flexShrink: 0, opacity: 0.7 }} />
+      </button>
+
+      {open && (
+        <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) close(); }}>
+          <div className="source-selector-popover" role="dialog" aria-label="选择影视源" style={{ position: 'relative', width: 'min(92vw, 360px)' }}>
+            <div className="source-selector-popover-head">
+              <div>
+                <b>选择影视源</b>
+                <small>来自中国 4K 影音抓取源</small>
+              </div>
+              <button className="icon-button" type="button" aria-label="关闭" onClick={close}>
+                <X size={17}/>
+              </button>
+            </div>
+            <div className="source-selector-list" role="radiogroup" aria-label="影视源列表">
+              {sources.map(source => {
+                const checked = draftSourceId === source.sourceId;
+                return (
+                  <button
+                    className={'source-selector-item' + (checked ? ' selected' : '')}
+                    type="button"
+                    key={source.sourceId}
+                    role="radio"
+                    aria-checked={checked}
+                    onClick={() => setDraftSourceId(source.sourceId)}
+                  >
+                    <span className="source-selector-name" title={source.name}>{source.name}</span>
+                    <span className={'source-selector-radio' + (checked ? ' checked' : '')} aria-hidden="true">
+                      {checked && <span />}
+                    </span>
+                  </button>
+                );
+              })}
+              {!sources.length && <div className="source-selector-empty">暂无可用影视源</div>}
+            </div>
+            <div className="source-selector-footer">
+              <button className="secondary" type="button" onClick={close}>取消</button>
+              <button className="primary" type="button" disabled={!draftSourceId} onClick={apply}>切换影视源</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
-function MovieSourceSelector({sources=[],selectedSourceId,onChange}){
- const [open,setOpen]=useState(false);
- const [draftSourceId,setDraftSourceId]=useState(selectedSourceId||'');
- useEffect(()=>{if(!open)setDraftSourceId(selectedSourceId||'');},[selectedSourceId,open]);
- const selected=sources.find(source=>source.sourceId===selectedSourceId);
- const close=()=>{setDraftSourceId(selectedSourceId||'');setOpen(false);};
- const apply=()=>{setOpen(false);if(draftSourceId&&draftSourceId!==selectedSourceId)onChange?.(draftSourceId);};
- return <section className="source-selector" style={{marginBottom:16}}>
-   <div className="section-title" style={{marginBottom:8}}><h3>影视源</h3><span style={{fontSize:12,color:'#8f9aaa'}}>{sources.length} 个可用源</span></div>
-   <button className="source-selector-trigger" type="button" aria-expanded={open} onClick={()=>{if(!open)setDraftSourceId(selectedSourceId||'');setOpen(value=>!value)}}>
-     <span className="source-selector-trigger-copy"><b>{selected?.name||'请选择影视源'}</b><small>{selected?'当前使用，点击切换':'选择后才开始加载'}</small></span>
-     <ChevronRight size={18} className={open?'source-selector-chevron open':'source-selector-chevron'}/>
-   </button>
-   {open&&<div className="source-selector-popover" role="dialog" aria-label="选择影视源">
-     <div className="source-selector-popover-head"><div><b>选择影视源</b><small>临时勾选，点击“选择”后才会生效</small></div><button className="icon-button" type="button" aria-label="关闭" onClick={close}><X size={17}/></button></div>
-     <div className="source-selector-list" role="radiogroup" aria-label="影视源列表">
-       {sources.map(source=>{const checked=draftSourceId===source.sourceId;return <button className={'source-selector-item'+(checked?' selected':'')} type="button" key={source.sourceId} role="radio" aria-checked={checked} onClick={()=>setDraftSourceId(source.sourceId)}>
-         <span className="source-selector-name" title={source.name}>{source.name}</span>
-         <span className={'source-selector-radio'+(checked?' checked':'')} aria-hidden="true">{checked&&<span/>}</span>
-       </button>})}
-       {!sources.length&&<div className="source-selector-empty">暂无可用影视源</div>}
-     </div>
-     <div className="source-selector-footer"><button className="secondary" type="button" onClick={close}>不选</button><button className="primary" type="button" disabled={!draftSourceId} onClick={apply}>选择</button></div>
-   </div>}
-   <small className="source-selector-hint">一次只加载当前选择的影视源，避免多个源同时请求。</small>
- </section>;
-}
+function MovieCatalog({movies=[],sources=[],selectedSourceId,onSelectMovieSource,state,setState,onMovie,onPlay,onSearch,recordSearch,movieCategories=[],movieActiveCategory,movieCategoryLoading,onLoadMovieCategory}){
+ const home=useMemo(()=>movieService.getHome({movies}),[movies]);
+ const movieSources=sources.filter(source=>source.sourceType==='movie'&&source.enabled!==false);
+ const selectedSource=sources.find(s=>s.sourceId===selectedSourceId) || movieSources[0] || null;
 
-function MovieCatalog({movies,state,setState,onMovie,onPlay,onSearch,recordSearch,sources=[],movieCategories=[],movieActiveCategory,movieCategoryLoading,onLoadMovieCategory}){
- const home=useMemo(()=>movieService.getHome({movies}),[movies]); const categories=movieCategories.length?movieCategories.filter(item=>!item.sourceId||item.sourceId===sources.find(source=>source.sourceType==='movie'&&source.enabled!==false)?.sourceId):[];
+ const rawCategories = movieCategories.filter(item=>!item.sourceId||item.sourceId===selectedSourceId);
+ const categories = rawCategories.some(c=>c.name==='全部'||c.id==='all')
+   ? rawCategories
+   : [{ id:'all', name:'全部', sourceId:selectedSourceId }, ...rawCategories];
+
  const [queryInput,setQueryInput]=useState('');
+
  const submitSearch=()=>{
   const keyword=String(queryInput||'').trim();
   if(!keyword)return;
@@ -105,18 +496,122 @@ function MovieCatalog({movies,state,setState,onMovie,onPlay,onSearch,recordSearc
   recordSearch?.(keyword);
   onSearch?.(keyword);
  };
- const selectedType=state.category==='电影'?'movie':state.category==='电视剧'?'tv':state.category==='综艺'?'variety':null;
- const subcategories=selectedType?(home.taxonomy?.[selectedType]??[]):[];
- const listMeta=movieCategoryLoading ? {items:[],page:state.page,pageSize:state.pageSize,total:0,hasMore:false} : (movieActiveCategory ? {items:moviesForCategory(movies,movieActiveCategory).slice((Math.max(1,state.page)-1)*state.pageSize,Math.max(1,state.page)*state.pageSize),page:Math.max(1,state.page),pageSize:state.pageSize,total:moviesForCategory(home,movieActiveCategory).length,hasMore:Math.max(1,state.page)*state.pageSize<moviesForCategory(home,movieActiveCategory).length} : movieService.list({movies,...state})); const apply=(patch)=>setState({...patch,page:1});
- const filters=home.filters??{}; const values=(key)=>['全部',...(filters[key]??[])];
- return <Page><Header title="影视"/><div className="searchbox"><Search size={18}/><input value={queryInput} onChange={e=>setQueryInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')submitSearch()}} placeholder="搜索影视内容"/><button className="secondary search-submit" type="button" onClick={submitSearch}>搜索</button>{queryInput&&<button className="icon-button" aria-label="清空搜索" type="button" onClick={()=>setQueryInput('')}><X size={16}/></button>}</div>
- <div className="chips category-lazy-chips">{categories.map(item=>{const selected=(movieActiveCategory?.id===item.id)||(state.category===item.name);return <button className={selected?'active':''} disabled={movieCategoryLoading} onClick={()=>{setState({category:item.name,page:1,filters:{...state.filters,categoryId:''}});onLoadMovieCategory?.(item)}} key={item.sourceId+':'+item.id+':'+item.name}>{item.name}</button>})}</div>
- {movieCategoryLoading&&<div className="empty compact"><span>正在加载“{movieActiveCategory?.name||state.category||'当前分类'}”…</span></div>}
- <div className="filter-row"><select value={state.filters.type||'全部'} onChange={e=>setState({filters:{...state.filters,type:e.target.value==='全部'?'':e.target.value},page:1})}>{values('types').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.year||'全部'} onChange={e=>setState({filters:{...state.filters,year:e.target.value==='全部'?'':e.target.value},page:1})}>{values('years').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.region||'全部'} onChange={e=>setState({filters:{...state.filters,region:e.target.value==='全部'?'':e.target.value},page:1})}>{values('regions').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.status||'全部'} onChange={e=>setState({filters:{...state.filters,status:e.target.value==='全部'?'':e.target.value},page:1})}>{values('statuses').map(x=><option key={x}>{x}</option>)}</select><select value={state.sort} onChange={e=>setState({sort:e.target.value,page:1})}>{[['default','默认'],['latest','最新'],['popular','热门'],['time','时间'],['title','名称']].map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></div>
- {listMeta.items.length
-   ? <MovieCarousel movies={listMeta.items} onMovie={onMovie}/>
-   : <EmptyState text={movies.length?'当前筛选暂无内容':'暂无影视内容'}/>}
- {!state.query.trim()&&listMeta.items.length>0&&<div className="pagination"><button disabled={state.page<=1} onClick={()=>setState({page:state.page-1})}>上一页</button><span>第 {state.page} 页 / 共 {Math.max(1,Math.ceil(listMeta.total/state.pageSize))} 页</span><button disabled={!listMeta.hasMore} onClick={()=>setState({page:state.page+1})}>下一页</button></div>}</Page>;
+
+ const activeCategory = movieActiveCategory || categories.find(c => c.name === state.category) || categories[0] || { id: 'all', name: '全部' };
+ const isAll = !activeCategory || activeCategory.id === 'all' || activeCategory.name === '全部';
+
+ const filteredMovies = useMemo(() => {
+   let list = isAll ? movies : moviesForCategory(movies, activeCategory);
+   // Apply local secondary filters
+   if (state.filters?.year && state.filters.year !== '全部') {
+     list = list.filter(m => String(m.year || '') === String(state.filters.year));
+   }
+   if (state.filters?.region && state.filters.region !== '全部') {
+     list = list.filter(m => String(m.region || '').includes(String(state.filters.region)));
+   }
+   if (state.sort === 'latest') {
+     list = [...list].sort((a,b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+   } else if (state.sort === 'popular') {
+     list = [...list].sort((a,b) => (b.popularity || 0) - (a.popularity || 0));
+   } else if (state.sort === 'title') {
+     list = [...list].sort((a,b) => (a.title || '').localeCompare(b.title || '', 'zh'));
+   }
+   return list;
+ }, [movies, isAll, activeCategory, state.filters, state.sort]);
+
+ const pageSize = Math.max(1, state.pageSize || 24);
+ const currentPage = Math.max(1, state.page || 1);
+ const totalPages = Math.max(1, Math.ceil(filteredMovies.length / pageSize));
+ const pagedMovies = filteredMovies.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+ const filters=home.filters??{};
+ const values=(key)=>['全部',...(filters[key]??[])];
+
+ const handleCategoryChange = (item) => {
+   setState({ category: item.name, page: 1, filters: { ...state.filters, categoryId: '' } });
+   onLoadMovieCategory?.(item);
+   if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+ };
+
+ const handlePageChange = (newPage) => {
+   setState({ page: newPage });
+   if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+ };
+
+ return <Page>
+  <header className="top-header" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div>
+      <span className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <Film size={11} color="#f59e0b" /> TVBOX 4K 影音
+      </span>
+      <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>影视库</h2>
+    </div>
+    <MovieSourcePill
+      sources={movieSources}
+      selectedSource={selectedSource}
+      onChange={onSelectMovieSource}
+    />
+  </header>
+
+  <div className="searchbox">
+    <Search size={18}/>
+    <input value={queryInput} onChange={e=>setQueryInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')submitSearch()}} placeholder="搜索电影、电视剧、动漫、演员…"/>
+    <button className="secondary search-submit" type="button" onClick={submitSearch}>搜索</button>
+    {queryInput&&<button className="icon-button" aria-label="清空搜索" type="button" onClick={()=>setQueryInput('')}><X size={16}/></button>}
+  </div>
+
+  {categories.length > 0 && (
+    <div className="category-chip-bar" role="tablist" aria-label="影视分类">
+      {categories.map(item => {
+        const selected = (activeCategory?.id === item.id) || (state.category === item.name);
+        return (
+          <button
+            key={item.sourceId + ':' + item.id + ':' + item.name}
+            className={'category-chip' + (selected ? ' active' : '')}
+            disabled={movieCategoryLoading}
+            role="tab"
+            aria-selected={selected}
+            onClick={() => handleCategoryChange(item)}
+          >
+            {item.name}
+          </button>
+        );
+      })}
+    </div>
+  )}
+
+  {movieCategoryLoading && <div className="empty compact"><span>正在从影视源加载“{activeCategory?.name||state.category||'当前分类'}”…</span></div>}
+
+  <div className="catalog-filter-bar">
+    <select className="catalog-filter-select" value={state.sort || 'default'} onChange={e => { setState({ sort: e.target.value, page: 1 }); }}>
+      {[['default','默认排序'],['latest','最新更新'],['popular','热门排行'],['title','片名排序']].map(([v,l])=><option value={v} key={v}>{l}</option>)}
+    </select>
+    <select className="catalog-filter-select" value={state.filters.year || '全部'} onChange={e => { setState({ filters: { ...state.filters, year: e.target.value === '全部' ? '' : e.target.value }, page: 1 }); }}>
+      {['全部','2026','2025','2024','2023','2022','2021','2020','2019'].map(x => <option key={x} value={x}>{x === '全部' ? '全部年份' : x + '年'}</option>)}
+    </select>
+    <select className="catalog-filter-select" value={state.filters.region || '全部'} onChange={e => { setState({ filters: { ...state.filters, region: e.target.value === '全部' ? '' : e.target.value }, page: 1 }); }}>
+      {['全部','内地','香港','台湾','韩国','日本','欧美'].map(x => <option key={x} value={x}>{x === '全部' ? '全部地区' : x}</option>)}
+    </select>
+  </div>
+
+  {/* 海报墙网格 - 一目了然展示所有抓取内容与角标 */}
+  {pagedMovies.length > 0 ? (
+    <>
+      <div className="movie-grid">
+        {pagedMovies.map(movie => (
+          <MovieCard key={movie.contentId || movie.title} movie={movie} onClick={onMovie} />
+        ))}
+      </div>
+      <div className="pagination">
+        <button disabled={currentPage <= 1} onClick={() => handlePageChange(currentPage - 1)}>上一页</button>
+        <span style={{ fontSize: 13, color: '#8f9aaa' }}>第 {currentPage} / {totalPages} 页 (共 {filteredMovies.length} 部)</span>
+        <button disabled={currentPage >= totalPages} onClick={() => handlePageChange(currentPage + 1)}>下一页</button>
+      </div>
+    </>
+  ) : (
+    <EmptyState text={movies.length ? '当前分类或筛选条件下暂无内容' : '暂无影视内容，请检查源连接'} />
+  )}
+ </Page>;
 }
 
 function MovieSearch({movies,initial,recordSearch,onMovie,onPlay,onBack,onQuery,sources=[]}){

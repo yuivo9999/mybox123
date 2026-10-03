@@ -68,6 +68,11 @@ export function normalizeContent({
   title,
   subtitle = '',
   type,
+  sourceCategoryId = '',
+  sourceCategoryIds = [],
+  sourceCategoryName = '',
+  sourceCategoryNames = [],
+  rating = '',
   poster = '',
   backdrop = '',
   background = backdrop,
@@ -106,6 +111,15 @@ export function normalizeContent({
   const resolvedEpisodeCount = episodeCount == null ? normalizedEpisodes.length : Math.max(0, Number(episodeCount) || 0);
   const sourceRelations = [{ sourceId, sourceItemId }];
 
+  const resolvedCatId = String(sourceCategoryId || (sourceCategoryIds[0] ?? '')).trim();
+  const resolvedCatIds = Array.isArray(sourceCategoryIds) && sourceCategoryIds.length
+    ? sourceCategoryIds.map(String)
+    : (resolvedCatId ? [resolvedCatId] : []);
+  const resolvedCatName = String(sourceCategoryName || (sourceCategoryNames[0] ?? category ?? '')).trim();
+  const resolvedCatNames = Array.isArray(sourceCategoryNames) && sourceCategoryNames.length
+    ? sourceCategoryNames.map(String)
+    : (resolvedCatName ? [resolvedCatName] : (category ? [String(category)] : []));
+
   return {
     contentId,
     mediaType: classification.mediaType,
@@ -113,6 +127,11 @@ export function normalizeContent({
     categoryLabels: classification.categoryLabels,
     sourceType: type || '',
     sourceCategory: category || '',
+    sourceCategoryId: resolvedCatId,
+    sourceCategoryIds: resolvedCatIds,
+    sourceCategoryName: resolvedCatName,
+    sourceCategoryNames: resolvedCatNames,
+    rating: String(rating ?? '').trim(),
     legacyContentId,
     contentIdentity,
     contentMatchKey: createContentMatchKey({ title, year, type, region }),

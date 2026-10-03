@@ -40,8 +40,13 @@ public final class TVBoxJarExecutor {
         if (!file.isFile()) throw new IllegalArgumentException("TVBOX_JAR_NOT_FOUND");
 
         String classNameResolved = resolveClassName(file, className);
+        // Android 14 (API 34+) enforces W^X (Write XOR Execute) policy on dynamic code loading.
+        // The file MUST be marked read-only before passing to DexClassLoader.
+        try { file.setReadOnly(); } catch (Throwable ignored) {}
+
         File optimized = new File(context.getCodeCacheDir(), "tvbox-jar");
         if (!optimized.exists() && !optimized.mkdirs()) throw new IllegalStateException("TVBOX_JAR_DEX_CACHE_FAILED");
+        try { optimized.setWritable(true, true); } catch (Throwable ignored) {}
 
         DexClassLoader loader = new DexClassLoader(
                 file.getAbsolutePath(),

@@ -1,5 +1,13 @@
 import { ErrorCode } from '../models/errors.js';
 import { errorService } from '../services/errorService.js';
+import {
+  idbGet,
+  idbSet,
+  idbDelete,
+  idbClearNamespace,
+  idbClearAll,
+  idbPruneLRU,
+} from './indexedDb.js';
 
 const CACHE_PREFIX = 'tvbox:cache:v1:';
 const CACHE_VERSION = 1;
@@ -17,20 +25,31 @@ export const CacheNamespace = Object.freeze({
 });
 
 export const CacheTTL = Object.freeze({
-  [CacheNamespace.SOURCE]: 6 * 60 * 60 * 1000,
-  [CacheNamespace.MOVIE]: 30 * 60 * 1000,
-  [CacheNamespace.DETAIL]: 6 * 60 * 60 * 1000,
-  [CacheNamespace.EPISODE]: 6 * 60 * 60 * 1000,
-  [CacheNamespace.LIVE_SOURCE]: 5 * 60 * 1000,
-  [CacheNamespace.LIVE_CHANNEL]: 5 * 60 * 1000,
-  [CacheNamespace.EPG]: 2 * 60 * 1000,
-  [CacheNamespace.IMAGE]: 24 * 60 * 60 * 1000,
-  [CacheNamespace.PLAYBACK_TEMP]: 5 * 60 * 1000,
+  [CacheNamespace.SOURCE]: 24 * 60 * 60 * 1000,
+  [CacheNamespace.MOVIE]: 2 * 60 * 60 * 1000,
+  [CacheNamespace.DETAIL]: 7 * 24 * 60 * 60 * 1000, // 7 days TTL
+  [CacheNamespace.EPISODE]: 24 * 60 * 60 * 1000,
+  [CacheNamespace.LIVE_SOURCE]: 60 * 60 * 1000,
+  [CacheNamespace.LIVE_CHANNEL]: 30 * 60 * 1000,
+  [CacheNamespace.EPG]: 3 * 24 * 60 * 60 * 1000, // 3 days EPG retention
+  [CacheNamespace.IMAGE]: 3 * 24 * 60 * 60 * 1000,
+  [CacheNamespace.PLAYBACK_TEMP]: 10 * 60 * 1000,
 });
 
-const MAX_ENTRIES_PER_NAMESPACE = 100;
-const MAX_SERIALIZED_BYTES_PER_ENTRY = 512 * 1024;
-const ACCESS_WRITE_INTERVAL = 30 * 1000;
+export const CacheMaxEntries = Object.freeze({
+  [CacheNamespace.DETAIL]: 500, // Up to 500 detail items
+  [CacheNamespace.EPG]: 1000, // 3-day EPG limit
+  [CacheNamespace.SOURCE]: 200,
+  [CacheNamespace.MOVIE]: 200,
+  [CacheNamespace.EPISODE]: 200,
+  [CacheNamespace.LIVE_SOURCE]: 200,
+  [CacheNamespace.LIVE_CHANNEL]: 500,
+  [CacheNamespace.IMAGE]: 500,
+  [CacheNamespace.PLAYBACK_TEMP]: 50,
+});
+
+// L1 Memory Cache for lightning-fast sync access
+const l1Cache = new Map();
 
 function stable(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -47,46 +66,29 @@ function storageKey(key) {
   return `${CACHE_PREFIX}${key}`;
 }
 
-function listKeys(namespace) {
-  const prefix = `${CACHE_PREFIX}${namespace}:`;
-  const keys = [];
-  for (let index = 0; index < window.localStorage.length; index += 1) {
-    const key = window.localStorage.key(index);
-    if (key?.startsWith(prefix)) keys.push(key);
-  }
-  return keys;
-}
-
-function removeStorageKey(key) {
-  window.localStorage.removeItem(key);
-}
-
-function prune(namespace) {
-  const entries = listKeys(namespace).map((key) => {
-    try {
-      const value = JSON.parse(window.localStorage.getItem(key));
-      return { key, createdAt: Number(value?.createdAt) || 0, lastAccessedAt: Number(value?.lastAccessedAt) || 0, expiresAt: Number(value?.expiresAt) || 0, size: String(window.localStorage.getItem(key) ?? '').length };
-    } catch {
-      return { key, createdAt: 0, expiresAt: 0, size: 0 };
-    }
-  });
-
+function pruneL1(namespace) {
+  const maxEntries = CacheMaxEntries[namespace] || 100;
+  const entries = [];
   const now = Date.now();
-  entries.filter((entry) => entry.expiresAt > 0 && entry.expiresAt <= now).forEach((entry) => removeStorageKey(entry.key));
-  const remaining = entries
-    .filter((entry) => !(entry.expiresAt > 0 && entry.expiresAt <= now))
-    .sort((a, b) => (a.lastAccessedAt || a.createdAt) - (b.lastAccessedAt || b.createdAt));
 
-  while (remaining.length > MAX_ENTRIES_PER_NAMESPACE) {
-    removeStorageKey(remaining.shift().key);
+  for (const [k, v] of l1Cache.entries()) {
+    if (v.namespace === namespace) {
+      if (v.expiresAt > 0 && v.expiresAt <= now) {
+        l1Cache.delete(k);
+      } else {
+        entries.push({ key: k, lastAccessedAt: v.lastAccessedAt || v.createdAt || 0 });
+      }
+    }
+  }
+
+  if (entries.length > maxEntries) {
+    entries.sort((a, b) => a.lastAccessedAt - b.lastAccessedAt);
+    const toDelete = entries.slice(0, entries.length - maxEntries);
+    toDelete.forEach((e) => l1Cache.delete(e.key));
   }
 }
 
 function set(namespace, key, value, { ttl = CacheTTL[namespace] } = {}) {
-  const serializedValue = JSON.stringify(value);
-  if (serializedValue === undefined) throw errorService.normalize(new Error('CACHE_SERIALIZE_FAILED'), { code: ErrorCode.STORAGE, context: { scope: 'cache-write', namespace, key } });
-  if (serializedValue.length > MAX_SERIALIZED_BYTES_PER_ENTRY) throw errorService.normalize(new Error('CACHE_ENTRY_TOO_LARGE'), { code: ErrorCode.STORAGE, context: { scope: 'cache-write', namespace, key } });
-
   const now = Date.now();
   const entry = {
     version: CACHE_VERSION,
@@ -96,55 +98,108 @@ function set(namespace, key, value, { ttl = CacheTTL[namespace] } = {}) {
     expiresAt: ttl == null ? 0 : now + Math.max(0, ttl),
     value,
   };
-  try {
-    window.localStorage.setItem(storageKey(key), JSON.stringify(entry));
-  } catch (error) {
-    throw errorService.normalize(error, { code: ErrorCode.STORAGE, context: { scope: 'cache-write', namespace, key } });
-  }
-  prune(namespace);
+
+  const fullKey = storageKey(key);
+  l1Cache.set(fullKey, entry);
+  pruneL1(namespace);
+
+  // Background IndexedDB persistence & LRU pruning (no 5MB storage limit)
+  void (async () => {
+    try {
+      await idbSet(fullKey, entry);
+      const maxEntries = CacheMaxEntries[namespace] || 100;
+      await idbPruneLRU(namespace, maxEntries);
+    } catch {}
+  })();
+
   return value;
 }
 
 function get(namespace, key, { allowStale = false } = {}) {
-  const raw = window.localStorage.getItem(storageKey(key));
-  if (raw === null) return { value: null, hit: false, stale: false };
+  const fullKey = storageKey(key);
+  const now = Date.now();
 
-  try {
-    const entry = JSON.parse(raw);
-    const now = Date.now();
-    const stale = entry.expiresAt > 0 && entry.expiresAt <= now;
-    if (stale && !allowStale) {
-      removeStorageKey(storageKey(key));
-      return { value: null, hit: false, stale: true };
-    }
-    if (now - (Number(entry.lastAccessedAt) || 0) >= ACCESS_WRITE_INTERVAL) {
-      entry.lastAccessedAt = now;
-      window.localStorage.setItem(storageKey(key), JSON.stringify(entry));
-    }
-    return { value: entry.value, hit: true, stale };
-  } catch {
-    removeStorageKey(storageKey(key));
+  let entry = l1Cache.get(fullKey);
+
+  if (!entry) {
+    // Attempt to read from IndexedDB asynchronously for next time
+    void (async () => {
+      try {
+        const idbEntry = await idbGet(fullKey);
+        if (idbEntry && (!idbEntry.expiresAt || idbEntry.expiresAt > Date.now() || allowStale)) {
+          l1Cache.set(fullKey, idbEntry);
+        }
+      } catch {}
+    })();
     return { value: null, hit: false, stale: false };
   }
+
+  const stale = entry.expiresAt > 0 && entry.expiresAt <= now;
+  if (stale && !allowStale) {
+    remove(namespace, key);
+    return { value: null, hit: false, stale: true };
+  }
+
+  entry.lastAccessedAt = now;
+  return { value: entry.value, hit: true, stale };
+}
+
+async function getAsync(namespace, key, { allowStale = false } = {}) {
+  const fullKey = storageKey(key);
+  const now = Date.now();
+
+  let entry = l1Cache.get(fullKey);
+  if (!entry) {
+    try {
+      entry = await idbGet(fullKey);
+      if (entry) l1Cache.set(fullKey, entry);
+    } catch {}
+  }
+
+  if (!entry) return { value: null, hit: false, stale: false };
+
+  const stale = entry.expiresAt > 0 && entry.expiresAt <= now;
+  if (stale && !allowStale) {
+    remove(namespace, key);
+    return { value: null, hit: false, stale: true };
+  }
+
+  entry.lastAccessedAt = now;
+  return { value: entry.value, hit: true, stale };
 }
 
 function remove(namespace, key) {
-  window.localStorage.removeItem(storageKey(key));
+  const fullKey = storageKey(key);
+  l1Cache.delete(fullKey);
+  void idbDelete(fullKey);
   return true;
 }
 
 function clear(namespace) {
-  listKeys(namespace).forEach(removeStorageKey);
+  for (const [k, v] of l1Cache.entries()) {
+    if (v.namespace === namespace) l1Cache.delete(k);
+  }
+  void idbClearNamespace(namespace);
 }
 
 function clearAll() {
-  Object.values(CacheNamespace).forEach(clear);
+  l1Cache.clear();
+  void idbClearAll();
+}
+
+function prune(namespace) {
+  pruneL1(namespace);
+  const maxEntries = CacheMaxEntries[namespace] || 100;
+  void idbPruneLRU(namespace, maxEntries);
 }
 
 function stats() {
   return Object.values(CacheNamespace).reduce((result, namespace) => {
-    const keys = listKeys(namespace);
-    result[namespace] = { entries: keys.length };
+    let count = 0;
+    for (const v of l1Cache.values()) {
+      if (v.namespace === namespace) count++;
+    }
+    result[namespace] = { entries: count };
     return result;
   }, {});
 }
@@ -154,6 +209,7 @@ export const cacheStorage = Object.freeze({
   version: CACHE_VERSION,
   createKey: createCacheKey,
   get,
+  getAsync,
   set,
   remove,
   clear,

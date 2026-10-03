@@ -165,8 +165,88 @@ export async function parseTXTLiveMetadataStream(text, onChannel) {
     };
     channels.push(channel);
     if (typeof onChannel === 'function') await onChannel(channel);
+
+    if (lineIndex > 0 && lineIndex % 1500 === 0) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
   }
   return channels;
+}
+
+export async function parseTXTLiveAsync(text) {
+  if (!text) return [];
+  const cleanText = String(text).replace(/^\uFEFF/, '');
+  const lines = cleanText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  let currentCategory = '默认频道';
+  const channelsMap = new Map();
+  const channelsList = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.includes('#genre#') || /^\[.*\]$/.test(line)) {
+      let cat = line.replace(/[,，]?\s*#genre#.*$/i, '').trim();
+      if (/^\[(.*)\]$/.test(cat)) cat = cat.slice(1, -1).trim();
+      if (cat) currentCategory = cat;
+      continue;
+    }
+    if (line.startsWith('#') || line.startsWith('//')) continue;
+
+    let name = '';
+    let rawUrls = '';
+    const commaIndex = line.search(/[,，]/);
+    if (commaIndex !== -1) {
+      name = line.slice(0, commaIndex).trim();
+      rawUrls = line.slice(commaIndex + 1).trim();
+    } else {
+      const match = line.match(/^([^\s]+)\s+((?:https?|rtmp|rtsp|p2p|mitv|mms):\/\/.+)$/i);
+      if (match) {
+        name = match[1].trim();
+        rawUrls = match[2].trim();
+      } else continue;
+    }
+    if (!name || !rawUrls) continue;
+
+    const urlCandidates = rawUrls.split('#').map(u => u.trim()).filter(Boolean);
+    const mapKey = `${currentCategory}:::${name}`;
+    let channel = channelsMap.get(mapKey);
+    if (!channel) {
+      channel = {
+        sourceItemId: `txt-${channelsList.length + 1}-${name}`,
+        canonicalId: name,
+        channelKey: name,
+        name,
+        logo: '',
+        categoryId: currentCategory,
+        category: currentCategory,
+        sourceOrder: channelsList.length,
+        streams: [],
+        epg: [],
+        currentProgram: null,
+        upcomingProgram: null,
+      };
+      channelsMap.set(mapKey, channel);
+      channelsList.push(channel);
+    }
+
+    for (const cand of urlCandidates) {
+      let streamUrl = cand;
+      let streamLabel = `线路 ${channel.streams.length + 1}`;
+      if (streamUrl.includes('$')) {
+        const parts = streamUrl.split('$');
+        streamUrl = parts[0].trim();
+        if (parts[1]?.trim()) streamLabel = parts[1].trim();
+      }
+      if (/^(?:https?|rtmp|rtsp|p2p|mitv|mms):\/\//i.test(streamUrl)
+        || /\.(?:m3u8|flv|mp4)(?:[?#].*)?$/i.test(streamUrl)) {
+        channel.streams.push({ url: streamUrl, label: streamLabel, quality: '', resolution: '' });
+      }
+    }
+
+    if (i > 0 && i % 1500 === 0) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+  }
+  return channelsList;
 }
 
 export function parseTXTLiveLineStreams(line) {

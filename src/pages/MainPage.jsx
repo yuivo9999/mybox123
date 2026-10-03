@@ -62,12 +62,12 @@ function Main({tab,movies,channels,favorites,history,sources,searches,progress,s
   </Page>;
  }
  if(tab==='appearance') return <Page><Header title="外观设置"/>
-   <SectionTitle title="主题"/>
+   <SectionTitle title="主题" />
    <SettingMenu icon={Settings} title="主题" value={settings?.theme==='sangtian'?'桑田山河':settings?.theme==='light'?'浅色':'深色'} onClick={()=>onUpdateSettings?.({theme:cycle(settings?.theme||'sangtian',['sangtian','dark','light'])})}/>
-   <SectionTitle title="字体"/>
+   <SectionTitle title="字体" />
    <SettingMenu icon={Settings} title="字体" value={getFontById(settings?.fontFamily).name} onClick={()=>setFontPicker(true)}/>
    <SettingMenu icon={Settings} title="字体大小" value={settings?.fontSize==='large'?'大':settings?.fontSize==='small'?'小':'中'} onClick={()=>onUpdateSettings?.({fontSize:cycle(settings?.fontSize||'medium',['small','medium','large'])})}/>
-   <SectionTitle title="显示"/>
+   <SectionTitle title="显示" />
    <SettingMenu icon={Settings} title="卡片显示" value={settings?.cardStyle==='compact'?'紧凑':'海报'} onClick={()=>onUpdateSettings?.({cardStyle:settings?.cardStyle==='compact'?'poster':'compact'})}/>
    <SettingMenu icon={Settings} title="显示密度" value={settings?.density==='compact'?'紧凑':'舒适'} onClick={()=>onUpdateSettings?.({density:settings?.density==='compact'?'comfortable':'compact'})}/>
    {fontPicker&&<FontPickerDialog value={settings?.fontFamily} onCancel={()=>setFontPicker(false)} onApply={(fontId)=>{onUpdateSettings?.({fontFamily:fontId});setFontPicker(false)}}/>}

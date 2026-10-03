@@ -272,6 +272,63 @@ public final class DrpySandboxRuntime {
                 catch (Exception e) { throw new RuntimeException("DRPY_URLDECODE_ERROR"); }
             }
         });
+
+        // ES2020+ Polyfills for Rhino environment
+        final String polyfills =
+            "if (typeof globalThis === 'undefined') { var globalThis = this; }\n" +
+            "if (typeof Object.fromEntries === 'undefined') {\n" +
+            "  Object.fromEntries = function(entries) {\n" +
+            "    if (!entries) return {};\n" +
+            "    var obj = {};\n" +
+            "    for (var i = 0; i < entries.length; i++) {\n" +
+            "      var e = entries[i];\n" +
+            "      if (e && e.length >= 2) obj[e[0]] = e[1];\n" +
+            "    }\n" +
+            "    return obj;\n" +
+            "  };\n" +
+            "}\n" +
+            "if (typeof Object.entries === 'undefined') {\n" +
+            "  Object.entries = function(obj) {\n" +
+            "    var res = [];\n" +
+            "    for (var k in obj) { if (Object.prototype.hasOwnProperty.call(obj, k)) res.push([k, obj[k]]); }\n" +
+            "    return res;\n" +
+            "  };\n" +
+            "}\n" +
+            "if (typeof Object.values === 'undefined') {\n" +
+            "  Object.values = function(obj) {\n" +
+            "    var res = [];\n" +
+            "    for (var k in obj) { if (Object.prototype.hasOwnProperty.call(obj, k)) res.push(obj[k]); }\n" +
+            "    return res;\n" +
+            "  };\n" +
+            "}\n" +
+            "if (typeof Array.prototype.flat === 'undefined') {\n" +
+            "  Array.prototype.flat = function(depth) {\n" +
+            "    var d = typeof depth === 'number' ? depth : 1;\n" +
+            "    var flatDeep = function(arr, currentDepth) {\n" +
+            "      return currentDepth > 0\n" +
+            "        ? arr.reduce(function(acc, val) { return acc.concat(Array.isArray(val) ? flatDeep(val, currentDepth - 1) : val); }, [])\n" +
+            "        : arr.slice();\n" +
+            "    };\n" +
+            "    return flatDeep(this, d);\n" +
+            "  };\n" +
+            "}\n" +
+            "if (typeof Array.prototype.flatMap === 'undefined') {\n" +
+            "  Array.prototype.flatMap = function(callback, thisArg) {\n" +
+            "    return this.map(callback, thisArg).flat();\n" +
+            "  };\n" +
+            "}\n" +
+            "if (typeof String.prototype.replaceAll === 'undefined') {\n" +
+            "  String.prototype.replaceAll = function(search, replace) {\n" +
+            "    if (search instanceof RegExp) {\n" +
+            "      var flags = search.flags.indexOf('g') === -1 ? search.flags + 'g' : search.flags;\n" +
+            "      return this.replace(new RegExp(search.source, flags), replace);\n" +
+            "    }\n" +
+            "    return this.split(search).join(replace);\n" +
+            "  };\n" +
+            "}\n";
+        try {
+            cx.evaluateString(scope, polyfills, "drpy-es2020-polyfills", 1, null);
+        } catch (Throwable ignored) {}
     }
 
     private static void installDomFunctions(Context cx, Scriptable scope) {

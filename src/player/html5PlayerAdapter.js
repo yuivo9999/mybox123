@@ -43,13 +43,33 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
       video.removeAttribute('src');
 
       const isHls = Boolean(next.url && (next.url.includes('.m3u8') || next.protocol === 'hls' || next.format === 'hls'));
+      const isLiveStream = Boolean(
+        next.kind === 'live' ||
+        next.protocol === 'LIVE' ||
+        next.playerHint?.isLive ||
+        next.metadata?.isLive
+      );
 
       if (isHls && Hls.isSupported()) {
         try {
+          // 统一直播与流媒体播放内核技术：
+          // 1. 初次打开时采用即时快速加载起播（低延迟首次渲染）。
+          // 2. 随播放进行，动态将前置缓冲区提升至 60 秒（1分钟）提前量（lookahead buffer），抗网络抖动，杜绝卡顿。
           const hls = new Hls({
             enableWorker: true,
-            lowLatencyMode: true,
-            backBufferLength: 90,
+            lowLatencyMode: false,
+            backBufferLength: 60,
+            maxBufferLength: isLiveStream ? 20 : 60,
+            maxMaxBufferLength: 120,
+            maxBufferSize: 80 * 1000 * 1000,
+            maxBufferHole: 0.8,
+            highBufferWatchdogPeriod: 2,
+            nudgeOffset: 0.2,
+            nudgeMaxRetry: 5,
+            liveSyncDurationCount: 6,
+            liveMaxLatencyDurationCount: 30,
+            fragLoadingTimeOut: 25000,
+            manifestLoadingTimeOut: 25000,
           });
           hlsInstance = hls;
           hls.attachMedia(video);
@@ -63,6 +83,12 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
             emit('prepared');
             if (next.playerHint?.autoplay !== false) {
               video.play().catch(() => {});
+            }
+          });
+          hls.on(Hls.Events.FRAG_LOADED, () => {
+            // 首次分片加载起播后，平滑扩大前置缓冲至 60 秒（1分钟提前量）
+            if (hls.config.maxBufferLength < 60) {
+              hls.config.maxBufferLength = 60;
             }
           });
           hls.on(Hls.Events.ERROR, (event, data) => {

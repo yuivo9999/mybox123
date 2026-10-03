@@ -209,6 +209,10 @@ public final class NativePlaybackBridge {
 
             mainHandler.post(() -> {
                 try {
+                    if (width <= 0 || height <= 0) {
+                        textureView.setVisibility(TextureView.GONE);
+                        return;
+                    }
                     FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) textureView.getLayoutParams();
                     if (lp == null) lp = new FrameLayout.LayoutParams(width, height);
                     lp.leftMargin = left;
@@ -368,6 +372,29 @@ public final class NativePlaybackBridge {
     }
 
     @JavascriptInterface
+    public synchronized String saveUserData(String key, String value) {
+        try {
+            activity.getSharedPreferences("tvbox_user_data", Context.MODE_PRIVATE)
+                    .edit()
+                    .putString(key, value)
+                    .apply();
+            return ok("saved", true);
+        } catch (Throwable e) {
+            return error("STORAGE_SAVE_ERROR:" + safeMessage(e));
+        }
+    }
+
+    @JavascriptInterface
+    public synchronized String loadUserData(String key) {
+        try {
+            return activity.getSharedPreferences("tvbox_user_data", Context.MODE_PRIVATE)
+                    .getString(key, "");
+        } catch (Throwable e) {
+            return "";
+        }
+    }
+
+    @JavascriptInterface
     public synchronized String releaseMedia(String ignored) {
         if (released) return ok("released", true);
         released = true;
@@ -379,6 +406,22 @@ public final class NativePlaybackBridge {
         }
         emit("released", null);
         return ok("released", true);
+    }
+
+    private boolean pausedByHost = false;
+
+    public synchronized void onHostPause() {
+        if (!released && wantPlay) {
+            pausedByHost = true;
+            pauseMedia("{}");
+        }
+    }
+
+    public synchronized void onHostResume() {
+        if (!released && pausedByHost) {
+            pausedByHost = false;
+            playMedia("{}");
+        }
     }
 
     public synchronized void release() {

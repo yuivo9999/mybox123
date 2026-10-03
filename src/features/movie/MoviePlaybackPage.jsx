@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Heart, ListVideo } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Heart, ListVideo, Film, RotateCw, Ratio, Play } from 'lucide-react';
 import { movieService } from '../../services/movieService.js';
 import { playbackService } from '../../services/playbackService.js';
 import { usePersistentState } from '../../state/usePersistentState.js';
@@ -31,6 +31,7 @@ export function MoviePlaybackPage({
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sourceModalOpen, setSourceModalOpen] = useState(false);
+  const [decoderEngine, setDecoderEngine] = useState('exo');
   const videoRef = useRef(null);
   const videoContainerRef = useRef(null);
 
@@ -100,19 +101,6 @@ export function MoviePlaybackPage({
     }
   };
 
-  const switchSource = id => {
-    setSource(id);
-    const next = request?.candidates?.find(item => item.sourceId === id);
-    if (next) switchCandidate(next.candidateId);
-  };
-
-  const handleChangePlaybackRate = rate => {
-    setPlaybackRate(rate);
-    if (videoRef.current) {
-      videoRef.current.playbackRate = rate;
-    }
-  };
-
   const handleRetry = () => {
     setError('');
     const nextCandidate = controller.start();
@@ -123,7 +111,13 @@ export function MoviePlaybackPage({
     }
   };
 
-  const sources = [...new Set((request?.candidates ?? []).map(item => item.sourceId).filter(Boolean))];
+  const handleChangePlaybackRate = rate => {
+    setPlaybackRate(rate);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = rate;
+    }
+  };
+
   const candidates = request?.candidates ?? [];
   const relatedMovies = movie ? movieService.getRelated({ movies, movie }) : [];
   const activeStreamUrl = resolvedInput?.url || candidate?.url || candidate?.metadata?.url || '';
@@ -132,22 +126,21 @@ export function MoviePlaybackPage({
     saveSettings({ ...settings, theme: newTheme });
   };
 
-  const candidateLabel = candidate?.metadata?.label || candidate?.label || source || '蓝光4K · 线路1';
+  const candidateLabel = candidate?.metadata?.label || candidate?.label || source || '默认线路';
 
   return (
     <div className="player-page theme-sangtian-layout">
-      {/* 1. Top Bar matching the image */}
+      {/* 1. Top Bar */}
       <SangtianTopBar
         onHamburger={() => setDrawerOpen(true)}
         onPreview={() => {
-          // Quick switch to alternate candidate
           const next = candidates.find(c => c.candidateId !== candidate?.candidateId);
           if (next) switchCandidate(next.candidateId);
         }}
-        previewText="预览区"
-        workspaceText={`工作区 ${episodeIndex + 1}`}
+        previewText="换源"
+        workspaceText={`集数 ${episodeIndex + 1}`}
         badgeRed={`${candidates.length || 8}`}
-        badgeYellow="9改"
+        badgeYellow="解析"
         onWorkspace={() => setSourceModalOpen(true)}
         currentTheme={settings?.theme || 'sangtian'}
         onSelectTheme={handleSelectTheme}
@@ -160,7 +153,7 @@ export function MoviePlaybackPage({
         onOpenSettings={() => onTab?.('settings') || onBack()}
       />
 
-      {/* Hamburger Navigation Drawer */}
+      {/* Drawer */}
       <SangtianDrawer
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
@@ -173,7 +166,8 @@ export function MoviePlaybackPage({
         onSelectTheme={handleSelectTheme}
       />
 
-      <section className="movie-playback-context" aria-label="当前影视播放信息">
+      {/* 2. Context Navigation Bar */}
+      <section className="movie-playback-context" aria-label="播放导航详情">
         <div className="movie-playback-context-main">
           <button className="movie-playback-back" type="button" onClick={onBack} aria-label="返回影视详情"><ChevronLeft size={18} /></button>
           <div className="movie-playback-title">
@@ -191,7 +185,7 @@ export function MoviePlaybackPage({
         </div>
       </section>
 
-      {/* 2. Video Playback Window matching the top window in image */}
+      {/* 3. Fully Featured Video Playback Window */}
       <SangtianPlayerWindow
         videoRef={videoRef}
         status={status}
@@ -213,18 +207,31 @@ export function MoviePlaybackPage({
         onPreviousEpisode={episodeIndex > 0 ? () => onEpisode?.(movie, episodeIndex - 1, source, request?.metadata?.returnRoute || 'detail') : undefined}
         onNextEpisode={episodeIndex < episodes.length - 1 ? () => onEpisode?.(movie, episodeIndex + 1, source, request?.metadata?.returnRoute || 'detail') : undefined}
         videoContainerRef={videoContainerRef}
-        terminalTag="BASH"
+        terminalTag="VOD DECODE"
+        isLive={false}
+        channels={[]}
+        activeChannel={null}
+        activeStreamIndex={0}
+        decoderEngine={decoderEngine}
+        onChangeDecoderEngine={setDecoderEngine}
       >
         <video
           ref={videoRef}
           controls
           playsInline
+          preload="metadata"
           poster={request?.metadata?.poster || movie?.poster}
           className="sangtian-video-element"
         />
+        {status === 'error' && (
+          <div className="video-error" style={{ display: 'none' }}>
+            <span>{error}</span>
+            <button onClick={handleRetry}>重新播放</button>
+          </div>
+        )}
       </SangtianPlayerWindow>
 
-      {/* 3. Floating Bar below video window */}
+      {/* 4. Floating Control Bar */}
       <SangtianFloatingBar
         playbackRate={playbackRate}
         onChangeRate={handleChangePlaybackRate}
@@ -232,17 +239,14 @@ export function MoviePlaybackPage({
         onOpenSourceModal={() => setSourceModalOpen(true)}
       />
 
-      {/* 4. Bottom Console Card borrowing 50% elements from image */}
+      {/* 5. Console Card display */}
       <SangtianConsoleCard
         title={request?.metadata?.title || movie?.title || '精彩视频'}
         subtitle={`${movie?.year || '2026'} · ${movie?.category || '高清影音'} · 第 ${episodeIndex + 1} 集`}
-        description={movie?.description}
+        description={movie?.description || '暂无视频简介。'}
         episodes={episodes}
         currentEpisodeId={request?.episodeId}
         onSelectEpisode={idx => onEpisode?.(movie, idx, source, request?.metadata?.returnRoute || 'detail')}
-        sources={sources}
-        currentSource={source}
-        onSelectSource={switchSource}
         candidates={candidates}
         currentCandidateId={candidate?.candidateId}
         onSelectCandidate={switchCandidate}
@@ -250,6 +254,8 @@ export function MoviePlaybackPage({
         relatedItems={relatedMovies}
         onSelectRelated={onMovie}
         onReplay={handleRetry}
+        playerStatus={status}
+        isLive={false}
         onTogglePip={() => {
           if (videoRef.current && document.pictureInPictureEnabled) {
             if (document.pictureInPictureElement) {
@@ -261,43 +267,46 @@ export function MoviePlaybackPage({
         }}
       />
 
-      {/* Source Selection Modal if requested */}
+      {/* Source/Episode Selection modal */}
       {sourceModalOpen && (
         <div className="sangtian-modal-backdrop" onClick={() => setSourceModalOpen(false)}>
           <div className="sangtian-modal" onClick={e => e.stopPropagation()}>
-            <h4>选择工作区与线路</h4>
-            <div className="sangtian-modal-section">
-              <span>可用来源：</span>
-              <div className="chips">
-                {sources.map(s => (
+            <h4>选择播放源与集数</h4>
+            {episodes.length > 0 && (
+              <div className="modal-episodes-section" style={{ marginBottom: 16 }}>
+                <h5>剧集选集</h5>
+                <div className="chips" style={{ maxHeight: 150, overflowY: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                  {episodes.map((ep, idx) => (
+                    <button
+                      key={ep.episodeId}
+                      className={episodeIndex === idx ? 'active' : ''}
+                      onClick={() => {
+                        onEpisode?.(movie, idx, source, request?.metadata?.returnRoute || 'detail');
+                        setSourceModalOpen(false);
+                      }}
+                    >
+                      {ep.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div>
+              <h5>线路 / 播放源</h5>
+              <div className="chips" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                {candidates.map(item => (
                   <button
-                    key={s}
-                    className={source === s ? 'active' : ''}
-                    onClick={() => { switchSource(s); setSourceModalOpen(false); }}
+                    key={item.candidateId}
+                    className={candidate?.candidateId === item.candidateId ? 'active' : ''}
+                    onClick={() => { switchCandidate(item.candidateId); setSourceModalOpen(false); }}
                   >
-                    {s}
+                    {item.metadata?.label ?? item.label ?? item.protocol}
                   </button>
                 ))}
               </div>
             </div>
-            <div className="sangtian-modal-section">
-              <span>可用线路候选：</span>
-              <div className="chips">
-                {candidates.map(c => (
-                  <button
-                    key={c.candidateId}
-                    className={candidate?.candidateId === c.candidateId ? 'active' : ''}
-                    onClick={() => { switchCandidate(c.candidateId); setSourceModalOpen(false); }}
-                  >
-                    {c.metadata?.label || c.label || c.protocol}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="actions">
-              <button className="primary" onClick={() => setSourceModalOpen(false)}>
-                完成
-              </button>
+            <div className="actions" style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="primary" onClick={() => setSourceModalOpen(false)}>完成</button>
             </div>
           </div>
         </div>

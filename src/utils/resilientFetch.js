@@ -36,6 +36,34 @@ export function decodeDataUrl(dataUrl) {
   }
 }
 
+function isPrivateOrSensitive(url, options = {}) {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '::1' ||
+      host.endsWith('.local') ||
+      host.startsWith('192.168.') ||
+      host.startsWith('10.') ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host)
+    ) {
+      return true;
+    }
+  } catch {}
+
+  const headers = options.headers || {};
+  const headerKeys = Object.keys(headers).map(k => k.toLowerCase());
+  const hasSensitiveHeaders = headerKeys.some(k =>
+    k === 'authorization' || k === 'cookie' || k === 'token' || k.includes('key') || k.includes('secret')
+  );
+  if (hasSensitiveHeaders) return true;
+
+  if (options.allowProxy === false) return true;
+  return false;
+}
+
 export async function resilientFetch(url, options = {}, transport = fetch) {
   if (!url || typeof url !== 'string') {
     throw new Error('URL_REQUIRED');
@@ -104,6 +132,12 @@ export async function resilientFetch(url, options = {}, transport = fetch) {
       cleanup();
       // Proceed to proxy fallback
     }
+  }
+
+  // If the URL is on an internal network or contains sensitive headers (tokens/keys/cookies),
+  // NEVER send it to public third-party proxies.
+  if (isPrivateOrSensitive(trimmedUrl, options)) {
+    throw new Error('FETCH_BLOCKED_SENSITIVE_OR_PRIVATE');
   }
 
   // Attempt proxy fallbacks
