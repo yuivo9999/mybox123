@@ -58,11 +58,26 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
     return '';
   };
 
+  const resolveExt = (value) => {
+    if (value == null) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        throw new Error('TVBOX_JAR_EXT_SERIALIZE_FAILED');
+      }
+    }
+    return String(value);
+  };
+
   const invoke = async (operation, payload = {}) => execute(operation, {
     ...payload,
     path: payload.path || preparedPath || '',
     className: payload.className || inferClassName(),
-    ext: payload.ext ?? definition.tvboxDefinition?.ext ?? '',
+    // CatVod Spider receives the TVBox `ext` value through init().
+    // Object EXT is serialized before crossing the native ABI boundary.
+    ext: resolveExt(payload.ext ?? definition.tvboxDefinition?.ext ?? ''),
   });
 
   const home = async (payload = {}) => invoke('home', { ...payload, path: await ensurePrepared(payload) });
