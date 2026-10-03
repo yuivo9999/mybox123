@@ -187,7 +187,7 @@ export const liveService = {
         referer: stream.referer,
         userAgent: stream.userAgent,
         priority: stream.priority,
-        metadata: { label: stream.label, quality: stream.quality, resolution: stream.resolution, sourceChannelId: stream.sourceChannelId },
+        metadata: { label: stream.label, quality: stream.quality, resolution: stream.resolution, sourceChannelId: stream.sourceChannelId, tvboxIJKProfiles: stream.tvboxIJKProfiles ?? channelRef?.tvboxIJKProfiles ?? {}, tvboxParseConfig: stream.tvboxParseConfig ?? channelRef?.tvboxParseConfig ?? null },
       }));
   },
 
