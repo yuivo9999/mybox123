@@ -494,7 +494,7 @@ public final class NativePlaybackBridge {
             // so Live goes directly to Exo and VOD gets the explicit IJK software step.
             if ("hardware".equals(decoderMode)) {
                 try {
-                    int actual = mp.getVideoDecoder();
+                    int actual = ijkPlayer.getVideoDecoder();
                     if (actual != 2) {
                         fallbackOrError("IJK_HARDWARE_NOT_ACTIVE:" + actual);
                         return;
