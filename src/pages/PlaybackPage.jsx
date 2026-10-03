@@ -146,10 +146,10 @@ function PlaybackView({
           const next = candidates.find(item => item.candidateId !== candidate?.candidateId && !controller.failedCandidateIds?.includes(item.candidateId));
           if (next) switchCandidate(next.candidateId);
         }}
-        previewText="预览区"
-        workspaceText="工作区 5"
-        badgeRed={`${candidates.length || 8}`}
-        badgeYellow="9改"
+        previewText={isLive ? "切换线路" : "预览区"}
+        workspaceText={isLive ? "直播线路" : "工作区 5"}
+        badgeRed={String(candidates.length)}
+        badgeYellow={isLive ? "直连" : "解析"}
         onWorkspace={() => setSourceModalOpen(true)}
         currentTheme="sangtian"
         onCopyLink={() => {
@@ -218,7 +218,7 @@ function PlaybackView({
         description={
           currentProgram
             ? `当前节目：${currentProgram.title || '未命名节目'} (${currentProgram.startAt || '—'}–${currentProgram.endAt || '—'})${nextProgram ? ` | 下一节目：${nextProgram.title || '—'}` : ''}`
-            : '本直播源已接入“桑田山河”高品质流分发矩阵，支持毫秒级候选重试与低延迟播放。'
+            : '当前频道使用源提供的原始直播地址播放；网络异常时会按现有播放策略自动重连或切换线路。'
         }
         episodes={channel?.streams?.map(s => ({ episodeId: s.streamId, title: s.label || s.protocol })) || []}
         currentEpisodeId={candidate?.candidateId}
