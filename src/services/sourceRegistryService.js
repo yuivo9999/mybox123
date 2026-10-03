@@ -45,8 +45,8 @@ export const sourceRegistryService = {
     return { ...result, detectedFormat: adapter.getSnapshotState?.().detectedFormat ?? null };
   },
 
-  async syncMovieSources(sources, selectedSourceId = null) {
-    return syncMovieSources(sources, selectedSourceId);
+  async syncMovieSources(sources, selectedSourceId = null, options = {}) {
+    return syncMovieSources(sources, selectedSourceId, options);
   },
 
   async registerAll(sources) {
