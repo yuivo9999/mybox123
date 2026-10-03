@@ -94,6 +94,7 @@ function normalizeRequest(request = {}) {
     timeoutMs,
     disableRedirects: Boolean(request.disableRedirects),
     responseType,
+    doh: request.doh ?? null,
   };
 }
 
@@ -134,7 +135,7 @@ export function isNativeHttpAvailable() {
       Capacitor.getPlatform() === 'android' &&
       Capacitor.isNativePlatform() &&
       Capacitor.isPluginAvailable('CapacitorHttp') &&
-      typeof CapacitorHttp.request === 'function'
+      typeof CapacitorHttp.request === 'function' || typeof window?.Capacitor?.Plugins?.TVBoxHttp?.request === 'function'
     );
   } catch {
     return false;
@@ -164,6 +165,8 @@ export async function nativeHttpRequest(input, { signal } = {}) {
     readTimeout: request.timeoutMs,
     disableRedirects: request.disableRedirects,
     responseType: request.responseType,
+    ...(request.doh?.url ? { dohUrl: String(request.doh.url) } : {}),
+    ...(Array.isArray(request.doh?.bootstrapIps) ? { dohBootstrapIps: request.doh.bootstrapIps.map(String) } : {}),
   });
 
   const abortPromise = signal
