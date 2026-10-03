@@ -20,7 +20,11 @@ function Main({tab,movies,channels,favorites,history,sources,searches,progress,s
   return <Page><Header title="播放历史"/>{historyMovies.length?<div className="movie-grid">{historyMovies.filter(({movie})=>movie).map(({movie,item})=>{const ep=movie.episodes?.find(e=>e.episodeId===item.episodeId);const pct=item.durationSeconds?Math.min(100,Math.round(item.positionSeconds/item.durationSeconds*100)):0;return <article className="movie-card history-card" key={item.historyId} onClick={()=>onMovie(movie)}><SmartImage src={movie.poster} alt={movie.title}/><div><b>{movie.title}</b><span>{ep?.title??'继续观看'} · {pct}%</span><small>最近观看：{new Date(item.lastPlayedAt||Date.now()).toLocaleString()}</small></div></article>})}</div>:<Empty text="还没有播放历史"/>}{historyMovies.filter(({movie})=>!movie).map(({item})=><div className="info-card" key={item.historyId}><Database size={18}/><div><b>暂时无法找到来源</b><span>播放历史已保留：{item.targetId}</span></div></div>)}{historyChannels.length>0&&<><SectionTitle title="Live"/><div className="channel-list">{historyChannels.map(c=><button className="menu" key={c.channelId} onClick={()=>onLiveChannel(c)}><Radio size={18}/><span>{c.name}<small>{c.category}</small></span><ChevronLeft className="flip" size={17}/></button>)}</div></>}</Page>;
  }
  if(tab==='search-history') return <Page><Header title="搜索历史"/><div className="actions"><button className="secondary" disabled={!searches.length} onClick={()=>setConfirm({type:'searches'})}>清空搜索历史</button></div><div className="history-list">{searches.map(i=><div className="menu" key={i.searchId}><Search size={18}/><button className="history-keyword" onClick={()=>onSearchHistory(i.keyword)}>{i.keyword}</button><em>{i.count} 次</em><button className="icon-button" aria-label="删除历史" onClick={()=>setConfirm({type:'search',id:i.searchId})}>×</button></div>)}{!searches.length&&<Empty text="还没有搜索历史"/>}</div>{confirm&&<ConfirmDialog title={confirm.type==='searches'?'清空搜索历史？':'删除这条搜索历史？'} onCancel={()=>setConfirm(null)} onConfirm={()=>{if(confirm.type==='searches')onClearSearches();else onRemoveSearch(confirm.id);setConfirm(null)}}/>}</Page>;
-  if(tab==='sources') return <Page><Header title="源管理"/><div className="actions"><button className="secondary" onClick={()=>setSourceForm({sourceType:'live',name:''})}>添加源</button><button className="secondary" onClick={()=>sourceConfigService.download(sources)}><Download size={16}/>导出</button><label className="secondary file-button"><Upload size={16}/>导入<input type="file" accept=".json,.txt,.m3u,application/json,text/plain" hidden onChange={async e=>{const file=e.target.files?.[0];if(!file)return;try{const parsed=await sourceConfigService.importFile(file);await onSaveSources(parsed)}catch(error){console.error(error)}finally{e.target.value=''}}}/></label></div><SectionTitle title="影视源"/><SourceList sources={sources.filter(s=>s.sourceType==='movie')} onEnabled={onSourceEnabled} onActive={onSourceActive} onTest={onTestSource} onRemove={onRemoveSource}/><SectionTitle title="Live 源"/><SourceList sources={sources.filter(s=>s.sourceType==='live')} onEnabled={onSourceEnabled} onActive={onSourceActive} onTest={onTestSource} onRemove={onRemoveSource}/><InfoCard title="源边界" text="影视源与 Live 源独立管理。支持标准 JSON 格式、M3U 播放列表以及 #genre# 分类 TXT 电视直播源文件。"/>{sourceForm&&<SourceForm value={sourceForm} onCancel={()=>setSourceForm(null)} onSave={source=>{onSaveSources([...sources,{...source,sourceId:`source_${source.sourceType}_${Date.now()}`,enabled:true,status:'未测试'}]);setSourceForm(null)}}/>}</Page>;
+  if(tab==='sources') return <Page><Header title="源管理"/><div className="actions"><button className="secondary" onClick={()=>setSourceForm({sourceType:'live',name:''})}>添加源</button><button className="secondary" onClick={()=>sourceConfigService.download(sources)}><Download size={16}/>导出</button><label className="secondary file-button"><Upload size={16}/>导入<input type="file" accept=".json,.txt,.m3u,application/json,text/plain" hidden onChange={async e=>{const file=e.target.files?.[0];if(!file)return;try{const parsed=await sourceConfigService.importFile(file);await onSaveSources(parsed)}catch(error){console.error(error)}finally{e.target.value=''}}}/></label></div><SectionTitle title="影视源"/><SourceList sources={sources.filter(s=>s.sourceType==='movie')} onEnabled={onSourceEnabled} onActive={onSourceActive} onTest={onTestSource} onRemove={onRemoveSource}/><SectionTitle title="Live 源"/><SourceList sources={sources.filter(s=>s.sourceType==='live')} onEnabled={onSourceEnabled} onActive={onSourceActive} onTest={onTestSource} onRemove={onRemoveSource}/><InfoCard title="源边界" text="影视源与 Live 源独立管理。支持标准 JSON 格式、M3U 播放列表以及 #genre# 分类 TXT 电视直播源文件。"/>{sourceForm&&<SourceForm value={sourceForm} onCancel={()=>setSourceForm(null)} onSave={source=>{
+  const additions = Array.isArray(source) ? source : [{...source,sourceId:`source_${source.sourceType}_${Date.now()}`,enabled:true,status:'未测试'}];
+  onSaveSources([...sources,...additions]);
+  setSourceForm(null);
+}}/>}</Page>;
  if(tab==='settings') return <Page><Header title="设置"/><SectionTitle title="播放设置"/><SettingMenu icon={Radio} title="自动继续播放" value={settings?.autoplayResume?'开启':'关闭'} onClick={()=>onUpdateSettings?.({autoplayResume:!settings?.autoplayResume})}/><SettingMenu icon={Radio} title="默认影视线路" value={settings?.defaultMovieSource||'自动选择'} onClick={()=>onUpdateSettings?.({defaultMovieSource:nextSource(sources,'movie',settings?.defaultMovieSource)})}/><SettingMenu icon={Radio} title="默认直播线路" value={settings?.defaultLiveSource||'自动选择'} onClick={()=>onUpdateSettings?.({defaultLiveSource:nextSource(sources,'live',settings?.defaultLiveSource)})}/><SectionTitle title="外观设置"/><SettingMenu icon={Settings} title="主题" value={settings?.theme==='sangtian'?'桑田山河':settings?.theme==='light'?'浅色':'深色'} onClick={()=>onUpdateSettings?.({theme:cycle(settings?.theme||'sangtian',['sangtian','dark','light'])})}/><SettingMenu icon={Settings} title="字体" value={settings?.fontSize==='large'?'大':settings?.fontSize==='small'?'小':'中'} onClick={()=>onUpdateSettings?.({fontSize:cycle(settings?.fontSize,['small','medium','large'])})}/><SettingMenu icon={Settings} title="卡片显示" value={settings?.cardStyle==='compact'?'紧凑':'海报'} onClick={()=>onUpdateSettings?.({cardStyle:settings?.cardStyle==='compact'?'poster':'compact'})}/><SettingMenu icon={Settings} title="显示密度" value={settings?.density==='compact'?'紧凑':'舒适'} onClick={()=>onUpdateSettings?.({density:settings?.density==='compact'?'comfortable':'compact'})}/><SectionTitle title="数据设置"/><Menu icon={Trash2} title="清除历史" onClick={()=>setConfirm({type:'history'})}/><Menu icon={Trash2} title="清除搜索记录" onClick={()=>setConfirm({type:'searches'})}/><Menu icon={Database} title="清除缓存" onClick={()=>{onClearCache();}}/>{confirm&&<ConfirmDialog title="确认清理？" onCancel={()=>setConfirm(null)} onConfirm={()=>{if(confirm.type==='history')onClearHistory();else onClearSearches();setConfirm(null)}}/>}</Page>;
  if(tab==='data-management') return <Page><Header title="数据管理"/><Menu icon={Trash2} title="清理用户数据" onClick={()=>setConfirm({type:'all'})}/><Menu icon={Database} title="清理缓存" onClick={onClearCache}/><InfoCard title="不可逆操作" text="用户数据清理会删除收藏、历史、播放进度和搜索历史；源配置不会删除。"/>{confirm&&<ConfirmDialog title="确认清理用户数据？" onCancel={()=>setConfirm(null)} onConfirm={()=>{onClearData();setConfirm(null)}}/>}</Page>;
  if(tab==='about') return <Page><Header title="关于"/><InfoCard title="TVBox React" text="安卓手机竖屏影视与 Live 内容聚合应用。"/><InfoCard title="版本" text="0.3.0 · 产品架构实现版"/><InfoCard title="版权与开源" text="本项目遵循仓库中声明的开源与第三方依赖许可要求。"/><InfoCard title="架构" text="影视、Live、用户数据、源管理与播放内核保持独立边界。"/></Page>;
@@ -49,22 +53,32 @@ const SourceForm=({value,onCancel,onSave})=>{
   const [name,setName]=useState(value.name);
   const [url,setUrl]=useState(value.url||'');
   const [sourceType,setSourceType]=useState(value.sourceType);
+  const [localFileSources,setLocalFileSources]=useState(null);
+  const [fileStatus,setFileStatus]=useState('');
   const handleFile=async(e)=>{
     const file=e.target.files?.[0];
     if(!file)return;
     try {
-      const dataUrl = await sourceConfigService.readFileAsDataURL(file);
-      setUrl(dataUrl);
+      const parsedSources = await sourceConfigService.parseLocalFile(file);
+      setLocalFileSources(parsedSources);
+      setUrl('');
       const fileName = file.name.replace(/\.[^.]+$/, '');
       if(!name) setName(fileName);
-      if(file.name.endsWith('.txt') || file.name.endsWith('.m3u')) {
-        setSourceType('live');
-      }
+      if(parsedSources.length === 1) setSourceType(parsedSources[0].sourceType);
+      setFileStatus(parsedSources.length > 1 ? `已识别为 ${parsedSources.length} 个源，保存后会一次性加入` : '本地文件已读取，将直接使用文件内容');
     } catch (err) {
+      setLocalFileSources(null);
+      setFileStatus(`文件读取失败：${err?.message || '格式无效'}`);
       console.error('File read failed', err);
+    } finally {
+      e.target.value='';
     }
   };
   const handleSave=()=>{
+    if (localFileSources?.length) {
+      onSave(localFileSources);
+      return;
+    }
     let finalUrl = url.trim();
     let finalType = sourceType;
     if (finalUrl.includes('#genre#') || finalUrl.startsWith('#EXTM3U')) {
@@ -94,10 +108,11 @@ const SourceForm=({value,onCancel,onSave})=>{
         <input type="file" accept=".txt,.m3u,.json,text/plain,application/json" hidden onChange={handleFile}/>
       </label>
     </div>
-    <select value={sourceType} onChange={e=>setSourceType(e.target.value)}>
+    <select value={sourceType} onChange={e=>setSourceType(e.target.value)} disabled={Boolean(localFileSources?.length)}>
       <option value="movie">影视源</option>
       <option value="live">Live 源</option>
     </select>
+    <div style={{fontSize:11,color:'#8f9aaa',minHeight:16}}>{fileStatus}</div>
     <div className="actions">
       <button className="secondary" onClick={onCancel}>取消</button>
       <button className="primary" disabled={!url.trim()} onClick={handleSave}>保存</button>
