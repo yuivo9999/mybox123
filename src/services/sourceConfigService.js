@@ -500,6 +500,8 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
           status: '未测试',
           sourceCapability: 'direct-live',
           adapterType: 'live-reference',
+          tvboxIJKProfiles: normalizeTVBoxIJKProfiles(parsed.ijk),
+          tvboxParseConfig,
           createdAt: Date.now(),
         });
       });
