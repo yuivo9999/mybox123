@@ -153,7 +153,7 @@ export function App(){
 
    // 系统/浏览器全屏优先退出全屏，不直接跳离播放页。
    if (typeof document !== 'undefined' && document.fullscreenElement) {
-     void document.exitFullscreen?.().catch?.(() => {});
+     const exitFullscreen = document.exitFullscreen?.(); if (exitFullscreen?.catch) exitFullscreen.catch(() => {});
      return;
    }
 
