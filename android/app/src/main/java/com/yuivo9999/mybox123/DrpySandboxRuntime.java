@@ -273,6 +273,15 @@ public final class DrpySandboxRuntime {
                 result.put("contentType", result, response.contentType);
                 result.put("body", result, response.body);
                 result.put("text", result, response.body);
+                org.json.JSONObject responseHeaders = new org.json.JSONObject();
+                if (response.headers != null) {
+                    for (java.util.Map.Entry<String, java.util.List<String>> entry : response.headers.entrySet()) {
+                        if (entry.getKey() == null) continue;
+                        java.util.List<String> values = entry.getValue();
+                        responseHeaders.put(entry.getKey(), values == null ? "" : String.join(", ", values));
+                    }
+                }
+                result.put("headers", responseHeaders);
                 return result;
             } catch (Exception e) {
                 throw new RuntimeException(e.getMessage() == null ? "DRPY_HTTP_ERROR" : e.getMessage());
