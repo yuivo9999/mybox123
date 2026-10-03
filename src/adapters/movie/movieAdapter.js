@@ -119,7 +119,7 @@ export function createMovieAdapter(config, transport = null) {
         });
       }
       const contentType = String(response?.headers?.get?.('content-type') ?? '').toLowerCase();
-      if (contentType.includes('text/html') && !/^\s*[{[]/.test(normalizedBody)) {
+      if (contentType.includes('text/html') && !/^\s*(?:\{|\[)/.test(normalizedBody)) {
         throw toAppError(new Error('MOVIE_SOURCE_HTML_RESPONSE'), {
           code: ErrorCode.SOURCE_RESPONSE,
           scope: 'movie-source-response',
