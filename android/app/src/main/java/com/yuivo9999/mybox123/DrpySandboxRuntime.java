@@ -81,9 +81,9 @@ public final class DrpySandboxRuntime {
      * Execute a deliberately small operation surface against a previously
      * defined Drpy rule. The script is evaluated in the same sandbox as load;
      * no Java classes or Android objects are exposed. Only explicitly defined
-     * rule functions are callable. String-based Drpy selectors such as 一级/二级
-     * are not interpreted here and must remain unsupported until a DOM adapter
-     * is added.
+     * rule functions are callable. Common Drpy jq-style selectors are now exposed through pdfh/pdfa/pd backed by
+     * the controlled Jsoup DOM runtime. Full upstream Drpy grammar remains intentionally
+     * out of scope; unsupported selector syntax returns a structured runtime error.
      */
     public static String executeOperation(
             String source,
