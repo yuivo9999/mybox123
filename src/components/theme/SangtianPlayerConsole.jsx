@@ -140,7 +140,7 @@ export function SangtianPlayerWindow({
           <span>{episodeLabel}{sourceLabel ? ' · ' + sourceLabel : ''}</span>
         </div>
         <div className="sangtian-window-actions">
-          <button className="sangtian-window-btn" onClick={onOpenSourceModal} title="选集与换源"><ListVideo size={13}/><span>选集/换源</span></button>
+          {!isLive && <button className="sangtian-window-btn" onClick={onOpenSourceModal} title="选集与换源"><ListVideo size={13}/><span>选集/换源</span></button>}
           <button className="sangtian-window-btn" onClick={onRetry} title="重新加载"><RefreshCw size={13}/><span>重载</span></button>
           <button className="sangtian-window-btn" onClick={handleCopyLink} title="复制播放链接">{copied ? <Check size={13}/> : <Copy size={13}/>}<span>{copied ? '已复制' : '复制'}</span></button>
           <button className={`sangtian-window-btn ${isLandscape ? 'active' : ''}`} onClick={handleToggleLandscape} title="方向"><RotateCw size={13}/><span>{isLandscape ? '竖屏' : '横屏'}</span></button>
@@ -160,11 +160,15 @@ export function SangtianPlayerWindow({
                    onClick={()=>setShowFullscreenBar(true)}>
                 <div className="sangtian-fullscreen-topbar"><span>{title || request?.metadata?.title || candidate?.label || '正在播放'} · {episodeLabel}</span><button onClick={handleToggleFullscreen}><Minimize2 size={18}/></button></div>
                 <div className="sangtian-fullscreen-center">
-                  <div className="fullscreen-skip-row">
-                    <button onClick={() => handleSkip(-10)} aria-label="后退10秒"><Rewind size={18}/><span>10秒</span></button>
+                  {!isLive ? (
+                    <div className="fullscreen-skip-row">
+                      <button onClick={() => handleSkip(-10)} aria-label="后退10秒"><Rewind size={18}/><span>10秒</span></button>
+                      <button onClick={handlePlayPause} className="fullscreen-play-btn">{isPlaying ? '暂停' : '播放'}</button>
+                      <button onClick={() => handleSkip(10)} aria-label="前进10秒"><FastForward size={18}/><span>10秒</span></button>
+                    </div>
+                  ) : (
                     <button onClick={handlePlayPause} className="fullscreen-play-btn">{isPlaying ? '暂停' : '播放'}</button>
-                    <button onClick={() => handleSkip(10)} aria-label="前进10秒"><FastForward size={18}/><span>10秒</span></button>
-                  </div>
+                  )}
                 </div>
                 <div className="sangtian-fullscreen-bottombar">
                   {!isLive && (
