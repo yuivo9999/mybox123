@@ -153,6 +153,8 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     return () => window.removeEventListener('scroll', save);
   }, []);
 
+  const hasEnabledLiveSource = sources.some(source => source.sourceType === 'live' && source.enabled !== false);
+
   const grouped = useMemo(() => {
     const map = new Map();
     for (const channel of allChannels) {
@@ -204,19 +206,21 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
         </div>
       )}
 
-      <div className="section-title">
-        <h3>频道文件树</h3>
-        {tv1Loading && <small>正在读取频道名称：{tv1LoadedCount}</small>}
-      </div>
+      {hasEnabledLiveSource && (
+        <>
+          <div className="section-title">
+            <h3>频道文件树</h3>
+            {tv1Loading && <small>正在读取频道名称：{tv1LoadedCount}</small>}
+          </div>
 
-      {tv1Error && <div className="info-card"><Radio size={18}/><div><b>部分 TV1 源读取异常</b><span>{tv1Error.message || '未知错误'}；已保留已读取的频道。</span></div></div>}
+          {tv1Error && <div className="info-card"><Radio size={18}/><div><b>部分 TV1 源读取异常</b><span>{tv1Error.message || '未知错误'}；已保留已读取的频道。</span></div></div>}
 
-      {!allChannels.length && tv1Loading && (
-        <LoadingState compact text="正在建立频道文件树，暂不读取频道播放地址…" />
-      )}
+          {!allChannels.length && tv1Loading && (
+            <LoadingState compact text="正在建立频道文件树，暂不读取频道播放地址…" />
+          )}
 
-      {!!allChannels.length && (
-        <div className="channel-tree">
+          {!!allChannels.length && (
+            <div className="channel-tree">
           {grouped.map(([category, categoryChannels]) => (
             <details key={category} open>
               <summary style={{ cursor: 'pointer', padding: '9px 6px', fontWeight: 700 }}>
@@ -254,11 +258,13 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
                 })}
               </div>
             </details>
-          ))}
-        </div>
-      )}
+            ))}
+            </div>
+          )}
 
-      {!tv1Loading && !allChannels.length && <EmptyState text="暂无可用 Live 源" />}
+          {!tv1Loading && !allChannels.length && <EmptyState text="暂无可用 Live 频道" />}
+        </>
+      )}
     </Page>
   );
 }
