@@ -1,0 +1,542 @@
+package com.yuivo9999.mybox123;
+
+import android.content.Context;
+import android.media.AudioAttributes;
+import android.media.MediaPlayer;
+import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Surface;
+import android.view.TextureView;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebView;
+import android.widget.FrameLayout;
+
+import androidx.annotation.Nullable;
+import androidx.media3.common.MediaItem;
+import androidx.media3.common.PlaybackException;
+import androidx.media3.common.Player;
+import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import tv.danmaku.ijk.media.player.IjkMediaPlayer;
+import tv.danmaku.ijk.media.player.IMediaPlayer;
+
+/**
+ * Single native playback boundary for the React/WebView application.
+ *
+ * Engines:
+ *   EXO    -> AndroidX Media3 / ExoPlayer (primary)
+ *   IJK    -> IJK/FFmpeg backend (fallback)
+ *   NATIVE -> android.media.MediaPlayer (last fallback)
+ *
+ * The Web layer never talks to any engine directly.
+ */
+public final class NativePlaybackBridge {
+    public static final String JS_NAME = "TVboxAndroidBridge";
+
+    private static final String ENGINE_EXO = "exo";
+    private static final String ENGINE_IJK = "ijk";
+    private static final String ENGINE_NATIVE = "native";
+
+    private final MainActivity activity;
+    private final WebView webView;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    private TextureView textureView;
+    private Surface surface;
+
+    private String url;
+    private Map<String, String> headers = Collections.emptyMap();
+    private String cookies = "";
+    private String selectedEngine = ENGINE_EXO;
+    private List<String> engineOrder = Collections.emptyList();
+    private int engineIndex = 0;
+    private boolean prepared = false;
+    private boolean wantPlay = false;
+    private boolean released = false;
+    private long lastPositionMs = 0L;
+
+    private ExoPlayer exoPlayer;
+    private IjkMediaPlayer ijkPlayer;
+    private MediaPlayer nativePlayer;
+
+    public NativePlaybackBridge(MainActivity activity, WebView webView) {
+        this.activity = activity;
+        this.webView = webView;
+        installTextureView();
+    }
+
+    private void installTextureView() {
+        FrameLayout root = activity.findViewById(android.R.id.content);
+        if (root == null) return;
+
+        textureView = new TextureView(activity);
+        textureView.setVisibility(TextureView.GONE);
+        textureView.setOpaque(false);
+
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+        );
+        root.addView(textureView, lp);
+
+        textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
+            @Override public void onSurfaceTextureAvailable(android.graphics.SurfaceTexture st, int w, int h) {
+                surface = new Surface(st);
+                attachSurface();
+            }
+
+            @Override public void onSurfaceTextureSizeChanged(android.graphics.SurfaceTexture st, int w, int h) {
+                attachSurface();
+            }
+
+            @Override public boolean onSurfaceTextureDestroyed(android.graphics.SurfaceTexture st) {
+                if (surface != null) {
+                    surface.release();
+                    surface = null;
+                }
+                return true;
+            }
+
+            @Override public void onSurfaceTextureUpdated(android.graphics.SurfaceTexture st) {}
+        });
+    }
+
+    @JavascriptInterface
+    public synchronized String loadMedia(String payload) {
+        if (released) return error("PLAYER_RELEASED");
+        try {
+            JSONObject input = new JSONObject(payload == null ? "{}" : payload);
+            url = input.optString("url", "");
+            if (url.isEmpty()) return error("PLAYER_URL_REQUIRED");
+
+            headers = readMap(input.optJSONObject("headers"));
+            cookies = input.optString("cookies", "");
+
+            JSONObject hint = input.optJSONObject("playerHint");
+            String requested = hint == null ? "" : hint.optString("engine", "");
+            engineOrder = buildEngineOrder(requested, url, input.optString("protocol", ""));
+
+            engineIndex = 0;
+            selectedEngine = engineOrder.get(engineIndex);
+            prepared = false;
+            wantPlay = false;
+            releaseCurrentEngine();
+
+            textureView.setVisibility(TextureView.VISIBLE);
+            createCurrentEngine();
+            return ok("engine", selectedEngine);
+        } catch (Exception e) {
+            return error("PLAYER_LOAD_ERROR:" + safeMessage(e));
+        }
+    }
+
+    @JavascriptInterface
+    public synchronized String prepareMedia(String ignored) {
+        if (released) return error("PLAYER_RELEASED");
+        if (url == null || url.isEmpty()) return error("PLAYER_INPUT_REQUIRED");
+        try {
+            prepared = false;
+            if (ENGINE_EXO.equals(selectedEngine)) {
+                exoPlayer.prepare();
+            } else if (ENGINE_IJK.equals(selectedEngine)) {
+                ijkPlayer.prepareAsync();
+            } else {
+                nativePlayer.prepareAsync();
+            }
+            return ok("engine", selectedEngine);
+        } catch (Throwable e) {
+            return fallbackOrError("PLAYER_PREPARE_ERROR:" + safeMessage(e));
+        }
+    }
+
+    @JavascriptInterface
+    public synchronized String playMedia(String ignored) {
+        if (released) return error("PLAYER_RELEASED");
+        wantPlay = true;
+        try {
+            if (!prepared) return ok("queued", true);
+            startCurrentEngine();
+            return ok("engine", selectedEngine);
+        } catch (Throwable e) {
+            return fallbackOrError("PLAYER_PLAY_ERROR:" + safeMessage(e));
+        }
+    }
+
+    @JavascriptInterface
+    public synchronized String pauseMedia(String ignored) {
+        wantPlay = false;
+        try {
+            if (ENGINE_EXO.equals(selectedEngine) && exoPlayer != null) exoPlayer.pause();
+            else if (ENGINE_IJK.equals(selectedEngine) && ijkPlayer != null) ijkPlayer.pause();
+            else if (nativePlayer != null) nativePlayer.pause();
+            emit("paused", null);
+            return ok("paused", true);
+        } catch (Throwable e) {
+            return error("PLAYER_PAUSE_ERROR:" + safeMessage(e));
+        }
+    }
+
+    @JavascriptInterface
+    public synchronized String seekMedia(String payload) {
+        try {
+            JSONObject input = new JSONObject(payload == null ? "{}" : payload);
+            long seconds = Math.max(0L, input.optLong("seconds", 0L));
+            long ms = seconds * 1000L;
+            lastPositionMs = ms;
+
+            if (ENGINE_EXO.equals(selectedEngine) && exoPlayer != null) exoPlayer.seekTo(ms);
+            else if (ENGINE_IJK.equals(selectedEngine) && ijkPlayer != null) ijkPlayer.seekTo(ms);
+            else if (nativePlayer != null && prepared) nativePlayer.seekTo((int) Math.min(Integer.MAX_VALUE, ms));
+
+            return ok("seconds", seconds);
+        } catch (Throwable e) {
+            return error("PLAYER_SEEK_ERROR:" + safeMessage(e));
+        }
+    }
+
+    @JavascriptInterface
+    public synchronized String stopMedia(String ignored) {
+        wantPlay = false;
+        try {
+            if (ENGINE_EXO.equals(selectedEngine) && exoPlayer != null) exoPlayer.stop();
+            else if (ENGINE_IJK.equals(selectedEngine) && ijkPlayer != null) ijkPlayer.stop();
+            else if (nativePlayer != null) nativePlayer.stop();
+            prepared = false;
+            emit("stopped", null);
+            return ok("stopped", true);
+        } catch (Throwable e) {
+            return error("PLAYER_STOP_ERROR:" + safeMessage(e));
+        }
+    }
+
+    @JavascriptInterface
+    public synchronized String setVolume(String payload) {
+        try {
+            JSONObject input = new JSONObject(payload == null ? "{}" : payload);
+            float value = (float) Math.max(0d, Math.min(1d, input.optDouble("value", 1d)));
+            if (ENGINE_EXO.equals(selectedEngine) && exoPlayer != null) exoPlayer.setVolume(value);
+            else if (ENGINE_IJK.equals(selectedEngine) && ijkPlayer != null) ijkPlayer.setVolume(value, value);
+            else if (nativePlayer != null) nativePlayer.setVolume(value, value);
+            return ok("value", value);
+        } catch (Throwable e) {
+            return error("PLAYER_VOLUME_ERROR:" + safeMessage(e));
+        }
+    }
+
+    @JavascriptInterface
+    public synchronized String getAudioTracks(String ignored) {
+        return new JSONArray().toString();
+    }
+
+    @JavascriptInterface
+    public synchronized String getSubtitleTracks(String ignored) {
+        return new JSONArray().toString();
+    }
+
+    @JavascriptInterface
+    public synchronized String selectAudioTrack(String ignored) {
+        return ok("supported", false);
+    }
+
+    @JavascriptInterface
+    public synchronized String selectSubtitleTrack(String ignored) {
+        return ok("supported", false);
+    }
+
+    @JavascriptInterface
+    public synchronized String getQualities(String ignored) {
+        return new JSONArray().toString();
+    }
+
+    @JavascriptInterface
+    public synchronized String selectQuality(String ignored) {
+        return ok("supported", false);
+    }
+
+    @JavascriptInterface
+    public synchronized String getState(String ignored) {
+        JSONObject state = new JSONObject();
+        try {
+            state.put("engine", selectedEngine);
+            state.put("url", url == null ? "" : url);
+            state.put("prepared", prepared);
+            state.put("wantPlay", wantPlay);
+            state.put("positionMs", currentPositionMs());
+            state.put("durationMs", currentDurationMs());
+        } catch (Exception ignored) {}
+        return state.toString();
+    }
+
+    @JavascriptInterface
+    public synchronized String releaseMedia(String ignored) {
+        if (released) return ok("released", true);
+        released = true;
+        wantPlay = false;
+        releaseCurrentEngine();
+        if (textureView != null) {
+            textureView.setVisibility(TextureView.GONE);
+        }
+        emit("released", null);
+        return ok("released", true);
+    }
+
+    public synchronized void release() {
+        if (!released) releaseMedia("{}");
+    }
+
+    private List<String> buildEngineOrder(String requested, String mediaUrl, String protocol) {
+        ArrayList<String> result = new ArrayList<>();
+        String normalized = requested == null ? "" : requested.trim().toLowerCase();
+        if (ENGINE_IJK.equals(normalized)) {
+            result.add(ENGINE_IJK);
+            result.add(ENGINE_EXO);
+            result.add(ENGINE_NATIVE);
+        } else if (ENGINE_NATIVE.equals(normalized)) {
+            result.add(ENGINE_NATIVE);
+            result.add(ENGINE_EXO);
+            result.add(ENGINE_IJK);
+        } else {
+            result.add(ENGINE_EXO);
+            result.add(ENGINE_IJK);
+            result.add(ENGINE_NATIVE);
+        }
+        return result;
+    }
+
+    private void createCurrentEngine() throws Exception {
+        if (ENGINE_EXO.equals(selectedEngine)) createExo();
+        else if (ENGINE_IJK.equals(selectedEngine)) createIjk();
+        else createNative();
+    }
+
+    private void createExo() {
+        DefaultHttpDataSource.Factory httpFactory = new DefaultHttpDataSource.Factory();
+        if (!headers.isEmpty()) httpFactory.setDefaultRequestProperties(headers);
+        if (!cookies.isEmpty()) {
+            Map<String, String> merged = new LinkedHashMap<>(headers);
+            merged.put("Cookie", cookies);
+            httpFactory.setDefaultRequestProperties(merged);
+        }
+
+        exoPlayer = new ExoPlayer.Builder(activity)
+                .setMediaSourceFactory(new DefaultMediaSourceFactory(httpFactory))
+                .build();
+
+        exoPlayer.addListener(new Player.Listener() {
+            @Override public void onPlaybackStateChanged(int state) {
+                if (state == Player.STATE_BUFFERING) emit("bufferingStart", null);
+                if (state == Player.STATE_READY) {
+                    prepared = true;
+                    emit("prepared", null);
+                    if (wantPlay) {
+                        try { exoPlayer.play(); } catch (Throwable e) { fallbackOrError("EXO_PLAY:" + safeMessage(e)); }
+                    }
+                }
+                if (state == Player.STATE_ENDED) emit("completed", null);
+            }
+
+            @Override public void onIsPlayingChanged(boolean isPlaying) {
+                emit(isPlaying ? "playing" : "paused", null);
+            }
+
+            @Override public void onPlayerError(PlaybackException error) {
+                fallbackOrError("EXO_ERROR:" + safeMessage(error));
+            }
+        });
+
+        exoPlayer.setVideoTextureView(textureView);
+        exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(url)));
+        attachSurface();
+    }
+
+    private void createIjk() throws IOException {
+        ijkPlayer = new IjkMediaPlayer();
+        if (!headers.isEmpty()) ijkPlayer.setDataSource(url, headers);
+        else ijkPlayer.setDataSource(url);
+        if (cookies.length() > 0) {
+            ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", "Cookie: " + cookies);
+        }
+
+        ijkPlayer.setOnPreparedListener(mp -> {
+            prepared = true;
+            emit("prepared", null);
+            if (wantPlay) {
+                try { ijkPlayer.start(); } catch (Throwable e) { fallbackOrError("IJK_PLAY:" + safeMessage(e)); }
+            }
+        });
+        ijkPlayer.setOnCompletionListener(mp -> emit("completed", null));
+        ijkPlayer.setOnBufferingUpdateListener((mp, percent) -> {
+            if (percent < 100) emit("buffering", null);
+        });
+        ijkPlayer.setOnErrorListener((mp, what, extra) -> {
+            fallbackOrError("IJK_ERROR:" + what + ":" + extra);
+            return true;
+        });
+
+        attachSurface();
+    }
+
+    private void createNative() throws IOException {
+        nativePlayer = new MediaPlayer();
+        nativePlayer.setAudioAttributes(new AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .build());
+
+        nativePlayer.setOnPreparedListener(mp -> {
+            prepared = true;
+            emit("prepared", null);
+            if (wantPlay) {
+                try { mp.start(); } catch (Throwable e) { emit("error", errorObject("NATIVE_PLAY:" + safeMessage(e))); }
+            }
+        });
+        nativePlayer.setOnCompletionListener(mp -> emit("completed", null));
+        nativePlayer.setOnBufferingUpdateListener((mp, percent) -> {
+            if (percent < 100) emit("buffering", null);
+        });
+        nativePlayer.setOnErrorListener((mp, what, extra) -> {
+            emit("error", errorObject("NATIVE_ERROR:" + what + ":" + extra));
+            return true;
+        });
+
+        Uri uri = Uri.parse(url);
+        nativePlayer.setDataSource(activity, uri, headers.isEmpty() ? null : headers);
+        if (surface != null) nativePlayer.setSurface(surface);
+    }
+
+    private void startCurrentEngine() {
+        if (ENGINE_EXO.equals(selectedEngine) && exoPlayer != null) exoPlayer.play();
+        else if (ENGINE_IJK.equals(selectedEngine) && ijkPlayer != null) ijkPlayer.start();
+        else if (nativePlayer != null) nativePlayer.start();
+        emit("playing", null);
+    }
+
+    private void attachSurface() {
+        if (surface == null) return;
+        if (ENGINE_EXO.equals(selectedEngine) && exoPlayer != null) {
+            exoPlayer.setVideoSurface(surface);
+        } else if (ENGINE_IJK.equals(selectedEngine) && ijkPlayer != null) {
+            ijkPlayer.setSurface(surface);
+        } else if (nativePlayer != null) {
+            nativePlayer.setSurface(surface);
+        }
+    }
+
+    private synchronized String fallbackOrError(String reason) {
+        if (engineIndex + 1 < engineOrder.size()) {
+            lastPositionMs = currentPositionMs();
+            releaseCurrentEngine();
+            engineIndex++;
+            selectedEngine = engineOrder.get(engineIndex);
+            prepared = false;
+            try {
+                createCurrentEngine();
+                emit("reconnecting", errorObject("fallback:" + reason));
+                if (lastPositionMs > 0) seekMedia("{\"seconds\":" + (lastPositionMs / 1000L) + "}");
+                prepareMedia("{}");
+                return ok("fallbackEngine", selectedEngine);
+            } catch (Throwable next) {
+                return fallbackOrError("FALLBACK_" + safeMessage(next));
+            }
+        }
+        emit("error", errorObject(reason));
+        return error(reason);
+    }
+
+    private void releaseCurrentEngine() {
+        try {
+            if (exoPlayer != null) {
+                exoPlayer.setVideoSurface(null);
+                exoPlayer.release();
+            }
+        } catch (Throwable ignored) {}
+        try {
+            if (ijkPlayer != null) {
+                ijkPlayer.setSurface(null);
+                ijkPlayer.release();
+            }
+        } catch (Throwable ignored) {}
+        try {
+            if (nativePlayer != null) {
+                nativePlayer.setSurface(null);
+                nativePlayer.release();
+            }
+        } catch (Throwable ignored) {}
+
+        exoPlayer = null;
+        ijkPlayer = null;
+        nativePlayer = null;
+        prepared = false;
+    }
+
+    private long currentPositionMs() {
+        try {
+            if (ENGINE_EXO.equals(selectedEngine) && exoPlayer != null) return Math.max(0L, exoPlayer.getCurrentPosition());
+            if (ENGINE_IJK.equals(selectedEngine) && ijkPlayer != null) return Math.max(0L, ijkPlayer.getCurrentPosition());
+            if (nativePlayer != null && prepared) return Math.max(0L, nativePlayer.getCurrentPosition());
+        } catch (Throwable ignored) {}
+        return lastPositionMs;
+    }
+
+    private long currentDurationMs() {
+        try {
+            if (ENGINE_EXO.equals(selectedEngine) && exoPlayer != null) return Math.max(0L, exoPlayer.getDuration());
+            if (ENGINE_IJK.equals(selectedEngine) && ijkPlayer != null) return Math.max(0L, ijkPlayer.getDuration());
+            if (nativePlayer != null && prepared) return Math.max(0L, nativePlayer.getDuration());
+        } catch (Throwable ignored) {}
+        return 0L;
+    }
+
+    private Map<String, String> readMap(@Nullable JSONObject object) {
+        if (object == null) return Collections.emptyMap();
+        Map<String, String> result = new LinkedHashMap<>();
+        Iterator<String> keys = object.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            result.put(key, object.optString(key, ""));
+        }
+        return result;
+    }
+
+    private String safeMessage(Throwable e) {
+        return e == null ? "unknown" : String.valueOf(e.getMessage()).replace("\\", "/").replace("\"", "'");
+    }
+
+    private String ok(String key, Object value) {
+        try { return new JSONObject().put("ok", true).put(key, value).toString(); }
+        catch (Exception e) { return "{\"ok\":true}"; }
+    }
+
+    private String error(String code) {
+        try { return new JSONObject().put("ok", false).put("code", code).toString(); }
+        catch (Exception e) { return "{\"ok\":false}"; }
+    }
+
+    private JSONObject errorObject(String message) {
+        try { return new JSONObject().put("message", message); }
+        catch (Exception e) { return new JSONObject(); }
+    }
+
+    private void emit(String event, @Nullable Object data) {
+        try {
+            JSONObject payload = new JSONObject().put("event", event);
+            if (data != null) payload.put("data", data);
+            final String script = "window.TVBoxWebView&&window.TVBoxWebView.onPlayerEvent&&window.TVBoxWebView.onPlayerEvent(" + JSONObject.quote(payload.toString()) + ")";
+            mainHandler.post(() -> webView.evaluateJavascript(script, null));
+        } catch (Throwable ignored) {}
+    }
+}
