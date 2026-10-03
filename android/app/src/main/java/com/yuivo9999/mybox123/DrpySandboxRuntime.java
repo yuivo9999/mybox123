@@ -10,6 +10,10 @@ import org.mozilla.javascript.ScriptableObject;
 import org.json.JSONObject;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import android.util.Base64;
 
 /**
  * Minimal sandbox for evaluating a Drpy JavaScript definition.
@@ -62,6 +66,7 @@ public final class DrpySandboxRuntime {
             }
             ScriptableObject.putProperty(scope, "console", Context.javaToJS(new SafeConsole(), scope));
             installDomFunctions(cx, scope);
+            installCompatibilityHelpers(cx, scope);
 
             Object result = cx.evaluateString(scope, source, "tvbox-drpy-extension", 1, null);
             Object rule = ScriptableObject.getProperty(scope, "rule");
@@ -178,6 +183,36 @@ public final class DrpySandboxRuntime {
         if ("episodes".equals(operation)) return "episodes";
         if ("playUrl".equals(operation)) return "playUrl";
         throw new IllegalArgumentException("DRPY_OPERATION_UNSUPPORTED:" + operation);
+    }
+
+    /** Bounded, side-effect-free helpers commonly used by TVBox/Drpy rules. */
+    private static void installCompatibilityHelpers(Context cx, Scriptable scope) {
+        ScriptableObject.putProperty(scope, "base64Encode", new BaseFunction() {
+            @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+                String value = args.length > 0 ? Context.toString(args[0]) : "";
+                return Base64.encodeToString(value.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
+            }
+        });
+        ScriptableObject.putProperty(scope, "base64Decode", new BaseFunction() {
+            @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+                String value = args.length > 0 ? Context.toString(args[0]) : "";
+                return new String(Base64.decode(value, Base64.DEFAULT), StandardCharsets.UTF_8);
+            }
+        });
+        ScriptableObject.putProperty(scope, "urlencode", new BaseFunction() {
+            @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) throws RuntimeException {
+                String value = args.length > 0 ? Context.toString(args[0]) : "";
+                try { return URLEncoder.encode(value, StandardCharsets.UTF_8.name()); }
+                catch (Exception e) { throw new RuntimeException("DRPY_URLENCODE_ERROR"); }
+            }
+        });
+        ScriptableObject.putProperty(scope, "urldecode", new BaseFunction() {
+            @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) throws RuntimeException {
+                String value = args.length > 0 ? Context.toString(args[0]) : "";
+                try { return URLDecoder.decode(value, StandardCharsets.UTF_8.name()); }
+                catch (Exception e) { throw new RuntimeException("DRPY_URLDECODE_ERROR"); }
+            }
+        });
     }
 
     private static void installDomFunctions(Context cx, Scriptable scope) {
