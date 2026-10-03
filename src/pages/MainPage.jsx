@@ -33,17 +33,23 @@ function Main({tab,movies,channels,favorites,history,sources,searches,progress,s
 function SourceList({sources,onEnabled,onActive,onTest,onRemove}){
   return <div className="source-list">{sources.map(source=>{
     const isTesting = source.status === '测试中';
+    const isUnsupported = source.sourceCapability === 'tvbox-extension' || source.adapterType === 'tvbox-extension';
     const statusColor = (source.status==='正常'||source.status==='可用') ? '#22c55e' : (source.status==='不可用'||source.status==='异常') ? '#f87171' : isTesting ? '#38bdf8' : '#94a3b8';
     return (
       <div className="menu source-row" key={source.sourceId}>
         <Server size={19}/>
         <span>
           <b>{source.name}</b>
-          <small>{source.sourceType}{source.liveMode==='tv1'?' · TV1专用':''} · <span style={{color: statusColor, fontWeight: 600}}>{source.status}</span>{source.isActive?' · 当前使用':''}</small>
+          <small>
+            {source.sourceType}{source.liveMode==='tv1'?' · TV1专用':''} ·
+            <span style={{color: statusColor, fontWeight: 600}}> {source.status}</span>
+            {isUnsupported && <span style={{color:'#f59e0b',fontWeight:600}}> · TVBox扩展待适配</span>}
+            {source.isActive?' · 当前使用':''}
+          </small>
         </span>
-        <button className={source.isActive?'primary':'secondary'} onClick={()=>onActive?.(source.sourceId)}>{source.isActive?'当前使用':'设为当前'}</button>
-        <button className="secondary" disabled={isTesting} onClick={()=>onTest(source)}>{isTesting?'测试中…':'测试'}</button>
-        <button className="secondary" onClick={()=>onEnabled(source.sourceId,!source.enabled)}>{source.enabled?<><Check size={15}/>停用</>:<>启用</>}</button>
+        <button className={source.isActive?'primary':'secondary'} disabled={isUnsupported} onClick={()=>onActive?.(source.sourceId)}>{source.isActive?'当前使用':isUnsupported?'待适配':'设为当前'}</button>
+        <button className="secondary" disabled={isTesting||isUnsupported} onClick={()=>onTest(source)}>{isTesting?'测试中…':isUnsupported?'暂不可测':'测试'}</button>
+        <button className="secondary" disabled={isUnsupported} onClick={()=>onEnabled(source.sourceId,!source.enabled)}>{source.enabled?<><Check size={15}/>停用</>:<>启用</>}</button>
         <button className="icon-button" onClick={()=>onRemove(source.sourceId)} aria-label="删除源">×</button>
       </div>
     );
