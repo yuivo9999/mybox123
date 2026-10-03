@@ -130,8 +130,17 @@ public final class DrpyDomRuntime {
     }
 
     private static boolean isOption(String value) {
-        return "Text".equalsIgnoreCase(value) || "Html".equalsIgnoreCase(value)
-                || value.matches("^[A-Za-z_:][A-Za-z0-9_:-]*$") && !looksLikeSelector(value);
+        if ("Text".equalsIgnoreCase(value) || "Html".equalsIgnoreCase(value)) return true;
+        if (value == null || value.isEmpty()) return false;
+        return isAttributeName(value);
+    }
+
+    private static boolean isAttributeName(String value) {
+        String lower = value.toLowerCase();
+        return lower.equals("href") || lower.equals("src") || lower.equals("url")
+                || lower.equals("title") || lower.equals("alt") || lower.equals("class")
+                || lower.equals("id") || lower.equals("style") || lower.equals("data-src")
+                || lower.endsWith("-url") || lower.contains("poster");
     }
 
     private static boolean looksLikeSelector(String value) {
