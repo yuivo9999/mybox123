@@ -1,6 +1,7 @@
 import { createMovieAdapter } from './movie/movieAdapter.js';
 import { createTVBoxExtensionAdapter } from './tvbox/tvboxExtensionAdapter.js';
 import { createTVBoxJarAdapter } from './tvbox/tvboxJarAdapter.js';
+import { createTVBoxExtJsonAdapter } from './tvbox/tvboxExtJsonAdapter.js';
 
 export const SOURCE_ADAPTER_TYPE = Object.freeze({
   HTTP_VOD: 'http-vod',
@@ -18,6 +19,9 @@ export function createSourceAdapter(source, options = {}) {
   if (sourceType === 'movie' && adapterType === SOURCE_ADAPTER_TYPE.TVBOX_EXTENSION) {
     if (source.tvboxAdapterKind === 'jar' || source.sourceCapability === 'tvbox-jar' || source.sourceCapability === 'tvbox-http-vod-with-jar') {
       return createTVBoxJarAdapter(source, options.jarRuntime);
+    }
+    if (source.tvboxAdapterKind === 'ext' && typeof source.tvboxExt === 'string' && /^https?:\/\//i.test(source.tvboxExt.trim()) && /(?:\.json|\.json(?:\?|$))/i.test(source.tvboxExt.trim())) {
+      return createTVBoxExtJsonAdapter(source, options.transport ?? null);
     }
     return createTVBoxExtensionAdapter(source, options.runtime);
   }
