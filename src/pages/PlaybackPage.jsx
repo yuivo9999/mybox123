@@ -234,6 +234,7 @@ function PlaybackView({
         onSelectRelated={switchChannel}
         onReplay={handleRetry}
         playerStatus={status}
+        isLive={isLive}
         onTogglePip={() => {
           if (videoRef.current && document.pictureInPictureEnabled) {
             if (document.pictureInPictureElement) {
