@@ -12,9 +12,9 @@ import java.util.Set;
 /**
  * Controlled native boundary for TVBox extension sources.
  *
- * This class intentionally does NOT execute CSP/Drpy/JAR/ext code yet.
- * It exposes a versioned capability/operation contract so the React layer
- * can distinguish "definition imported" from "native runtime executable".
+ * This bridge currently executes only the sandboxed Drpy load operation.
+ * CSP/JAR/ext remain capability-declared but unsupported until their native
+ * runtimes are implemented behind this same contract.
  */
 public final class TVBoxExtensionBridge {
     public static final String JS_NAME = "TVBoxExtensionBridge";
@@ -32,7 +32,6 @@ public final class TVBoxExtensionBridge {
             JSONObject result = new JSONObject();
             result.put("contractVersion", CONTRACT_VERSION);
             result.put("available", true);
-            result.put("runtimeVersion", JSONObject.NULL);
             result.put("supportedKinds", new JSONArray().put("drpy-js"));
             result.put("supportedOperations", new JSONArray().put("load"));
             result.put("runtimeVersion", "drpy-sandbox-1");
@@ -71,8 +70,12 @@ public final class TVBoxExtensionBridge {
             result.put("contractVersion", CONTRACT_VERSION);
             result.put("rule", new JSONObject(ruleJson));
             return result.toString();
+        } catch (SecurityException e) {
+            return error(e.getMessage() == null ? "DRPY_SCRIPT_SECURITY_ERROR" : e.getMessage(), operation, kind);
+        } catch (IllegalArgumentException e) {
+            return error(e.getMessage() == null ? "DRPY_SCRIPT_INVALID" : e.getMessage(), operation, kind);
         } catch (Exception e) {
-            return error("TVBOX_EXTENSION_INVALID_REQUEST", "", "");
+            return error("TVBOX_EXTENSION_EXECUTION_ERROR", operation, kind);
         }
     }
 
