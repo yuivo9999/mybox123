@@ -48,6 +48,7 @@ export function normalizeMovie({ sourceId, item, index = 0, sourceMetadata = {} 
     sourceItemId: item.sourceItemId ?? item.id ?? `item-${index + 1}`,
     canonicalId: item.canonicalId ?? item.globalId ?? item.externalId ?? item.tmdbId ?? item.imdbId ?? '',
     title: item.title ?? item.name ?? '',
+    titleEn: item.titleEn ?? item.vod_en ?? item.en ?? '',
     subtitle: item.subtitle ?? item.subTitle ?? '',
     type: item.type ?? item.contentType ?? '',
     poster: item.poster ?? item.pic ?? item.cover ?? '',
