@@ -5,6 +5,7 @@ import { searchMovieSources } from '../../services/movieSourceService.js';
 import { getCategoryIdByLabel } from '../../config/mediaTaxonomy.js';
 import { usePageState, pageStateStore } from '../../state/pageStateStore.js';
 import { SmartImage, EmptyState } from '../../components/StateViews.jsx';
+import { MovieCarousel } from '../../components/media/MovieCarousel.jsx';
 import { MoviePlaybackPage } from './MoviePlaybackPage.jsx';
 
 export function MovieFeature(props){
