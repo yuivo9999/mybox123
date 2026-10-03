@@ -143,6 +143,10 @@ export function createMovieAdapter(config, transport = null) {
               tvboxJar: config.tvboxJar,
               tvboxType: config.tvboxType,
               playerType: config.playerType,
+              headers: config.headers,
+              userAgent: config.userAgent,
+              referer: config.referer,
+              cookies: config.cookies,
             },
           });
         } catch (error) {
