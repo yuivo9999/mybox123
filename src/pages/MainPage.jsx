@@ -115,7 +115,7 @@ const SourceForm=({value,onCancel,onSave})=>{
     <div style={{fontSize:11,color:'#8f9aaa',minHeight:16}}>{fileStatus}</div>
     <div className="actions">
       <button className="secondary" onClick={onCancel}>取消</button>
-      <button className="primary" disabled={!url.trim()} onClick={handleSave}>保存</button>
+      <button className="primary" disabled={!localFileSources?.length && !url.trim()} onClick={handleSave}>保存</button>
     </div>
   </div></div>;
 };
