@@ -136,6 +136,7 @@ export function createPlaybackCore(task,hooks={}) {
   },
   async resolveAndLoad(candidate=task.currentCandidate,options={}){return resolveAndLoad(candidate,options);},
   resolve,
+  setVideoViewBounds(bounds){return player?.setVideoViewBounds?.(bounds) ?? false;},
   async play(){if(!player)throw new Error('PLAYER_ADAPTER_NOT_ATTACHED');return player.play();},
   pause(){return player?.pause();},seek(s){return player?.seek(s);},setVolume(v){return player?.setVolume(v);},
   getAudioTracks(){return player?.getAudioTracks?.()??[];},getSubtitleTracks(){return player?.getSubtitleTracks?.()??[];},selectAudioTrack(id){return player?.selectAudioTrack?.(id)??false;},selectSubtitleTrack(id){return player?.selectSubtitleTrack?.(id)??false;},getQualities(){return player?.getQualities?.()??[];},selectQuality(id){return player?.selectQuality?.(id)??false;},
