@@ -1,3 +1,5 @@
+import { classifyMedia } from '../config/mediaTaxonomy.js';
+
 export const ContentType = Object.freeze({
   MOVIE: 'movie',
   SERIES: 'series',
@@ -88,6 +90,7 @@ export function normalizeContent({
   episodes = [],
 }) {
   const legacyContentId = createContentId(sourceId, sourceItemId);
+  const classification = classifyMedia({ type, category, region, title, episodes });
   const contentIdentity = createContentIdentity({ canonicalId, title, year, type, region });
   const contentId = `content:${contentIdentity || legacyContentId}`;
   const normalizedEpisodes = episodes.map((episode, index) => normalizeEpisode({
@@ -105,6 +108,11 @@ export function normalizeContent({
 
   return {
     contentId,
+    mediaType: classification.mediaType,
+    categoryIds: classification.categoryIds,
+    categoryLabels: classification.categoryLabels,
+    sourceType: type || '',
+    sourceCategory: category || '',
     legacyContentId,
     contentIdentity,
     contentMatchKey: createContentMatchKey({ title, year, type, region }),
@@ -119,7 +127,7 @@ export function normalizeContent({
     background: background || backdrop || '',
     description,
     year,
-    category,
+    category: classification.categoryLabels[0] || category || '',
     region,
     director,
     directors: director ? [director] : [],
