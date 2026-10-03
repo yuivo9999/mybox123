@@ -23,8 +23,7 @@ async function fetchBody(source, options = {}) {
 
 function createSession(source, body) {
   const lines = String(body).replace(/^\uFEFF/, '').split(/\r?\n/);
-  const metadata = parseTXTLiveMetadata(body);
-  const session = { sourceId: source.sourceId, lines, metadata, createdAt: Date.now() };
+  const session = { sourceId: source.sourceId, lines, metadata: [], createdAt: Date.now() };
   sessions.set(source.sourceId, session);
   return session;
 }
