@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Copy, Download, Maximize2, Minimize2, RotateCw, Tv, Sparkles, Terminal, Paperclip,
   Image as ImageIcon, Globe, Play, Clock3, ArrowUp, ChevronDown,
-  FileText, LayoutGrid, SlidersHorizontal, Check, RefreshCw
+  FileText, LayoutGrid, SlidersHorizontal, Check, RefreshCw, Ratio
 } from 'lucide-react';
 
 export function SangtianPlayerWindow({
@@ -22,8 +22,33 @@ export function SangtianPlayerWindow({
   const [copied, setCopied] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
   const [isWebFullscreen, setIsWebFullscreen] = useState(false);
+  const [aspectMode, setAspectMode] = useState('original');
+  const [videoAspectRatio, setVideoAspectRatio] = useState(null);
 
   const streamUrl = resolvedInput?.url || candidate?.url || candidate?.metadata?.url || 'https://live.tvbox.stream/stream.m3u8';
+
+  const aspectOptions = [
+    { id: 'original', label: '原始', title: '原始比例（保持视频源比例）' },
+    { id: '16:9', label: '16:9', title: '16:9 画面比例' },
+    { id: '4:3', label: '4:3', title: '4:3 画面比例' },
+    { id: 'fill', label: '铺满', title: '铺满全屏（可能裁切画面）' },
+  ];
+
+  const currentAspect = aspectOptions.find(item => item.id === aspectMode) || aspectOptions[0];
+
+  const handleCycleAspect = () => {
+    setAspectMode(prev => {
+      const index = aspectOptions.findIndex(item => item.id === prev);
+      return aspectOptions[(index + 1) % aspectOptions.length].id;
+    });
+  };
+
+  const handleVideoMetadata = event => {
+    const video = event.currentTarget;
+    if (video.videoWidth > 0 && video.videoHeight > 0) {
+      setVideoAspectRatio(video.videoWidth / video.videoHeight);
+    }
+  };
 
   const handleCopyLink = () => {
     if (navigator?.clipboard?.writeText) {
@@ -68,7 +93,7 @@ export function SangtianPlayerWindow({
   };
 
   return (
-    <div className={`sangtian-window ${isLandscape ? 'is-landscape' : ''} ${isWebFullscreen ? 'is-web-fullscreen' : ''}`}>
+    <div className={`sangtian-window ${isLandscape ? 'is-landscape' : ''} ${isWebFullscreen ? 'is-web-fullscreen' : ''} aspect-${aspectMode.replace(':', '-')}`}>
       {/* Top Header Bar of the Window - Exactly matching screenshot */}
       <div className="sangtian-window-bar">
         <div className="sangtian-window-tag">
@@ -109,6 +134,15 @@ export function SangtianPlayerWindow({
           >
             <Tv size={13} />
             <span>{isWebFullscreen ? '还原' : '网页全屏'}</span>
+          </button>
+
+          <button
+            className={`sangtian-window-btn ${aspectMode !== 'original' ? 'active' : ''}`}
+            onClick={handleCycleAspect}
+            title={currentAspect.title}
+          >
+            <Ratio size={13} />
+            <span>{currentAspect.label}</span>
           </button>
 
           <button
