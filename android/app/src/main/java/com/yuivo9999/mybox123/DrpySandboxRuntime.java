@@ -188,6 +188,18 @@ public final class DrpySandboxRuntime {
 
     /** Bounded, side-effect-free helpers commonly used by TVBox/Drpy rules. */
     private static void installCompatibilityHelpers(Context cx, Scriptable scope) {
+        ScriptableObject.putProperty(scope, "urljoin", new BaseFunction() {
+            @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+                String base = args.length > 0 ? Context.toString(args[0]) : "";
+                String relative = args.length > 1 ? Context.toString(args[1]) : "";
+                try {
+                    return URI.create(base).resolve(relative).toString();
+                } catch (Exception e) {
+                    throw new RuntimeException("DRPY_URLJOIN_ERROR");
+                }
+            }
+        });
+        ScriptableObject.putProperty(scope, "urlJoin", ScriptableObject.getProperty(scope, "urljoin"));
         ScriptableObject.putProperty(scope, "base64Encode", new BaseFunction() {
             @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
                 String value = args.length > 0 ? Context.toString(args[0]) : "";
