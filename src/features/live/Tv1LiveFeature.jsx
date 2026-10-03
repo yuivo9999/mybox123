@@ -32,7 +32,7 @@ export function Tv1LiveFeature({ sources = [], favorites = [], onPlay, toggleFav
       const next = await requestManager.run(`tv1-live:${activeSource.sourceId}`, signal => tv1LiveService.load(activeSource, { signal }));
       if (!isCurrent()) return;
       setChannels(next);
-      setSelectedChannelId(current => next.some(item => item.channelId === current) ? current : (next[0]?.channelId || ''));
+      setSelectedChannelId(current => next.some(item => item.channelId === current) ? current : '');
       setStreamIndex(0);
       setStatus('success');
     } catch (reason) {
@@ -53,7 +53,7 @@ export function Tv1LiveFeature({ sources = [], favorites = [], onPlay, toggleFav
     };
   }, [activeSource?.sourceId]);
 
-  const activeChannel = useMemo(() => channels.find(channel => channel.channelId === selectedChannelId) || channels[0] || null, [channels, selectedChannelId]);
+  const activeChannel = useMemo(() => selectedChannelId ? channels.find(channel => channel.channelId === selectedChannelId) || null : null, [channels, selectedChannelId]);
   const activeStream = activeChannel?.streams?.[streamIndex] || activeChannel?.streams?.[0] || null;
   const categories = useMemo(() => ['全部', ...new Set(channels.map(channel => channel.category).filter(Boolean))], [channels]);
   const visible = useMemo(() => category === '全部' ? channels : channels.filter(channel => channel.category === category), [channels, category]);
@@ -93,7 +93,7 @@ export function Tv1LiveFeature({ sources = [], favorites = [], onPlay, toggleFav
       </div>
       {activeChannel && <>
         <SangtianPlayerWindow videoRef={videoRef} status={activeStream ? 'playing' : 'idle'} candidate={{ label: activeStream?.label || '默认线路', url: activeStream?.url, protocol: activeStream?.protocol || 'HLS/M3U8', sourceId: activeSource?.sourceId }} terminalTag={`TV1 · ${activeChannel.name}`}>
-          <video ref={videoRef} controls playsInline autoPlay className="sangtian-video-element"/>
+          <video ref={videoRef} controls playsInline className="sangtian-video-element"/>
         </SangtianPlayerWindow>
         <div className="live-current-bar">
           <div className="live-current-info"><span className="live-pill">● TV1 专用</span><b>{activeChannel.name}</b><small>{activeChannel.category} · {activeStream?.label || '线路 1'}</small></div>
