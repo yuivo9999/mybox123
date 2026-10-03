@@ -5,7 +5,9 @@ function validateImportedSources(value) {
   return value.map((source, index) => {
     if (!source || typeof source !== 'object') throw new Error(`SOURCE_IMPORT_ITEM_INVALID:${index}`);
     const sourceRef = String(source.sourceRef || source.url || '').trim();
-    if (!sourceRef) throw new Error(`SOURCE_IMPORT_URL_REQUIRED:${index}`);
+    const isDeferredTVBoxProvider = source.adapterType === 'tvbox-live-extension'
+      || source.sourceCapability === 'tvbox-live-provider';
+    if (!sourceRef && !isDeferredTVBoxProvider) throw new Error(`SOURCE_IMPORT_URL_REQUIRED:${index}`);
     return source;
   });
 }
@@ -302,7 +304,8 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
       const capability = classifyTVBoxCapability(site);
       const directMovie = capability.sourceCapability === 'direct-http-vod';
       const isSupportedDirect = sourceType === 'movie' && directMovie;
-      const adapterType = capability.adapterType;
+      const isTVBoxLiveProvider = sourceType === 'live' && capability.adapterType === 'tvbox-extension';
+      const adapterType = isTVBoxLiveProvider ? 'tvbox-live-extension' : capability.adapterType;
 
       const sourceId = `tvbox_${sourceType}_${stableHash(`${resolvedBundleId}|${sourceType}|${site.key || api || index}`)}`;
       const name = String(site.name || site.key || `TVBox${sourceType === 'live' ? '直播' : '影视'}-${index + 1}`).trim();
@@ -313,15 +316,15 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
         sourceKey: `${sourceType}|${site.key || api || index}`,
         name,
         sourceType,
-        sourceRef: api,
-        url: api,
+        sourceRef: isTVBoxLiveProvider ? '' : api,
+        url: isTVBoxLiveProvider ? '' : api,
         // “导入”与“当前运行时是否支持”必须分离：
         // 导入后所有合法 site 都保留并默认启用；真正请求时由 movieSourceService
         // 再依据 sourceCapability/adapterType 判断是否存在可执行适配器。
         enabled: true,
         status: isSupportedDirect ? '未测试' : '待适配',
         runtimeSupported: isSupportedDirect,
-        sourceCapability: capability.sourceCapability,
+        sourceCapability: isTVBoxLiveProvider ? 'tvbox-live-provider' : capability.sourceCapability,
         adapterType,
         tvboxAdapterKind: capability.kind,
         tvboxRequiresJar: capability.requiresJar === true,
@@ -329,7 +332,9 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
         tvboxKey: String(site.key || '').trim(),
         tvboxApi: api,
         tvboxDefinition: { ...site },
+        ...(isTVBoxLiveProvider ? { tvboxLiveProvider: true } : {}),
         tvboxUnsupportedReason: isSupportedDirect ? null : (
+          isTVBoxLiveProvider ? 'TVBox Live Provider 当前未适配执行器' :
           !api ? '缺少 api' :
             capability.kind === 'drpy-js' ? 'Drpy JS 源当前未适配执行器'
             : capability.kind === 'csp' ? 'CSP 源当前未适配执行器'
