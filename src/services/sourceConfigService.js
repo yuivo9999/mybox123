@@ -497,8 +497,15 @@ export const sourceConfigService = {
       if (!previous) return source;
       return {
         ...source,
+        // 重新导入同一个 bundle 时，只更新源定义，不覆盖运行时状态。
+        // 特别是 TXT 源可能已经在首次探测后被提升为 tv1；再次导入不能把它降回 generic。
         enabled: previous.enabled !== false,
         isActive: previous.isActive === true,
+        ...(previous.liveMode ? { liveMode: previous.liveMode } : {}),
+        ...(previous.status ? { status: previous.status } : {}),
+        ...(previous.lastCheckedAt ? { lastCheckedAt: previous.lastCheckedAt } : {}),
+        ...(previous.lastUsedAt ? { lastUsedAt: previous.lastUsedAt } : {}),
+        ...(Array.isArray(previous.capabilities) ? { capabilities: previous.capabilities } : {}),
         createdAt: previous.createdAt || source.createdAt,
       };
     });
