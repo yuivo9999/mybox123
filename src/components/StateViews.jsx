@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, ImageOff, LoaderCircle } from 'lucide-react';
+import { ImageOff, LoaderCircle } from 'lucide-react';
 export function LoadingState({ text = '正在加载…', compact = false }) {
   return <div className={compact ? 'empty compact state-view' : 'empty state-view'}><LoaderCircle className="spin" size={22} /><span>{text}</span></div>;
 }
