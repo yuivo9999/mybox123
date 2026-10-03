@@ -86,7 +86,14 @@ public final class TVBoxJarBridge {
 
         String fileName = safeFileName(data.optString("name", "spider")) + ".jar";
         File target = new File(dir, fileName);
-        download(url, target);
+        try {
+            download(url, target);
+        } catch (Throwable error) {
+            // Never retain a partial or over-sized artifact after a failed download.
+            //noinspection ResultOfMethodCallIgnored
+            target.delete();
+            throw error;
+        }
         String actualMd5 = md5(target);
         if (!expectedMd5.isEmpty() && !expectedMd5.equals(actualMd5)) {
             // Never retain a file that failed an explicit integrity check.
