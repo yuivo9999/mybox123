@@ -329,6 +329,28 @@ function isDirectMovieEndpoint(api, site = {}) {
   return classifyTVBoxCapability({ ...site, api }).sourceCapability === 'direct-http-vod';
 }
 
+function normalizeTVBoxIJKProfiles(value) {
+  if (!Array.isArray(value)) return {};
+  const profiles = {};
+  value.forEach((profile) => {
+    const group = String(profile?.group || '').trim();
+    if (!group) return;
+    const options = Array.isArray(profile?.options) ? profile.options.map((option) => ({
+      category: Number(option?.category),
+      name: String(option?.name || '').trim(),
+      value: option?.value == null ? '' : String(option.value),
+    })).filter(option =>
+      Number.isInteger(option.category)
+      && option.category >= 1
+      && option.category <= 4
+      && option.name
+      && option.value !== ''
+    ) : [];
+    if (options.length) profiles[group] = options;
+  });
+  return profiles;
+}
+
 function parseTVBoxSources(parsed, { bundleId = null } = {}) {
   const imported = [];
   const resolvedBundleId = bundleId || `bundle_tvbox_${stableHash(JSON.stringify(parsed))}`;
@@ -375,6 +397,9 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
         tvboxKey: String(site.key || '').trim(),
         tvboxApi: api,
         tvboxDefinition: { ...site },
+        ...(Object.keys(normalizeTVBoxIJKProfiles(parsed.ijk)).length
+          ? { tvboxIJKProfiles: normalizeTVBoxIJKProfiles(parsed.ijk) }
+          : {}),
         ...(isTVBoxLiveProvider ? { tvboxLiveProvider: true } : {}),
         tvboxUnsupportedReason: isSupportedDirect || safeExtJson || isSupportedJar ? null : (
           isTVBoxLiveProvider ? 'TVBox Live Provider 当前未适配执行器' :
