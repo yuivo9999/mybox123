@@ -1,4 +1,6 @@
-import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { Capacitor, CapacitorHttp, registerPlugin } from '@capacitor/core';
+
+const TVBoxHttp = registerPlugin('TVBoxHttp');
 
 const ALLOWED_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 const ALLOWED_RESPONSE_TYPES = new Set(['text', 'json']);
@@ -135,7 +137,7 @@ export function isNativeHttpAvailable() {
       Capacitor.getPlatform() === 'android' &&
       Capacitor.isNativePlatform() &&
       Capacitor.isPluginAvailable('CapacitorHttp') &&
-      typeof CapacitorHttp.request === 'function' || typeof window?.Capacitor?.Plugins?.TVBoxHttp?.request === 'function'
+      typeof CapacitorHttp.request === 'function' && typeof TVBoxHttp?.request === 'function'
     );
   } catch {
     return false;
@@ -155,19 +157,27 @@ export async function nativeHttpRequest(input, { signal } = {}) {
 
   let abortHandler;
 
-  const nativePromise = CapacitorHttp.request({
-    url: request.url,
-    method: request.method,
-    headers: request.headers,
-    params: request.params,
-    data: request.data,
-    connectTimeout: request.timeoutMs,
-    readTimeout: request.timeoutMs,
-    disableRedirects: request.disableRedirects,
-    responseType: request.responseType,
-    ...(request.doh?.url ? { dohUrl: String(request.doh.url) } : {}),
-    ...(Array.isArray(request.doh?.bootstrapIps) ? { dohBootstrapIps: request.doh.bootstrapIps.map(String) } : {}),
-  });
+  const nativePromise = request.doh?.url
+    ? TVBoxHttp.request({
+        url: request.url,
+        method: request.method,
+        headers: request.headers,
+        body: request.data == null ? undefined : (typeof request.data === 'string' ? request.data : JSON.stringify(request.data)),
+        timeoutMs: request.timeoutMs,
+        dohUrl: String(request.doh.url),
+        dohBootstrapIps: Array.isArray(request.doh.bootstrapIps) ? request.doh.bootstrapIps.map(String) : [],
+      })
+    : CapacitorHttp.request({
+        url: request.url,
+        method: request.method,
+        headers: request.headers,
+        params: request.params,
+        data: request.data,
+        connectTimeout: request.timeoutMs,
+        readTimeout: request.timeoutMs,
+        disableRedirects: request.disableRedirects,
+        responseType: request.responseType,
+      });
 
   const abortPromise = signal
     ? new Promise((_, reject) => {
