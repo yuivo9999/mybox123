@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import {
-  Copy, Maximize2, Minimize2, RotateCw, Sparkles, Terminal, Paperclip,
+  Copy, Maximize2, Minimize2, RotateCw, Sparkles, Paperclip,
   Play, ArrowUp, ChevronDown,
-  FileText, LayoutGrid, SlidersHorizontal, Check, RefreshCw, Ratio
+  FileText, LayoutGrid, SlidersHorizontal, Check, RefreshCw, Ratio, Rewind, FastForward, ListVideo
 } from 'lucide-react';
 
 export function SangtianPlayerWindow({
   videoRef, status, error, resolvedInput, candidate, request, onRetry, onSwitchCandidate,
-  onFullscreen, terminalTag = 'BASH', children, videoContainerRef, isLive = false,
-  playbackRate = 1.0, onChangePlaybackRate,
+  onFullscreen, children, videoContainerRef, isLive = false,
+  playbackRate = 1.0, onChangePlaybackRate, title = '', episodeLabel = '', sourceLabel = '',
+  onOpenSourceModal, onPreviousEpisode, onNextEpisode,
 }) {
-  const [showTerminal, setShowTerminal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
   const [isSystemFullscreen, setIsSystemFullscreen] = useState(false);
@@ -112,6 +112,14 @@ export function SangtianPlayerWindow({
     video.currentTime = Number(value);
     setCurrentTime(Number(value));
   };
+  const handleSkip = seconds => {
+    const video = videoRef?.current;
+    if (!video || !Number.isFinite(video.currentTime)) return;
+    const target = Math.max(0, Number(video.currentTime) + seconds);
+    if (Number.isFinite(video.duration)) video.currentTime = Math.min(video.duration, target);
+    else video.currentTime = target;
+    setCurrentTime(video.currentTime);
+  };
   const handlePlayPause = () => {
     const video = videoRef?.current;
     if (!video) return;
@@ -127,8 +135,13 @@ export function SangtianPlayerWindow({
   return (
     <div className={`sangtian-window ${isLive ? 'is-live-direct' : ''} ${isLandscape ? 'is-landscape' : ''} ${isSystemFullscreen ? 'is-system-fullscreen' : ''} aspect-${aspectMode.replace(':','-')}`}>
       {!fullscreen && <div className="sangtian-window-bar">
-        <div className="sangtian-window-tag"><span>{terminalTag}</span></div>
+        <div className="sangtian-window-title-wrap">
+          <b>{title || '正在播放'}</b>
+          <span>{episodeLabel}{sourceLabel ? ' · ' + sourceLabel : ''}</span>
+        </div>
         <div className="sangtian-window-actions">
+          <button className="sangtian-window-btn" onClick={onOpenSourceModal} title="选集与换源"><ListVideo size={13}/><span>选集/换源</span></button>
+          <button className="sangtian-window-btn" onClick={onRetry} title="重新加载"><RefreshCw size={13}/><span>重载</span></button>
           <button className="sangtian-window-btn" onClick={handleCopyLink} title="复制播放链接">{copied ? <Check size={13}/> : <Copy size={13}/>}<span>{copied ? '已复制' : '复制'}</span></button>
           <button className={`sangtian-window-btn ${isLandscape ? 'active' : ''}`} onClick={handleToggleLandscape} title="方向"><RotateCw size={13}/><span>{isLandscape ? '竖屏' : '横屏'}</span></button>
           <button className={`sangtian-window-btn ${aspectMode !== 'original' ? 'active' : ''}`} onClick={handleCycleAspect} title={currentAspect.title}><Ratio size={13}/><span>{currentAspect.label}</span></button>
@@ -137,21 +150,7 @@ export function SangtianPlayerWindow({
       </div>}
 
       <div ref={videoContainerRef} className="sangtian-window-body">
-        {showTerminal ? (
-          <div className="sangtian-terminal-panel"><pre className="terminal-code">{`播放信息
-
-模式：${isLive ? 'Live 直连' : '影视解析'}
-协议：${resolvedInput?.protocol || candidate?.protocol || '未知'}
-源：${candidate?.sourceId || '—'}
-状态：${status || 'idle'}
-播放进度：${formatTime(currentTime)} / ${formatTime(duration)}
-已缓冲：${formatTime(bufferedSeconds)}
-加载速率：${loadSpeed}
-网络估速：${networkDownlink != null ? networkDownlink + ' Mbps' : '不可用'}
-播放地址：${streamUrl || '等待地址…'}`}</pre>
-            <div className="terminal-footer"><button className="terminal-back-btn" onClick={()=>setShowTerminal(false)}><Play size={13}/><span>返回视频播放</span></button></div></div>
-        ) : (
-          <>
+        <>
             {renderedChildren}
             {!resolvedInput && candidate && status !== 'error' && <div className="sangtian-video-overlay"><div className="sangtian-loading-spinner"/><span>{isLive ? '正在连接直播直链…' : '正在解析视频播放地址…'}</span></div>}
             {resolvedInput && status !== 'error' && !isPlaying && <div className="sangtian-video-overlay compact"><div className="sangtian-loading-spinner"/><span>正在缓冲…</span></div>}
@@ -159,8 +158,14 @@ export function SangtianPlayerWindow({
             {fullscreen && (
               <div className={`sangtian-fullscreen-controls ${isLandscape ? 'landscape' : 'portrait'} ${showFullscreenBar ? 'visible' : ''}`}
                    onClick={()=>setShowFullscreenBar(true)}>
-                <div className="sangtian-fullscreen-topbar"><span>{request?.metadata?.title || candidate?.label || '正在播放'}</span><button onClick={handleToggleFullscreen}><Minimize2 size={18}/></button></div>
-                <div className="sangtian-fullscreen-center"><button onClick={handlePlayPause} className="fullscreen-play-btn">{isPlaying ? '暂停' : '播放'}</button></div>
+                <div className="sangtian-fullscreen-topbar"><span>{title || request?.metadata?.title || candidate?.label || '正在播放'} · {episodeLabel}</span><button onClick={handleToggleFullscreen}><Minimize2 size={18}/></button></div>
+                <div className="sangtian-fullscreen-center">
+                  <div className="fullscreen-skip-row">
+                    <button onClick={() => handleSkip(-10)} aria-label="后退10秒"><Rewind size={18}/><span>10秒</span></button>
+                    <button onClick={handlePlayPause} className="fullscreen-play-btn">{isPlaying ? '暂停' : '播放'}</button>
+                    <button onClick={() => handleSkip(10)} aria-label="前进10秒"><FastForward size={18}/><span>10秒</span></button>
+                  </div>
+                </div>
                 <div className="sangtian-fullscreen-bottombar">
                   {!isLive && (
                     <>
@@ -174,6 +179,8 @@ export function SangtianPlayerWindow({
                   )}
                   {isLive && <div className="sangtian-fullscreen-live-status"><span className="live-pill">● LIVE</span><span>{status === 'buffering' ? '正在缓冲' : status === 'error' ? '播放失败' : isPlaying ? '直播中' : '已暂停'}</span></div>}
                   <div className="sangtian-fullscreen-actions">
+                    {onPreviousEpisode && <button onClick={onPreviousEpisode}>上一集</button>}
+                    {onNextEpisode && <button onClick={onNextEpisode}>下一集</button>}
                     <button onClick={handleToggleLandscape}><RotateCw size={15}/>{isLandscape ? '竖屏' : '横屏'}</button>
                     <button onClick={handleCycleAspect}><Ratio size={15}/>{currentAspect.label}</button>
                     {!isLive && <button onClick={()=>{const next=playbackRate>=2?0.75:playbackRate+0.25;onChangePlaybackRate?.(Number(next.toFixed(2)));}}><Play size={15}/>{playbackRate.toFixed(2)}x</button>}
@@ -183,7 +190,6 @@ export function SangtianPlayerWindow({
               </div>
             )}
           </>
-        )}
       </div>
     </div>
   );
