@@ -184,6 +184,9 @@ export function MoviePlaybackPage({
           const next = candidates.find(c => c.candidateId !== candidate?.candidateId);
           if (next) switchCandidate(next.candidateId);
         }}
+        playbackRate={playbackRate}
+        onChangePlaybackRate={handleChangePlaybackRate}
+        videoContainerRef={videoContainerRef}
         terminalTag="BASH"
       >
         <video
