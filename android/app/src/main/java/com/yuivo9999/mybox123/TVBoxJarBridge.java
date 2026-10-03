@@ -14,6 +14,13 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.util.Locale;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Stage-3 TVBox JAR runtime boundary.
@@ -31,9 +38,11 @@ public final class TVBoxJarBridge {
     private static final int MAX_JAR_BYTES = 20 * 1024 * 1024;
     private static final int MAX_PAYLOAD_CHARS = 256 * 1024;
     private static final int MAX_RESULT_CHARS = 5 * 1024 * 1024;
+    private static final long SPIDER_TIMEOUT_MS = 20_000L;
 
     private final Context context;
     private final TVBoxJarExecutor executor;
+    private final ExecutorService executionExecutor = Executors.newSingleThreadExecutor();
 
     public TVBoxJarBridge(Context context) {
         this.context = context.getApplicationContext();
@@ -133,9 +142,28 @@ public final class TVBoxJarBridge {
         File cache = new File(context.getCacheDir(), "tvbox/jar").getCanonicalFile();
         if (!jarFile.getPath().startsWith(cache.getPath() + File.separator)) throw new SecurityException("TVBOX_JAR_PATH_OUTSIDE_CACHE");
         if (!jarFile.isFile() || jarFile.length() > MAX_JAR_BYTES) throw new SecurityException("TVBOX_JAR_NOT_READY");
-        String result = executor.invoke(jarFile, className, operation, data);
-        if (result != null && result.length() > MAX_RESULT_CHARS) throw new SecurityException("TVBOX_JAR_RESULT_TOO_LARGE");
-        return result;
+        Future<String> future = executionExecutor.submit(new Callable<String>() {
+            @Override public String call() throws Exception {
+                return executor.invoke(jarFile, className, operation, data);
+            }
+        });
+        try {
+            String result = future.get(SPIDER_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            if (result != null && result.length() > MAX_RESULT_CHARS) throw new SecurityException("TVBOX_JAR_RESULT_TOO_LARGE");
+            return result;
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            throw new SecurityException("TVBOX_JAR_EXECUTION_TIMEOUT");
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof Exception) throw (Exception) cause;
+            if (cause instanceof Error) throw (Error) cause;
+            throw new Exception("TVBOX_JAR_EXECUTION_FAILED");
+        } catch (InterruptedException e) {
+            future.cancel(true);
+            Thread.currentThread().interrupt();
+            throw new SecurityException("TVBOX_JAR_EXECUTION_INTERRUPTED");
+        }
     }
 
     private String inspect(JSONObject data) throws Exception {
@@ -229,6 +257,10 @@ public final class TVBoxJarBridge {
     private static String safeFileName(String value) {
         String normalized = value == null ? "spider" : value.replaceAll("[^a-zA-Z0-9._-]", "_");
         return normalized.isEmpty() ? "spider" : normalized.substring(0, Math.min(80, normalized.length()));
+    }
+
+    public void release() {
+        executionExecutor.shutdownNow();
     }
 
     private String error(String code) {
