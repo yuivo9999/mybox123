@@ -40,6 +40,17 @@ export function createNativePlayerAdapter(hooks={}) {
   selectSubtitleTrack(trackId){return call('selectSubtitleTrack',{trackId});},
   getQualities(){return call('getQualities',{});},
   selectQuality(qualityId){return call('selectQuality',{qualityId});},
+  setVideoViewBounds(bounds){
+   if(!bounds || typeof bounds !== 'object') return false;
+   return call('setPlayerViewBounds',{
+    left:Number(bounds.left)||0,
+    top:Number(bounds.top)||0,
+    width:Math.max(0,Number(bounds.width)||0),
+    height:Math.max(0,Number(bounds.height)||0),
+    viewportWidth:Math.max(0,Number(bounds.viewportWidth)||0),
+    viewportHeight:Math.max(0,Number(bounds.viewportHeight)||0),
+   });
+  },
   release(){if(released)return;released=true;state=PlayerState.RELEASED;emit('released');if(typeof window!=='undefined'&&window.TVBoxWebView?.onPlayerEvent===eventHandler)delete window.TVBoxWebView.onPlayerEvent;return call('releaseMedia',{}).catch(()=>undefined);},
  };
  return createPlayerAdapterContract(adapter);
