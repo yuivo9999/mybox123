@@ -61,6 +61,10 @@ function mergeContentInto(current, item) {
 
   current.sourceRefs = sourceRelations;
   current.sourceRelations = sourceRelations;
+  current.categoryIds = [...new Set([...(current.categoryIds ?? []), ...(item.categoryIds ?? [])])];
+  current.categoryLabels = [...new Set([...(current.categoryLabels ?? []), ...(item.categoryLabels ?? [])])];
+  current.sourceCategories = [...new Set([...(current.sourceCategories ?? []), item.sourceCategory].filter(Boolean))];
+  current.sourceTypes = [...new Set([...(current.sourceTypes ?? []), item.sourceType].filter(Boolean))];
   current.episodes = mergeEpisodes(current.episodes ?? [], item.episodes ?? []);
 
   if (!current.poster && item.poster) current.poster = item.poster;
@@ -109,6 +113,10 @@ export function mergeContents(items = []) {
         ...item,
         sourceRefs: sourceRelations,
         sourceRelations,
+        categoryIds: [...new Set(item.categoryIds ?? [])],
+        categoryLabels: [...new Set(item.categoryLabels ?? [])],
+        sourceCategories: item.sourceCategory ? [item.sourceCategory] : [],
+        sourceTypes: item.sourceType ? [item.sourceType] : [],
         episodes: mergeEpisodes([], item.episodes ?? []),
         availableSourceCount: Math.max(1, new Set(sourceRelations.map(ref => ref.sourceId).filter(Boolean)).size),
       };
