@@ -20,6 +20,7 @@ export function createLiveFeature({ channels = [] } = {}) {
 export function LiveFeature({ channels = [], sources = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite }) {
   const page = usePageState();
   const videoRef = useRef(null);
+  const playerWindowBodyRef = useRef(null);
   const [selectedChannelId, setSelectedChannelId] = useState('');
   const [activeStreamIndex, setActiveStreamIndex] = useState(0);
   const [tv1Channels, setTv1Channels] = useState([]);
@@ -176,6 +177,40 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   };
 
   useEffect(() => {
+    const body = playerWindowBodyRef.current;
+    if (!body || !playbackController?.setVideoViewBounds) return undefined;
+
+    const syncNativeVideoSurface = () => {
+      if (typeof window === 'undefined' || typeof body.getBoundingClientRect !== 'function') return;
+      const rect = body.getBoundingClientRect();
+      playbackController.setVideoViewBounds({
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+      });
+    };
+
+    syncNativeVideoSurface();
+    const observer = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(syncNativeVideoSurface)
+      : null;
+    observer?.observe(body);
+    window.addEventListener('resize', syncNativeVideoSurface);
+    window.addEventListener('orientationchange', syncNativeVideoSurface);
+    const timer = window.setTimeout(syncNativeVideoSurface, 150);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', syncNativeVideoSurface);
+      window.removeEventListener('orientationchange', syncNativeVideoSurface);
+      window.clearTimeout(timer);
+    };
+  }, [playbackController]);
+
+  useEffect(() => {
     if (!playbackController) {
       setPlaybackCandidate(null);
       setResolvedPlaybackInput(null);
@@ -225,6 +260,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
 
       <SangtianPlayerWindow
         videoRef={videoRef}
+        videoContainerRef={playerWindowBodyRef}
         status={playbackStatus}
         candidate={activeStream ? {
           label: playbackCandidate?.label || activeStream.label || '默认线路',
