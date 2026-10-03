@@ -101,3 +101,7 @@ export function getCategoryLabel(mediaType, categoryId) {
 export function getTaxonomy(mediaType) {
   return MEDIA_TAXONOMY[mediaType] ? [...MEDIA_TAXONOMY[mediaType]] : [];
 }
+
+export function getCategoryIdByLabel(mediaType, label) {
+  return MEDIA_TAXONOMY[mediaType]?.find(item => item.label === label)?.id ?? '';
+}
