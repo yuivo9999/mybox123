@@ -67,13 +67,31 @@ function moviesForCategory(movies=[], category){
 }
 
 function MovieSourceSelector({sources=[],selectedSourceId,onChange}){
+ const [open,setOpen]=useState(false);
+ const [draftSourceId,setDraftSourceId]=useState(selectedSourceId||'');
+ useEffect(()=>{if(!open)setDraftSourceId(selectedSourceId||'');},[selectedSourceId,open]);
+ const selected=sources.find(source=>source.sourceId===selectedSourceId);
+ const draft=sources.find(source=>source.sourceId===draftSourceId);
+ const close=()=>{setDraftSourceId(selectedSourceId||'');setOpen(false);};
+ const apply=()=>{setOpen(false);if(draftSourceId&&draftSourceId!==selectedSourceId)onChange?.(draftSourceId);};
  return <section className="source-selector" style={{marginBottom:16}}>
    <div className="section-title" style={{marginBottom:8}}><h3>影视源</h3><span style={{fontSize:12,color:'#8f9aaa'}}>{sources.length} 个可用源</span></div>
-   <select aria-label="选择影视源" value={selectedSourceId||''} onChange={e=>{if(e.target.value) onChange?.(e.target.value)}} style={{width:'100%'}}>
-     <option value="">请选择一个影视源（选择后才开始加载）</option>
-     {sources.map(source=><option key={source.sourceId} value={source.sourceId}>{source.name}</option>)}
-   </select>
-   <small style={{display:'block',marginTop:6,color:'#8f9aaa'}}>一次只加载当前选择的影视源，避免 4k.json 中多个源同时请求。</small>
+   <button className="source-selector-trigger" type="button" aria-expanded={open} onClick={()=>{if(!open)setDraftSourceId(selectedSourceId||'');setOpen(value=>!value)}}>
+     <span className="source-selector-trigger-copy"><b>{selected?.name||'请选择影视源'}</b><small>{selected?'当前使用，点击切换':'选择后才开始加载'}</small></span>
+     <ChevronRight size={18} className={open?'source-selector-chevron open':'source-selector-chevron'}/>
+   </button>
+   {open&&<div className="source-selector-popover" role="dialog" aria-label="选择影视源">
+     <div className="source-selector-popover-head"><div><b>选择影视源</b><small>临时勾选，点击“选择”后才会生效</small></div><button className="icon-button" type="button" aria-label="关闭" onClick={close}><X size={17}/></button></div>
+     <div className="source-selector-list" data-horizontal-scroll="true">
+       {sources.map(source=>{const checked=draftSourceId===source.sourceId;return <button className={'source-selector-item'+(checked?' selected':'')} type="button" key={source.sourceId} onClick={()=>setDraftSourceId(source.sourceId)} aria-pressed={checked}>
+         <span className="source-selector-name" title={source.name}>{source.name}</span>
+         <span className={'source-selector-radio'+(checked?' checked':'')} aria-hidden="true">{checked&&<span/>}</span>
+       </button>})}
+       {!sources.length&&<div className="source-selector-empty">暂无可用影视源</div>}
+     </div>
+     <div className="source-selector-footer"><button className="secondary" type="button" onClick={close}>不选</button><button className="primary" type="button" disabled={!draftSourceId} onClick={apply}>选择</button></div>
+   </div>}
+   <small className="source-selector-hint">一次只加载当前选择的影视源，避免多个源同时请求。</small>
  </section>;
 }
 
