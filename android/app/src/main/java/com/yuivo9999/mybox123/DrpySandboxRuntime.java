@@ -1,0 +1,88 @@
+package com.yuivo9999.mybox123;
+
+import org.mozilla.javascript.ClassShutter;
+import org.mozilla.javascript.Context;
+import org.mozilla.javascript.ContextFactory;
+import org.mozilla.javascript.Scriptable;
+import org.mozilla.javascript.ScriptableObject;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/**
+ * Minimal sandbox for evaluating a Drpy JavaScript definition.
+ *
+ * This is deliberately not a complete Drpy implementation yet. It provides
+ * the execution boundary only. Network, filesystem, Java reflection and
+ * Android objects are not exposed to the script.
+ */
+public final class DrpySandboxRuntime {
+    private static final int MAX_INSTRUCTIONS = 200_000;
+    private static final long MAX_SCRIPT_CHARS = 1_000_000L;
+
+    private DrpySandboxRuntime() {}
+
+    public static String evaluateDefinition(String source) {
+        if (source == null || source.trim().isEmpty()) {
+            throw new IllegalArgumentException("DRPY_SCRIPT_REQUIRED");
+        }
+        if (source.length() > MAX_SCRIPT_CHARS) {
+            throw new IllegalArgumentException("DRPY_SCRIPT_TOO_LARGE");
+        }
+
+        ContextFactory factory = new ContextFactory() {
+            @Override
+            protected Context makeContext() {
+                Context cx = super.makeContext();
+                cx.setInstructionObserverThreshold(10_000);
+                cx.setMaximumInterpreterStackDepth(1000);
+                return cx;
+            }
+
+            @Override
+            protected void observeInstructionCount(Context cx, int instructionCount) {
+                throw new SecurityException("DRPY_SCRIPT_INSTRUCTION_LIMIT");
+            }
+        };
+
+        AtomicBoolean closed = new AtomicBoolean(false);
+        Context cx = factory.enterContext();
+        try {
+            cx.setLanguageVersion(Context.VERSION_ES6);
+            cx.setOptimizationLevel(-1);
+            cx.setClassShutter(new ClassShutter() {
+                @Override
+                public boolean visibleToScripts(String fullClassName) {
+                    return false;
+                }
+            });
+
+            Scriptable scope = cx.initSafeStandardObjects();
+            ScriptableObject.putProperty(scope, "console", Context.javaToJS(new SafeConsole(), scope));
+
+            Object result = cx.evaluateString(
+                    scope,
+                    source,
+                    "tvbox-drpy-extension",
+                    1,
+                    null
+            );
+
+            Object rule = ScriptableObject.getProperty(scope, "rule");
+            if (rule == Scriptable.NOT_FOUND) {
+                rule = result;
+            }
+
+            return Context.toString(rule == Scriptable.NOT_FOUND ? "" : rule);
+        } finally {
+            if (closed.compareAndSet(false, true)) {
+                Context.exit();
+            }
+        }
+    }
+
+    private static final class SafeConsole {
+        public void log(Object ignored) {}
+        public void warn(Object ignored) {}
+        public void error(Object ignored) {}
+    }
+}
