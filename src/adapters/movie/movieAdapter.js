@@ -297,7 +297,7 @@ export function createMovieAdapter(config, transport = null) {
       keyword: query,
     });
     const filtered = movies.filter(item =>
-      [item.title, item.subtitle, item.description, item.category]
+      [item.title, item.subtitle, item.description, item.category, item.titleEn]
         .some(value => String(value ?? '').toLowerCase().includes(query))
     );
     return {
