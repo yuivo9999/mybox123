@@ -8,7 +8,8 @@ import { tv1LiveService } from './tv1LiveService.js';
 export async function testSource(source, options = {}) {
   if (!source?.sourceId) throw new Error('SOURCE_ID_REQUIRED');
 
-  if (source.sourceCapability === 'tvbox-extension' || source.adapterType === 'tvbox-extension') {
+  if (String(source.sourceCapability || '').startsWith('tvbox-')
+    || String(source.adapterType || '').startsWith('tvbox-')) {
     return {
       ok: false,
       sourceId: source.sourceId,
