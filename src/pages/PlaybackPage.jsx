@@ -26,6 +26,7 @@ function PlaybackView({
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sourceModalOpen, setSourceModalOpen] = useState(false);
+  const isLive = kind === 'live';
   const videoRef = useRef(null);
   const playerWindowBodyRef = useRef(null);
 
@@ -42,7 +43,7 @@ function PlaybackView({
       if (next) setError('');
     },
     onResolvedInput: setResolvedInput,
-    onParserError: ({ code }) => setError('解析失败：' + code),
+    onParserError: ({ code }) => { if (!isLive) setError('解析失败：' + code); },
     onPlayerError: ({ error: e }) => setError(e?.message || '播放器加载失败'),
     onExhausted: () => setStatus('error'),
   }), [request]);
@@ -132,7 +133,7 @@ function PlaybackView({
 
   const candidates = request?.candidates ?? [];
   const relatedChannels = channels.filter(c => c.channelId !== channel?.channelId);
-  const activeStreamUrl = resolvedInput?.url || candidate?.url || candidate?.metadata?.url || '';
+  const activeStreamUrl = resolvedInput?.url || candidate?.mediaUrl || candidate?.url || candidate?.metadata?.url || '';
 
   const candidateLabel = candidate?.metadata?.label || candidate?.label || '蓝光4K · 线路1';
 
@@ -185,9 +186,10 @@ function PlaybackView({
           const next = candidates.find(item => item.candidateId !== candidate?.candidateId && !controller.failedCandidateIds?.includes(item.candidateId));
           if (next) switchCandidate(next.candidateId);
         }}
-        terminalTag="BASH"
+        terminalTag={isLive ? 'LIVE DIRECT' : 'BASH'}
+        isLive={isLive}
       >
-        <video ref={videoRef} controls playsInline className="sangtian-video-element" />
+        <video ref={videoRef} controls playsInline preload="metadata" className="sangtian-video-element" />
         {status === 'error' && (
           <div className="video-error" style={{ display: 'none' }}>
             <span>{error}</span>
@@ -203,6 +205,7 @@ function PlaybackView({
       {/* 3. Floating Bar below video window */}
       <SangtianFloatingBar
         playbackRate={playbackRate}
+        isLive={isLive}
         onChangeRate={handleChangePlaybackRate}
         currentCandidateLabel={`✦ ${candidateLabel}`}
         onOpenSourceModal={() => setSourceModalOpen(true)}
@@ -230,6 +233,7 @@ function PlaybackView({
         relatedItems={relatedChannels}
         onSelectRelated={switchChannel}
         onReplay={handleRetry}
+        playerStatus={status}
         onTogglePip={() => {
           if (videoRef.current && document.pictureInPictureEnabled) {
             if (document.pictureInPictureElement) {
