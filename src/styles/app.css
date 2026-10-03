@@ -1392,3 +1392,24 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
 .android-search-failed{padding:8px 6px;color:#8e96a0;font-size:10px}
 .android-search-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));border-top:1px solid rgba(255,255,255,.08);color:#858c95;font-size:10px}
 .theme-light .android-search-dialog{background:#fff;color:#20242a;border-color:rgba(0,0,0,.1)}.theme-light .android-search-header,.theme-light .android-search-footer{border-color:rgba(0,0,0,.08)}.theme-light .android-search-result-row{background:rgba(0,0,0,.035)}.theme-light .android-search-status{background:rgba(0,0,0,.035)}
+
+/* 影视横向卡片：参考 2t.jpg 的海报+标题结构，卡片底部改为白色 */
+.movie-carousel-wrap{position:relative;margin:0 -2px 4px;min-width:0}
+.movie-carousel{display:flex;gap:12px;overflow-x:auto;overflow-y:hidden;padding:4px 18px 14px 2px;scroll-snap-type:x mandatory;scroll-padding-inline:18px;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;touch-action:pan-x;scrollbar-width:none}
+.movie-carousel::-webkit-scrollbar{display:none}
+.movie-carousel-card{flex:0 0 clamp(118px,31vw,146px);scroll-snap-align:start;background:#fff;color:#151515;border-radius:12px;overflow:hidden;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.10);transform:scale(.96);opacity:.88;transition:transform .22s cubic-bezier(.2,.8,.2,1),opacity .22s ease,box-shadow .22s ease;outline:none}
+.movie-carousel-card[data-active="true"]{transform:scale(1);opacity:1;box-shadow:0 8px 22px rgba(0,0,0,.16)}
+.movie-carousel-card:focus-visible{box-shadow:0 0 0 3px rgba(70,110,255,.35),0 8px 22px rgba(0,0,0,.16)}
+.movie-carousel-poster{width:100%;aspect-ratio:2/3;background:#edf0f3;overflow:hidden}
+.movie-carousel-poster img{width:100%;height:100%;display:block;object-fit:cover}
+.movie-carousel-placeholder{width:100%;height:100%;display:grid;place-items:center;color:#8b939f;background:#edf0f3}
+.movie-carousel-caption{min-height:58px;padding:8px 9px 9px;background:#fff}
+.movie-carousel-caption b{display:block;color:#151515;font-size:13px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.movie-carousel-caption span{display:block;color:#666b73;font-size:10px;line-height:1.35;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.movie-carousel-hint{display:flex;align-items:center;justify-content:flex-end;gap:7px;padding:0 8px 1px;color:#9299a4;font-size:10px;pointer-events:none}
+.movie-carousel-hint i{width:28px;height:1px;background:#c9ced5;position:relative}
+.movie-carousel-hint i:after{content:"";position:absolute;right:0;top:-3px;width:6px;height:6px;border-top:1px solid #aab0b9;border-right:1px solid #aab0b9;transform:rotate(45deg)}
+@media (min-width:520px){.movie-carousel{gap:14px}.movie-carousel-card{flex-basis:142px}}
+.theme-sangtian .movie-carousel-card,.theme-light .movie-carousel-card{color:#151515;background:#fff}
+.theme-sangtian .movie-carousel-caption,.theme-light .movie-carousel-caption{background:#fff}
+@media (prefers-reduced-motion:reduce){.movie-carousel-card{transition:none}}
