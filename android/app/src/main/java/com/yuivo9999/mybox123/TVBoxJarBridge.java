@@ -59,7 +59,9 @@ public final class TVBoxJarBridge {
             result.put("supportedKinds", new org.json.JSONArray().put("jar"));
             result.put("supportedOperations", new org.json.JSONArray().put("prepare").put("inspect").put("home").put("category").put("detail").put("search").put("play"));
             result.put("executionEnabled", true);
-            result.put("reason", "CATVOD_SPIDER_ABI_DEXCLASSLOADER");
+            result.put("executionMode", "host-process");
+            result.put("isolatedProcessReady", false);
+            result.put("reason", "CATVOD_SPIDER_ABI_DEXCLASSLOADER_HOST_PROCESS");
             return result.toString();
         } catch (Exception e) {
             return "{\"available\":false,\"reason\":\"TVBOX_JAR_CAPABILITY_ERROR\"}";
@@ -129,6 +131,8 @@ public final class TVBoxJarBridge {
         result.put("size", target.length());
         result.put("md5", actualMd5);
         result.put("executionEnabled", true);
+        result.put("executionMode", "host-process");
+        result.put("isolatedProcessReady", false);
         result.put("reused", reused);
         return result.toString();
     }
@@ -204,6 +208,7 @@ public final class TVBoxJarBridge {
         result.put("classCount", classCount);
         result.put("hasCatVodSpiderPackage", hasSpiderPackage);
         result.put("executionEnabled", false);
+        result.put("executionMode", "inspection-only");
         return result.toString();
     }
 
