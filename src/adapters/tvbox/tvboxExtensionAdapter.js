@@ -36,6 +36,7 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
     tvboxExt: config.tvboxExt ?? null,
     tvboxJar: config.tvboxJar ?? null,
     tvboxDefinition: config.tvboxDefinition ?? null,
+    tvboxParseConfig: config.tvboxParseConfig ?? null,
   });
 
   const unavailable = (operation) => toAppError(
