@@ -217,15 +217,71 @@ function classifyTVBoxSite(site = {}) {
   const api = String(site.api || '').trim();
   const text = `${name} ${key} ${api}`;
   const liveLike = /(直播|体育赛事|赛事直播|竞技直播|网红直播|310直播)/i.test(text);
-  if (liveLike) return 'live';
-  return 'movie';
+  return liveLike ? 'live' : 'movie';
+}
+
+function classifyTVBoxCapability(site = {}) {
+  const api = String(site.api || '').trim();
+  const type = Number(site.type);
+  const hasJar = site.jar != null && String(site.jar).trim() !== '';
+  const hasExt = site.ext != null;
+  const isDrpy = /^drpy(?:_js)?_/i.test(String(site.key || ''))
+    || /(?:^|\/)drpy2(?:\.min)?\.js(?:$|[?#])/i.test(api);
+  const isCsp = /^csp_/i.test(api);
+  const isDirectVod = type === 1
+    && /^https?:\/\//i.test(api)
+    && /(?:api\.php\/)?provide\/vod(?:\/|\?|$)/i.test(api);
+
+  if (isDirectVod) {
+    return {
+      sourceCapability: 'direct-http-vod',
+      adapterType: 'http-vod',
+      requiresJar: hasJar,
+      kind: hasJar ? 'http-vod-with-jar' : 'http-vod',
+    };
+  }
+  if (isDrpy) {
+    return {
+      sourceCapability: 'tvbox-drpy-js',
+      adapterType: 'tvbox-extension',
+      requiresJar: hasJar,
+      kind: 'drpy-js',
+    };
+  }
+  if (isCsp) {
+    return {
+      sourceCapability: 'tvbox-csp',
+      adapterType: 'tvbox-extension',
+      requiresJar: hasJar,
+      kind: 'csp',
+    };
+  }
+  if (hasJar) {
+    return {
+      sourceCapability: 'tvbox-jar',
+      adapterType: 'tvbox-extension',
+      requiresJar: true,
+      kind: 'jar',
+    };
+  }
+  if (hasExt) {
+    return {
+      sourceCapability: 'tvbox-ext',
+      adapterType: 'tvbox-extension',
+      requiresJar: false,
+      kind: 'ext',
+    };
+  }
+  return {
+    sourceCapability: 'tvbox-extension',
+    adapterType: 'tvbox-extension',
+    requiresJar: false,
+    kind: 'unknown',
+  };
 }
 
 function isDirectMovieEndpoint(api, site = {}) {
-  const raw = String(api || '').trim();
-  const type = Number(site.type);
-  if (type !== 1 || !/^https?:\/\//i.test(raw)) return false;
-  return /(?:api\.php\/)?provide\/vod(?:\/|\?|$)/i.test(raw) || /\/api\.php(?:\/|\?|$)/i.test(raw);
+  return classifyTVBoxCapability({ ...site, api }).sourceCapability === 'direct-http-vod';
 }
 
 function parseTVBoxSources(parsed, { bundleId = null } = {}) {
@@ -239,9 +295,10 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
 
       const api = String(site.api || '').trim();
       const sourceType = classifyTVBoxSite(site);
-      const directMovie = isDirectMovieEndpoint(api, site);
+      const capability = classifyTVBoxCapability(site);
+      const directMovie = capability.sourceCapability === 'direct-http-vod';
       const isSupportedDirect = sourceType === 'movie' && directMovie;
-      const adapterType = isSupportedDirect ? 'http-vod' : 'tvbox-extension';
+      const adapterType = capability.adapterType;
 
       const sourceId = `tvbox_${sourceType}_${stableHash(`${resolvedBundleId}|${sourceType}|${site.key || api || index}`)}`;
       const name = String(site.name || site.key || `TVBox${sourceType === 'live' ? '直播' : '影视'}-${index + 1}`).trim();
@@ -256,14 +313,21 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
         url: api,
         enabled: isSupportedDirect,
         status: isSupportedDirect ? '未测试' : '待适配',
-        sourceCapability: isSupportedDirect ? 'direct-http' : 'tvbox-extension',
-        adapterType,
+        sourceCapability: sourceType === 'live' ? 'tvbox-live-provider' : capability.sourceCapability,
+        adapterType: sourceType === 'live' ? 'tvbox-live-provider' : adapterType,
+        tvboxAdapterKind: sourceType === 'live' ? 'live-provider' : capability.kind,
+        tvboxRequiresJar: capability.requiresJar === true,
         tvboxType: Number.isFinite(Number(site.type)) ? Number(site.type) : null,
         tvboxKey: String(site.key || '').trim(),
         tvboxApi: api,
         tvboxDefinition: { ...site },
         tvboxUnsupportedReason: isSupportedDirect ? null : (
-          !api ? '缺少 api' : sourceType === 'live' ? 'TVBox site 不是直接直播地址，当前没有 Live 专用适配器' : '当前源不是标准 type=1 VOD HTTP 接口，可能依赖 CSP/JAR/JS 扩展'
+          !api ? '缺少 api' : sourceType === 'live' ? 'TVBox site 是直播提供器，当前没有 Live 专用适配器'
+            : capability.kind === 'drpy-js' ? 'Drpy JS 源当前未适配执行器'
+            : capability.kind === 'csp' ? 'CSP 源当前未适配执行器'
+            : capability.kind === 'jar' || capability.kind === 'http-vod-with-jar' ? '该源依赖 JAR 扩展，当前未适配 JAR 执行器'
+            : capability.kind === 'ext' ? '该源依赖 ext 扩展配置，当前未适配'
+            : '当前源不是标准可直接请求的 VOD HTTP 接口'
         ),
         ...(site.jar != null ? { tvboxJar: site.jar } : {}),
         ...(site.ext != null ? { tvboxExt: site.ext } : {}),
