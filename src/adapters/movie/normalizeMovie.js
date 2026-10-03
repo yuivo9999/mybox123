@@ -1,6 +1,20 @@
 import { normalizeContent } from '../../models/content.js';
 
-export function normalizeMovie({ sourceId, item, index = 0 }) {
+export function normalizeMovie({ sourceId, item, index = 0, sourceMetadata = {} }) {
+  const playbackMetadata = Object.fromEntries(
+    Object.entries({
+      sourceCapability: sourceMetadata.sourceCapability,
+      adapterType: sourceMetadata.adapterType,
+      tvboxAdapterKind: sourceMetadata.tvboxAdapterKind,
+      tvboxRequiresJar: sourceMetadata.tvboxRequiresJar,
+      tvboxJar: sourceMetadata.tvboxJar,
+      playerType: sourceMetadata.tvboxType ?? sourceMetadata.playerType,
+    }).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  );
+  const normalizeCandidate = (candidate = {}) => ({
+    ...candidate,
+    metadata: { ...playbackMetadata, ...(candidate.metadata ?? {}) },
+  });
   const episodes = (item.episodes ?? []).map((episode, episodeIndex) => {
     if (typeof episode === 'string') return { title: episode };
     return {
@@ -12,7 +26,7 @@ export function normalizeMovie({ sourceId, item, index = 0 }) {
       playbackCandidates: [
         ...(Array.isArray(episode.playbackCandidates) ? episode.playbackCandidates : []),
         ...(episode.url ? [{ mediaUrl: episode.url, protocol: episode.protocol, label: episode.label }] : []),
-      ].filter(candidate => candidate.mediaUrl || candidate.url),
+      ].filter(candidate => candidate.mediaUrl || candidate.url).map(normalizeCandidate),
     };
   });
 
