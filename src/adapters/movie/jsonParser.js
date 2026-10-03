@@ -69,4 +69,32 @@ export function parseJSONMovies(input) {
     }];
   });
 }
-\n/**\n * Normalize a TVBox/CatVod Spider response into the same raw item shape used by\n * the normal movie pipeline. Accepts common vod_* and playback fields.\n */\nexport function parseTVBoxResult(input) {\n  const value = typeof input === 'string' ? JSON.parse(input) : input;\n  const list = asArray(value);\n  return list.flatMap((item, index) => {\n    if (!item || typeof item !== 'object') return [];\n    return [{\n      sourceItemId: String(item.sourceItemId ?? item.vod_id ?? item.id ?? `item-${index + 1}`),\n      canonicalId: item.canonicalId ?? item.globalId ?? item.vod_id ?? item.id ?? '',\n      title: String(item.title ?? item.name ?? item.vod_name ?? `内容 ${index + 1}`),\n      type: item.type ?? item.contentType ?? item.vod_type ?? '',\n      category: item.category ?? item.type_name ?? item.vod_class ?? item.group ?? item.categoryName ?? '',\n      poster: item.poster ?? item.pic ?? item.vod_pic ?? item.image ?? '',\n      backdrop: item.backdrop ?? item.vod_pic_slide ?? item.pic_slide ?? '',\n      description: item.description ?? item.desc ?? item.vod_content ?? '',\n      year: String(item.year ?? item.vod_year ?? ''),\n      region: item.region ?? item.area ?? item.vod_area ?? '',\n      director: item.director ?? item.vod_director ?? '',\n      actors: Array.isArray(item.actors) ? item.actors : String(item.vod_actor ?? '').split(/[,，/\\s]+/).filter(Boolean),\n      popularity: Number(item.popularity ?? item.vod_hits ?? 0) || 0,\n      updateInfo: item.updateInfo ?? item.vod_remarks ?? item.vod_state ?? '',\n      episodes: asEpisodes(item),\n    }];\n  });\n}\n
+
+/**
+ * Normalize a TVBox/CatVod Spider response into the same raw item shape used by
+ * the normal movie pipeline. Accepts common vod_* and playback fields.
+ */
+export function parseTVBoxResult(input) {
+  const value = typeof input === 'string' ? JSON.parse(input) : input;
+  const list = asArray(value);
+  return list.flatMap((item, index) => {
+    if (!item || typeof item !== 'object') return [];
+    return [{
+      sourceItemId: String(item.sourceItemId ?? item.vod_id ?? item.id ?? `item-${index + 1}`),
+      canonicalId: item.canonicalId ?? item.globalId ?? item.vod_id ?? item.id ?? '',
+      title: String(item.title ?? item.name ?? item.vod_name ?? `内容 ${index + 1}`),
+      type: item.type ?? item.contentType ?? item.vod_type ?? '',
+      category: item.category ?? item.type_name ?? item.vod_class ?? item.group ?? item.categoryName ?? '',
+      poster: item.poster ?? item.pic ?? item.vod_pic ?? item.image ?? '',
+      backdrop: item.backdrop ?? item.vod_pic_slide ?? item.pic_slide ?? '',
+      description: item.description ?? item.desc ?? item.vod_content ?? '',
+      year: String(item.year ?? item.vod_year ?? ''),
+      region: item.region ?? item.area ?? item.vod_area ?? '',
+      director: item.director ?? item.vod_director ?? '',
+      actors: Array.isArray(item.actors) ? item.actors : String(item.vod_actor ?? '').split(/[,，/\\s]+/).filter(Boolean),
+      popularity: Number(item.popularity ?? item.vod_hits ?? 0) || 0,
+      updateInfo: item.updateInfo ?? item.vod_remarks ?? item.vod_state ?? '',
+      episodes: asEpisodes(item),
+    }];
+  });
+}
