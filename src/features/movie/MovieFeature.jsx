@@ -167,7 +167,11 @@ function OtherSourceSearchDialog({title,currentSourceId,sources=[],onClose,onMov
      setError('暂无其他已启用影视源可搜索');
      return ()=>{active=false;controller.abort();};
    }
-   searchMovieSources(otherSources,title,{signal:controller.signal,concurrency:4,pageSize:12,timeoutMs:4500})
+   searchMovieSources(otherSources,title,{signal:controller.signal,pageSize:12,timeoutMs:4500,onSourceResult:(entry)=>{
+       if(!active)return;
+       if(entry.status==='fulfilled') setResults(current=>[...current,entry]);
+       else setFailed(current=>[...current,entry]);
+     }})
      .then(result=>{
        if(!active)return;
        setResults(result.results??[]);
@@ -190,7 +194,7 @@ function OtherSourceSearchDialog({title,currentSourceId,sources=[],onClose,onMov
      </div>
      <div className="info-card" style={{marginTop:12,marginBottom:12,padding:10}}>
        <Search size={15}/>
-       <span style={{fontSize:11}}>已启用影视源并发搜索，当前源不会重复搜索。</span>
+       <span style={{fontSize:11}}>已启用影视源逐个搜索，当前源不会重复搜索；每个源返回后立即显示。</span>
      </div>
      {loading&&<div className="empty compact"><span>正在搜索其他影视源…</span></div>}
      {!loading&&error&&<div className="empty compact"><span>{error}</span></div>}
