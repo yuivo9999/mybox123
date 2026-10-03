@@ -18,11 +18,11 @@ import java.util.Locale;
 /**
  * Stage-3 TVBox JAR runtime boundary.
  *
- * This stage deliberately implements acquisition, integrity verification and
- * ABI discovery only. It does not execute arbitrary downloaded bytecode.
- * Actual Spider invocation is enabled only after a compatible host ABI is
- * present; this prevents a random JAR from gaining the application's Android
- * privileges merely because a config references it.
+ * Stage-4 JAR runtime boundary. JARs are acquired into a verified app cache,
+ * inspected, then loaded through DexClassLoader against the host CatVod Spider
+ * ABI. This is an execution boundary, not a security sandbox: downloaded JAR
+ * bytecode can access whatever Android APIs the host process exposes, so only
+ * explicitly classified Spider sources should reach execution.
  */
 public final class TVBoxJarBridge {
     public static final String JS_NAME = "TVBoxJarBridge";
@@ -31,9 +31,11 @@ public final class TVBoxJarBridge {
     private static final int MAX_JAR_BYTES = 20 * 1024 * 1024;
 
     private final Context context;
+    private final TVBoxJarExecutor executor;
 
     public TVBoxJarBridge(Context context) {
         this.context = context.getApplicationContext();
+        this.executor = new TVBoxJarExecutor(this.context);
     }
 
     @JavascriptInterface
@@ -44,9 +46,9 @@ public final class TVBoxJarBridge {
             result.put("available", true);
             result.put("stage", 3);
             result.put("supportedKinds", new org.json.JSONArray().put("jar"));
-            result.put("supportedOperations", new org.json.JSONArray().put("prepare").put("inspect"));
-            result.put("executionEnabled", false);
-            result.put("reason", "JAR_ACQUIRE_VERIFY_INSPECT_ONLY");
+            result.put("supportedOperations", new org.json.JSONArray().put("prepare").put("inspect").put("home").put("category").put("detail").put("search").put("play"));
+            result.put("executionEnabled", true);
+            result.put("reason", "CATVOD_SPIDER_ABI_DEXCLASSLOADER");
             return result.toString();
         } catch (Exception e) {
             return "{\"available\":false,\"reason\":\"TVBOX_JAR_CAPABILITY_ERROR\"}";
@@ -61,6 +63,8 @@ public final class TVBoxJarBridge {
             JSONObject data = input.optJSONObject("payload");
             if ("prepare".equals(operation)) return prepare(data);
             if ("inspect".equals(operation)) return inspect(data);
+            if ("home".equals(operation) || "category".equals(operation) || "detail".equals(operation)
+                    || "search".equals(operation) || "play".equals(operation)) return executeSpider(operation, data);
             return error("TVBOX_JAR_OPERATION_UNSUPPORTED");
         } catch (SecurityException e) {
             return error(e.getMessage() == null ? "TVBOX_JAR_SECURITY_ERROR" : e.getMessage());
@@ -94,8 +98,16 @@ public final class TVBoxJarBridge {
         result.put("path", target.getAbsolutePath());
         result.put("size", target.length());
         result.put("md5", actualMd5);
-        result.put("executionEnabled", false);
+        result.put("executionEnabled", true);
         return result.toString();
+    }
+
+    private String executeSpider(String operation, JSONObject data) throws Exception {
+        if (data == null) throw new IllegalArgumentException("TVBOX_JAR_PAYLOAD_REQUIRED");
+        String path = data.optString("path", "");
+        if (path.isEmpty()) throw new IllegalArgumentException("TVBOX_JAR_PATH_REQUIRED");
+        String className = data.optString("className", "");
+        return executor.invoke(new File(path), className, operation, data);
     }
 
     private String inspect(JSONObject data) throws Exception {
