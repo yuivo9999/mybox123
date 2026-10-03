@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { ChevronLeft, Clock3, Database, Film, Info, Radio, Search, Server, Settings, Trash2, Check, Download, Upload, X } from 'lucide-react';
+import { ChevronLeft, Clock3, Database, Film, Info, Radio, Search, Server, Settings, Trash2, Check, Download, Upload, X, ArrowLeft, CheckSquare, Square, Power, PowerOff, RefreshCw } from 'lucide-react';
 import { LiveFeature } from '../features/live/LiveFeature.jsx';
 import { SmartImage, EmptyState } from '../components/StateViews.jsx';
 import { sourceConfigService } from '../services/sourceConfigService.js';
 
 function Main({tab,movies,channels,favorites,history,sources,searches,progress,settings,onTab,onMovie,onLive,onLiveChannel,onSearchHistory,toggleFavorite,onClearData,onClearHistory,onSaveSources,onClearSearches,onRemoveSearch,onClearCache,onSourceEnabled,onSourceActive,onTestSource,onRemoveSource,onUpdateSettings}){
  const [favoriteSection,setFavoriteSection]=useState('movies');
- const [confirm,setConfirm]=useState(null); const [sourceForm,setSourceForm]=useState(null);
+ const [confirm,setConfirm]=useState(null); const [sourceForm,setSourceForm]=useState(null); const [batchMode,setBatchMode]=useState(false);
  if(tab==='live') return <LiveFeature channels={channels} sources={sources} favorites={favorites} onChannel={onLiveChannel} onPlay={onLive} onTab={onTab} toggleFavorite={toggleFavorite}/>;
  if(tab==='favorites'){
   const favoriteContentRecords=favorites.filter(i=>i.targetType==='content');
@@ -20,7 +20,7 @@ function Main({tab,movies,channels,favorites,history,sources,searches,progress,s
   return <Page><Header title="播放历史"/>{historyMovies.length?<div className="movie-grid">{historyMovies.filter(({movie})=>movie).map(({movie,item})=>{const ep=movie.episodes?.find(e=>e.episodeId===item.episodeId);const pct=item.durationSeconds?Math.min(100,Math.round(item.positionSeconds/item.durationSeconds*100)):0;return <article className="movie-card history-card" key={item.historyId} onClick={()=>onMovie(movie)}><SmartImage src={movie.poster} alt={movie.title}/><div><b>{movie.title}</b><span>{ep?.title??'继续观看'} · {pct}%</span><small>最近观看：{new Date(item.lastPlayedAt||Date.now()).toLocaleString()}</small></div></article>})}</div>:<Empty text="还没有播放历史"/>}{historyMovies.filter(({movie})=>!movie).map(({item})=><div className="info-card" key={item.historyId}><Database size={18}/><div><b>暂时无法找到来源</b><span>播放历史已保留：{item.targetId}</span></div></div>)}{historyChannels.length>0&&<><SectionTitle title="Live"/><div className="channel-list">{historyChannels.map(c=><button className="menu" key={c.channelId} onClick={()=>onLiveChannel(c)}><Radio size={18}/><span>{c.name}<small>{c.category}</small></span><ChevronLeft className="flip" size={17}/></button>)}</div></>}</Page>;
  }
  if(tab==='search-history') return <Page><Header title="搜索历史"/><div className="actions"><button className="secondary" disabled={!searches.length} onClick={()=>setConfirm({type:'searches'})}>清空搜索历史</button></div><div className="history-list">{searches.map(i=><div className="menu" key={i.searchId}><Search size={18}/><button className="history-keyword" onClick={()=>onSearchHistory(i.keyword)}>{i.keyword}</button><em>{i.count} 次</em><button className="icon-button" aria-label="删除历史" onClick={()=>setConfirm({type:'search',id:i.searchId})}>×</button></div>)}{!searches.length&&<Empty text="还没有搜索历史"/>}</div>{confirm&&<ConfirmDialog title={confirm.type==='searches'?'清空搜索历史？':'删除这条搜索历史？'} onCancel={()=>setConfirm(null)} onConfirm={()=>{if(confirm.type==='searches')onClearSearches();else onRemoveSearch(confirm.id);setConfirm(null)}}/>}</Page>;
-  if(tab==='sources') return <Page><Header title="源管理"/><div className="actions"><button className="secondary" onClick={()=>setSourceForm({sourceType:'live',name:''})}>添加源</button><button className="secondary" onClick={()=>sourceConfigService.download(sources)}><Download size={16}/>导出</button><label className="secondary file-button"><Upload size={16}/>导入<input type="file" accept=".json,.txt,.m3u,application/json,text/plain" hidden onChange={async e=>{const file=e.target.files?.[0];if(!file)return;try{const parsed=await sourceConfigService.importFile(file);await onSaveSources(parsed)}catch(error){console.error(error)}finally{e.target.value=''}}}/></label></div><SectionTitle title="影视源"/><SourceList sources={sources.filter(s=>s.sourceType==='movie')} onEnabled={onSourceEnabled} onActive={onSourceActive} onTest={onTestSource} onRemove={onRemoveSource}/><SectionTitle title="Live 源"/><SourceList sources={sources.filter(s=>s.sourceType==='live')} onEnabled={onSourceEnabled} onActive={onSourceActive} onTest={onTestSource} onRemove={onRemoveSource}/><InfoCard title="源边界" text="影视源与 Live 源独立管理。支持标准 JSON 格式、M3U 播放列表以及 #genre# 分类 TXT 电视直播源文件。"/>{sourceForm&&<SourceForm value={sourceForm} onCancel={()=>setSourceForm(null)} onSave={source=>{
+  if(tab==='sources') return <Page><Header title="源管理"/><div className="actions"><button className="secondary" onClick={()=>setSourceForm({sourceType:'live',name:''})}>添加源</button><button className="secondary" onClick={()=>sourceConfigService.download(sources)}><Download size={16}/>导出</button><label className="secondary file-button"><Upload size={16}/>导入<input type="file" accept=".json,.txt,.m3u,application/json,text/plain" hidden onChange={async e=>{const file=e.target.files?.[0];if(!file)return;try{const parsed=await sourceConfigService.importFile(file);await onSaveSources(parsed)}catch(error){console.error(error)}finally{e.target.value=''}}}/></label><button className="secondary" onClick={()=>setBatchMode(true)}><CheckSquare size={16}/>批量</button></div>{batchMode?<BatchSourceManager sources={sources} onBack={()=>setBatchMode(false)} onEnabled={onSourceEnabled} onTest={onTestSource} onRemove={onRemoveSource}/>:<><SectionTitle title="影视源"/><SourceList sources={sources.filter(s=>s.sourceType==='movie')} onEnabled={onSourceEnabled} onActive={onSourceActive} onTest={onTestSource} onRemove={onRemoveSource}/><SectionTitle title="Live 源"/><SourceList sources={sources.filter(s=>s.sourceType==='live')} onEnabled={onSourceEnabled} onActive={onSourceActive} onTest={onTestSource} onRemove={onRemoveSource}/></>}<InfoCard title="源边界" text="影视源与 Live 源独立管理。支持标准 JSON 格式、M3U 播放列表以及 #genre# 分类 TXT 电视直播源文件。"/>{sourceForm&&<SourceForm value={sourceForm} onCancel={()=>setSourceForm(null)} onSave={source=>{
   const additions = Array.isArray(source) ? source : [{...source,sourceId:`source_${source.sourceType}_${Date.now()}`,enabled:true,status:'未测试'}];
   onSaveSources([...sources,...additions]);
   setSourceForm(null);
@@ -66,6 +66,72 @@ function Main({tab,movies,channels,favorites,history,sources,searches,progress,s
  if(tab==='data-management') return <Page><Header title="数据管理"/><Menu icon={Trash2} title="清理用户数据" onClick={()=>setConfirm({type:'all'})}/><Menu icon={Database} title="清理缓存" onClick={onClearCache}/><InfoCard title="不可逆操作" text="用户数据清理会删除收藏、历史、播放进度和搜索历史；源配置不会删除。"/>{confirm&&<ConfirmDialog title="确认清理用户数据？" onCancel={()=>setConfirm(null)} onConfirm={()=>{onClearData();setConfirm(null)}}/>}</Page>;
  if(tab==='about') return <Page><Header title="关于"/><InfoCard title="TVBox React" text="安卓手机竖屏影视与 Live 内容聚合应用。"/><InfoCard title="版本" text="0.3.0 · 产品架构实现版"/><InfoCard title="版权与开源" text="本项目遵循仓库中声明的开源与第三方依赖许可要求。"/><InfoCard title="架构" text="影视、Live、用户数据、源管理与播放内核保持独立边界。"/></Page>;
  return <Page><Header title="我的"/><div className="profile"><div className="avatar">T</div><div><b>TVBox 用户</b><span>本地数据独立存储 · 产品架构版</span></div></div><Menu icon={Clock3} title="播放历史" onClick={()=>onTab('history')} badge={history.length}/><Menu icon={Search} title="搜索历史" onClick={()=>onTab('search-history')} badge={searches.length}/><Menu icon={Server} title="源管理" onClick={()=>onTab('sources')} badge={sources.length}/><Menu icon={Settings} title="设置" onClick={()=>onTab('settings')}/><Menu icon={Database} title="数据管理" onClick={()=>onTab('data-management')}/><Menu icon={Info} title="关于" onClick={()=>onTab('about')}/></Page>;
+}
+function BatchSourceManager({sources,onBack,onEnabled,onTest,onRemove}){
+  const [selectedIds,setSelectedIds]=useState([]);
+  const [filter,setFilter]=useState('all');
+  const [busy,setBusy]=useState(false);
+  const [notice,setNotice]=useState('');
+  const [confirmDelete,setConfirmDelete]=useState(false);
+  const visibleSources=sources.filter(source=>filter==='all'||source.sourceType===filter);
+  const selectedSources=sources.filter(source=>selectedIds.includes(source.sourceId));
+  const allVisibleSelected=visibleSources.length>0&&visibleSources.every(source=>selectedIds.includes(source.sourceId));
+  const toggle=(id)=>setSelectedIds(ids=>ids.includes(id)?ids.filter(item=>item!==id):[...ids,id]);
+  const toggleAll=()=>setSelectedIds(ids=>allVisibleSelected?ids.filter(id=>!visibleSources.some(source=>source.sourceId===id)):[...new Set([...ids,...visibleSources.map(source=>source.sourceId)])]);
+  const clearSelection=()=>setSelectedIds([]);
+  const runBatch=async(action)=>{
+    if(!selectedSources.length||busy)return;
+    setBusy(true); setNotice('正在处理…');
+    try{
+      for(const source of selectedSources){
+        if(action==='enable'&&source.enabled===false) await onEnabled?.(source.sourceId,true);
+        if(action==='disable'&&source.enabled!==false) await onEnabled?.(source.sourceId,false);
+        if(action==='test'&&!String(source.sourceCapability||'').startsWith('tvbox-')&&!String(source.adapterType||'').startsWith('tvbox-')) await onTest?.(source);
+        if(action==='remove') await onRemove?.(source.sourceId);
+      }
+      setNotice(action==='remove'?'已删除所选源':action==='test'?'已提交所选源测试':action==='enable'?'已启用所选源':'已停用所选源');
+      if(action==='remove') setSelectedIds([]);
+    }catch(error){console.error('Batch source action failed',error);setNotice('批量操作未能全部完成，请检查源状态。');}
+    finally{setBusy(false);setConfirmDelete(false);}
+  };
+  return <div className="batch-source-page">
+    <div className="batch-source-header">
+      <button className="secondary icon-text-button" onClick={onBack} disabled={busy}><ArrowLeft size={17}/>返回源管理</button>
+      <div className="batch-source-title"><span className="eyebrow">SOURCE MANAGEMENT</span><h3>批量管理源</h3><small>已选择 {selectedSources.length} / {sources.length}</small></div>
+    </div>
+    <div className="batch-source-toolbar">
+      <div className="batch-source-filters">
+        <button className={filter==='all'?'primary':'secondary'} onClick={()=>setFilter('all')} disabled={busy}>全部 {sources.length}</button>
+        <button className={filter==='movie'?'primary':'secondary'} onClick={()=>setFilter('movie')} disabled={busy}>影视 {sources.filter(s=>s.sourceType==='movie').length}</button>
+        <button className={filter==='live'?'primary':'secondary'} onClick={()=>setFilter('live')} disabled={busy}>Live {sources.filter(s=>s.sourceType==='live').length}</button>
+      </div>
+      <div className="batch-source-selection-actions">
+        <button className="secondary" onClick={toggleAll} disabled={!visibleSources.length||busy}>{allVisibleSelected?'取消全选':'全选当前'}</button>
+        <button className="secondary" onClick={clearSelection} disabled={!selectedSources.length||busy}>清空选择</button>
+      </div>
+    </div>
+    <div className="batch-source-actions">
+      <button className="secondary" onClick={()=>runBatch('enable')} disabled={!selectedSources.length||busy}><Power size={16}/>启用</button>
+      <button className="secondary" onClick={()=>runBatch('disable')} disabled={!selectedSources.length||busy}><PowerOff size={16}/>停用</button>
+      <button className="secondary" onClick={()=>runBatch('test')} disabled={!selectedSources.length||busy}><RefreshCw size={16}/>批量测试</button>
+      <button className="danger-button" onClick={()=>setConfirmDelete(true)} disabled={!selectedSources.length||busy}><Trash2 size={16}/>删除所选 ({selectedSources.length})</button>
+    </div>
+    {notice&&<div className="batch-source-notice">{notice}</div>}
+    <div className="batch-source-list">
+      {visibleSources.map(source=>{
+        const checked=selectedIds.includes(source.sourceId);
+        const unsupported=String(source.sourceCapability||'').startsWith('tvbox-')||String(source.adapterType||'').startsWith('tvbox-');
+        return <button className={`batch-source-row${checked?' selected':''}`} key={source.sourceId} onClick={()=>toggle(source.sourceId)} disabled={busy}>
+          <span className="batch-source-check">{checked?<CheckSquare size={20}/>:<Square size={20}/>}</span>
+          <span className="batch-source-info"><b>{source.name}</b><small>{source.sourceType==='live'?'Live 源':'影视源'} · {source.status}{source.enabled===false?' · 已停用':''}{source.isActive?' · 当前使用':''}{unsupported?' · 待适配':''}</small></span>
+          <span className={`batch-source-state ${source.enabled===false?'off':''}`}>{source.enabled===false?'停用':'启用'}</span>
+        </button>;
+      })}
+      {!visibleSources.length&&<Empty text="暂无可管理的源"/>}
+    </div>
+    <div className="batch-source-tip"><Info size={16}/><span>批量删除不可撤销；启用、停用和测试会逐个调用现有源管理逻辑，不会绕过当前源的安全检查。</span></div>
+    {confirmDelete&&<ConfirmDialog title={`确定删除已选择的 ${selectedSources.length} 个源吗？`} onCancel={()=>setConfirmDelete(false)} onConfirm={()=>runBatch('remove')}/>} 
+  </div>;
 }
 function SourceList({sources,onEnabled,onActive,onTest,onRemove}){
   const [removeId,setRemoveId]=useState(null);
