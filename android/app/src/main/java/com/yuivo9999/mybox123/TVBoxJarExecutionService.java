@@ -11,6 +11,14 @@ import android.os.ParcelFileDescriptor;
 
 import org.json.JSONObject;
 
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
 /**
  * Isolated-process CatVod Spider execution boundary.
  *
@@ -39,6 +47,7 @@ public final class TVBoxJarExecutionService extends Service {
 
     private HandlerThread handlerThread;
     private Messenger messenger;
+    private final ExecutorService spiderExecutor = Executors.newSingleThreadExecutor();
 
     @Override
     public void onCreate() {
@@ -58,6 +67,7 @@ public final class TVBoxJarExecutionService extends Service {
         if (handlerThread != null) handlerThread.quitSafely();
         handlerThread = null;
         messenger = null;
+        spiderExecutor.shutdownNow();
         super.onDestroy();
     }
 
@@ -100,16 +110,34 @@ public final class TVBoxJarExecutionService extends Service {
             String payload = request.getData().getString(KEY_PAYLOAD, "{}");
             descriptor = request.getData().getParcelable(KEY_JAR_FD);
             if (descriptor == null) throw new IllegalArgumentException("TVBOX_JAR_FD_REQUIRED");
-            JSONObject data = new JSONObject(payload == null || payload.isEmpty() ? "{}" : payload);
-            TVBoxJarIsolatedExecutor executor = new TVBoxJarIsolatedExecutor(getApplicationContext());
-            reply(request, executor.invoke(descriptor, className, operation, data), MSG_RESULT);
+            final ParcelFileDescriptor executionDescriptor = descriptor;
+            final JSONObject data = new JSONObject(payload == null || payload.isEmpty() ? "{}" : payload);
+            final TVBoxJarIsolatedExecutor executor = new TVBoxJarIsolatedExecutor(getApplicationContext());
+            final String executionOperation = operation;
+            final String executionClassName = className;
+            Future<String> future = spiderExecutor.submit(new Callable<String>() {
+                @Override public String call() throws Exception {
+                    return executor.invoke(executionDescriptor, executionClassName, executionOperation, data);
+                }
+            });
             descriptor = null;
+            try {
+                reply(request, future.get(20_000L, TimeUnit.MILLISECONDS), MSG_RESULT);
+            } catch (TimeoutException timeout) {
+                future.cancel(true);
+                reply(request, error("TVBOX_JAR_ISOLATED_EXECUTION_TIMEOUT"), MSG_RESULT);
+            } catch (ExecutionException failure) {
+                Throwable cause = failure.getCause();
+                reply(request, error(cause == null || cause.getMessage() == null
+                        ? "TVBOX_JAR_ISOLATED_EXECUTION_FAILED" : cause.getMessage()), MSG_RESULT);
+            } finally {
+                try { executionDescriptor.close(); } catch (Exception ignored) { }
+            }
         } catch (Throwable error) {
-            reply(request, error(error.getMessage() == null ? "TVBOX_JAR_ISOLATED_EXECUTION_ERROR" : error.getMessage()), MSG_RESULT);
-        } finally {
             if (descriptor != null) {
                 try { descriptor.close(); } catch (Exception ignored) { }
             }
+            reply(request, error(error.getMessage() == null ? "TVBOX_JAR_ISOLATED_EXECUTION_ERROR" : error.getMessage()), MSG_RESULT);
         }
     }
 
