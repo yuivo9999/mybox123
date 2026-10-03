@@ -1,4 +1,5 @@
 import { contentService } from './contentService.js';
+import { MEDIA_TYPE, MEDIA_TAXONOMY } from '../config/mediaTaxonomy.js';
 import { cacheStorage, CacheNamespace, createCacheKey } from '../storage/cache.js';
 
 function sourceIdentity(movies = []) {
@@ -21,6 +22,8 @@ function applyFilters(items, filters = {}) {
     if (filters.type && filters.type !== '全部' && movie.type !== filters.type) return false;
     if (filters.region && filters.region !== '全部' && movie.region !== filters.region) return false;
     if (filters.status && filters.status !== '全部' && movie.status !== filters.status) return false;
+    if (filters.mediaType && filters.mediaType !== 'all' && movie.mediaType !== filters.mediaType) return false;
+    if (filters.categoryId && filters.categoryId !== 'all' && !(movie.categoryIds ?? []).includes(filters.categoryId)) return false;
     return true;
   });
 }
@@ -57,7 +60,13 @@ export const movieService = {
     const key = createCacheKey({ namespace: CacheNamespace.MOVIE, sourceId: sourceIdentity(movies), contentId: 'list', params: { category, page: safePage, pageSize: safePageSize, filters, sort } });
     const cached = cacheStorage.get(CacheNamespace.MOVIE, key, { allowStale: true });
     if (cached.hit && !cached.stale) return cached.value;
-    let filtered = movies.filter((movie) => category === '全部' || movie.category === category || (category === '电视剧' && movie.episodes?.length > 1));
+    let filtered = movies.filter((movie) => {
+      if (category === '全部') return true;
+      if (category === '电影') return movie.mediaType === MEDIA_TYPE.MOVIE;
+      if (category === '电视剧') return movie.mediaType === MEDIA_TYPE.TV;
+      if (category === '综艺') return movie.mediaType === MEDIA_TYPE.VARIETY;
+      return (movie.categoryIds ?? []).includes(category) || (movie.categoryLabels ?? []).includes(category) || movie.category === category;
+    });
     filtered = sortItems(applyFilters(filtered, filters), sort);
     const start = (safePage - 1) * safePageSize;
     const value = { items: filtered.slice(start, start + safePageSize), page: safePage, pageSize: safePageSize, total: filtered.length, hasMore: start + safePageSize < filtered.length };
@@ -68,7 +77,7 @@ export const movieService = {
     const key = createCacheKey({ namespace: CacheNamespace.MOVIE, sourceId: sourceIdentity(movies), contentId: 'search', params: { keyword: clean } });
     const cached = cacheStorage.get(CacheNamespace.MOVIE, key, { allowStale: true });
     if (cached.hit && !cached.stale) return cached.value;
-    const value = movies.filter((movie) => normalizeText(movie.title).includes(clean) || normalizeText(movie.description).includes(clean) || normalizeText(movie.category).includes(clean));
+    const value = movies.filter((movie) => normalizeText(movie.title).includes(clean) || normalizeText(movie.description).includes(clean) || normalizeText(movie.category).includes(clean) || (movie.categoryLabels ?? []).some(label => normalizeText(label).includes(clean)));
     cacheStorage.set(CacheNamespace.MOVIE, key, value); return value;
   },
   getDetail({ movies = [], contentId } = {}) { return cachedDetail(movies, contentId); },
@@ -86,12 +95,33 @@ export const movieService = {
   },
   getHome({ movies = [], history = [], progress = [], limit = 4 } = {}) {
     const continueWatching = getContinueWatching({ movies, history, progress, limit });
-    const categories = [...new Set(movies.map((movie) => movie.category).filter(Boolean))];
+    const categories = ['电影', '电视剧', '综艺'];
+    const taxonomy = {
+      movie: MEDIA_TAXONOMY.movie.map(item => item.label),
+      tv: MEDIA_TAXONOMY.tv.map(item => item.label),
+      variety: MEDIA_TAXONOMY.variety.map(item => item.label),
+    };
     const regions = [...new Set(movies.map((movie) => movie.region).filter(Boolean))];
     const years = [...new Set(movies.map((movie) => movie.year).filter(Boolean))].sort((a,b) => Number(b)-Number(a));
     const statuses = [...new Set(movies.map((movie) => movie.status).filter(Boolean))];
     const types = [...new Set(movies.map((movie) => movie.type).filter(Boolean))];
-    return { continueWatching, recommended: movies.slice(0, limit), popular: movies.slice(0, limit), latest: [...movies].sort((a,b)=>Number(b.year||0)-Number(a.year||0)).slice(0, limit), categories, filters: { types, regions, years, statuses } };
+    const byType = (mediaType) => movies.filter(movie => movie.mediaType === mediaType);
+    const latest = [...movies].sort((a,b)=>Number(b.year||0)-Number(a.year||0));
+    return {
+      continueWatching,
+      recommended: movies.slice(0, limit),
+      popular: movies.slice(0, limit),
+      latest: latest.slice(0, limit),
+      popularMovies: byType(MEDIA_TYPE.MOVIE).slice(0, limit),
+      popularSeries: byType(MEDIA_TYPE.TV).slice(0, limit),
+      popularVariety: byType(MEDIA_TYPE.VARIETY).slice(0, limit),
+      movieRanking: [...byType(MEDIA_TYPE.MOVIE)].sort((a,b)=>Number(b.popularity??b.rating??0)-Number(a.popularity??a.rating??0)).slice(0, limit),
+      tvRanking: [...byType(MEDIA_TYPE.TV)].sort((a,b)=>Number(b.popularity??b.rating??0)-Number(a.popularity??a.rating??0)).slice(0, limit),
+      varietyRanking: [...byType(MEDIA_TYPE.VARIETY)].sort((a,b)=>Number(b.popularity??b.rating??0)-Number(a.popularity??a.rating??0)).slice(0, limit),
+      categories,
+      taxonomy,
+      filters: { types, regions, years, statuses },
+    };
   },
   clearCache() { cacheStorage.clear(CacheNamespace.MOVIE); cacheStorage.clear(CacheNamespace.DETAIL); cacheStorage.clear(CacheNamespace.EPISODE); },
 };
