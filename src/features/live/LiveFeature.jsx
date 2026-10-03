@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, startTransition } from 'react';
-import { ChevronLeft, Heart, Play, Radio } from 'lucide-react';
+import { ChevronLeft, Heart, Play, Radio, ListVideo } from 'lucide-react';
 import { liveService } from '../../services/liveService.js';
 import { playbackService } from '../../services/playbackService.js';
 import { requestManager } from '../../services/requestManager.js';
@@ -272,6 +272,9 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
         resolvedInput={resolvedPlaybackInput}
         isLive
         terminalTag={activeChannel ? 'LIVE · ' + activeChannel.name : 'LIVE · 等待频道'}
+        channelGroups={grouped}
+        activeChannelId={activeChannel?.channelId || ''}
+        onSelectChannel={selectChannel}
       >
         <video ref={videoRef} controls playsInline className="sangtian-video-element" />
       </SangtianPlayerWindow>
@@ -282,6 +285,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
             <span className="live-pill">● 正在直播</span>
             <b>{activeChannel.name}</b>
             <small>{activeChannel.category} · {activeStream?.label || (streamLoading ? '正在读取地址…' : '等待播放')}</small>
+            <span className="live-current-source">源 {activeStream?.sourceId || activeChannel.sourceRefs?.[0]?.sourceId || '—'} · {activeChannel.streams?.length || 0} 条线路</span>
           </div>
           <div className="live-current-actions">
             {activeChannel.streams?.length > 1 && activeChannel.streams.map((stream, index) => (
@@ -305,8 +309,11 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
 
       {hasEnabledLiveSource && (
         <>
-          <div className="section-title">
-            <h3>频道文件树</h3>
+          <div className="section-title live-channel-section-title">
+            <div>
+              <h3>频道文件树</h3>
+              <small>{allChannels.length ? grouped.length + ' 个分组 · ' + allChannels.length + ' 个频道' : '正在建立频道索引'}</small>
+            </div>
             {tv1Loading && <small>正在读取频道名称：{tv1LoadedCount}</small>}
           </div>
 
