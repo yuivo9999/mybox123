@@ -32,4 +32,13 @@ export const tv1LiveService = {
       capabilities: { search: true, categories: true, multiStream: true, epg: false, currentProgram: false, upcomingProgram: false },
     })).filter(channel => channel.streams.length);
   },
+
+  async healthCheck(source, options = {}) {
+    try {
+      await this.load(source, options);
+      return { ok: true, sourceId: source.sourceId, status: 'healthy', checkedAt: Date.now(), error: null };
+    } catch (error) {
+      return { ok: false, sourceId: source.sourceId, status: 'error', checkedAt: Date.now(), error };
+    }
+  },
 };
