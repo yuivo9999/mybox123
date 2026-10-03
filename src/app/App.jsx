@@ -274,6 +274,25 @@ export function App(){
 
 function AppFrame({children}){return <div className="app-shell"><div className="screen">{children}</div></div>}
 function BottomNav({tab,onTab}){return <nav>{[['home',Home,'首页'],['movies',Film,'影视'],['live',Radio,'直播'],['favorites',Heart,'收藏'],['me',User,'我的']].map(([key,Icon,label])=><button className={tab===key?'active':''} onClick={()=>onTab(key)} key={key}><Icon size={21} fill={tab===key?'currentColor':'none'}/><span>{label}</span></button>)}</nav>}
-export function AppRoot(){return <ErrorBoundary><App/></ErrorBoundary>}
+export function AppRoot(){
+ const {tab,route,selected}=useSessionState();
+ const recoverFromPageError=()=>{
+   if(route==='movie-play'){
+     const returnRoute=selected?.metadata?.returnRoute||'detail';
+     sessionStateStore.patch({tab:'movies',route:returnRoute,selected:returnRoute==='detail'?selected:null});
+   }else if(route==='detail'||route==='search'){
+     sessionStateStore.patch({tab:'movies',route:null,selected:null});
+   }else if(route==='live-play'){
+     sessionStateStore.patch({tab:'live',route:'live-channel',selected:selected?.channelId?{...selected}:null});
+   }else if(route==='live-channel'){
+     sessionStateStore.patch({tab:'live',route:null,selected:null});
+   }else if(route==='appearance'){
+     sessionStateStore.patch({tab:'settings',route:null,selected:null});
+   }else if(route==='settings'||route==='sources'||route==='data-management'||route==='history'||route==='search-history'){
+     sessionStateStore.patch({tab:'me',route:null,selected:null});
+   }
+ };
+ return <ErrorBoundary onReset={recoverFromPageError}><App/></ErrorBoundary>;
+}
 
 function FirstLaunch({onLater,onSources}){return <div className="app-shell"><div className="screen"><main className="page first-launch"><div className="profile"><div className="avatar">T</div><div><span className="eyebrow">TVBOX REACT</span><h1>欢迎使用</h1><span>当前还没有配置内容源</span></div></div><div className="actions"><button className="primary" onClick={onSources}>去添加源</button><button className="secondary" onClick={onLater}>稍后设置</button></div></main></div></div>}
