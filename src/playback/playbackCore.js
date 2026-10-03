@@ -66,6 +66,19 @@ export function createPlaybackCore(task,hooks={}) {
 
  const resolve=async(candidate=task.currentCandidate,options={})=>{
   if(!candidate)return null;
+  // Live 使用源提供的原始 mediaUrl，完全跳过影视解析器链。
+  if(task.request.kind===PlaybackKind.LIVE){
+   const directInput={
+    ...candidate,
+    url:candidate.mediaUrl,
+    mediaUrl:candidate.mediaUrl,
+    session:null,
+    parserSkipped:true,
+    playerHint:{autoplay:true,...(candidate.playerHint??{})},
+   };
+   hooks.onResolvedInput?.(directInput);
+   return directInput;
+  }
   if(sessionId)playbackSessionManager.clear(sessionId);
   sessionId=playbackSessionManager.create(candidate);
   try{
@@ -81,7 +94,7 @@ export function createPlaybackCore(task,hooks={}) {
    failAndResolve(normalized,failureCode);
    return null;
   }
- };
+ }
 
  const playResolved=async(input)=>{
   if(!player)throw new Error('PLAYER_ADAPTER_NOT_ATTACHED');
