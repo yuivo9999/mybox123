@@ -70,11 +70,23 @@ function MovieSourceSelector({sources=[],selectedSourceId,onChange}){
 
 function MovieCatalog({movies,state,setState,onMovie,onPlay,onSearch,recordSearch,sources=[]}){
  const home=useMemo(()=>movieService.getHome({movies}),[movies]); const categories=['全部','电影','电视剧','综艺'];
+ const [queryInput,setQueryInput]=useState(state.query||'');
+ useEffect(()=>{
+  const current=String(state.query||'');
+  if(current!==queryInput)setQueryInput(current);
+ },[state.query]);
+ useEffect(()=>{
+  const normalized=String(queryInput||'').trim();
+  const persisted=String(state.query||'').trim();
+  if(normalized===persisted)return;
+  const timer=setTimeout(()=>setState({query:queryInput,page:1}),300);
+  return()=>clearTimeout(timer);
+ },[queryInput,state.query,setState]);
  const selectedType=state.category==='电影'?'movie':state.category==='电视剧'?'tv':state.category==='综艺'?'variety':null;
  const subcategories=selectedType?(home.taxonomy?.[selectedType]??[]):[];
  const listMeta=movieService.list({movies,...state}); const apply=(patch)=>setState({...patch,page:1});
  const filters=home.filters??{}; const values=(key)=>['全部',...(filters[key]??[])];
- return <Page><Header title="影视"/><div className="searchbox"><Search size={18}/><input value={state.query} onChange={e=>setState({query:e.target.value,page:1})} onKeyDown={e=>e.key==='Enter'&&recordSearch(state.query)} placeholder="搜索影视内容"/>{state.query&&<X size={16} onClick={()=>setState({query:'',page:1})}/>}</div>
+ return <Page><Header title="影视"/><div className="searchbox"><Search size={18}/><input value={queryInput} onChange={e=>setQueryInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){setState({query:queryInput,page:1});recordSearch(queryInput)}}} placeholder="搜索影视内容"/>{queryInput&&<X size={16} onClick={()=>setQueryInput('')}/>}</div>
  <div className="chips">{categories.map(item=><button className={state.category===item?'active':''} onClick={()=>apply({category:item,filters:{...state.filters,categoryId:''}})} key={item}>{item}</button>)}</div>
  {selectedType&&<div className="chips">{subcategories.map(item=>{const selected=state.filters.categoryId===item.id;return <button className={selected?'active':''} onClick={()=>setState({filters:{...state.filters,categoryId:selected?'':item.id},page:1})} key={item.id}>{item.label}</button>})}</div>}
  <div className="filter-row"><select value={state.filters.type||'全部'} onChange={e=>setState({filters:{...state.filters,type:e.target.value==='全部'?'':e.target.value},page:1})}>{values('types').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.year||'全部'} onChange={e=>setState({filters:{...state.filters,year:e.target.value==='全部'?'':e.target.value},page:1})}>{values('years').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.region||'全部'} onChange={e=>setState({filters:{...state.filters,region:e.target.value==='全部'?'':e.target.value},page:1})}>{values('regions').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.status||'全部'} onChange={e=>setState({filters:{...state.filters,status:e.target.value==='全部'?'':e.target.value},page:1})}>{values('statuses').map(x=><option key={x}>{x}</option>)}</select><select value={state.sort} onChange={e=>setState({sort:e.target.value,page:1})}>{[['default','默认'],['latest','最新'],['popular','热门'],['time','时间'],['title','名称']].map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></div>
