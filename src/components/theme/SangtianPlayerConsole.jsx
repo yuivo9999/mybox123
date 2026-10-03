@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
-  Copy, Download, Maximize2, Minimize2, RotateCw, Tv, Sparkles, Terminal, Paperclip,
-  Play, Clock3, ArrowUp, ChevronDown,
+  Copy, Maximize2, Minimize2, RotateCw, Tv, Sparkles, Terminal, Paperclip,
+  Play, ArrowUp, ChevronDown,
   FileText, LayoutGrid, SlidersHorizontal, Check, RefreshCw, Ratio
 } from 'lucide-react';
 
@@ -119,6 +119,9 @@ export function SangtianPlayerWindow({
     if (video.paused) video.play().catch(() => {}); else video.pause();
   };
   const fullscreen = isSystemFullscreen || isWebFullscreen;
+  const renderedChildren = isLive
+    ? React.Children.map(children, child => React.isValidElement(child) ? React.cloneElement(child, { controls: !fullscreen }) : child)
+    : children;
   const bufferPct = duration > 0 ? Math.min(100, (bufferedSeconds / duration) * 100) : 0;
   const loadSpeed = bufferRate > 0 ? `${bufferRate.toFixed(1)} 秒/秒` : '—';
 
@@ -128,7 +131,6 @@ export function SangtianPlayerWindow({
         <div className="sangtian-window-tag"><span>{terminalTag}</span></div>
         <div className="sangtian-window-actions">
           <button className="sangtian-window-btn" onClick={handleCopyLink} title="复制播放链接">{copied ? <Check size={13}/> : <Copy size={13}/>}<span>{copied ? '已复制' : '复制'}</span></button>
-          <button className={`sangtian-window-btn ${showTerminal ? 'active' : ''}`} onClick={() => setShowTerminal(v=>!v)} title="播放信息">{showTerminal ? <Play size={13}/> : <Download size={13}/>}<span>{showTerminal ? '画面' : '信息'}</span></button>
           <button className={`sangtian-window-btn ${isLandscape ? 'active' : ''}`} onClick={handleToggleLandscape} title="方向"><RotateCw size={13}/><span>{isLandscape ? '竖屏' : '横屏'}</span></button>
           <button className={`sangtian-window-btn ${isWebFullscreen ? 'active' : ''}`} onClick={()=>setIsWebFullscreen(v=>!v)} title="窗口全屏"><Tv size={13}/><span>{isWebFullscreen ? '还原' : '全屏'}</span></button>
           <button className={`sangtian-window-btn ${aspectMode !== 'original' ? 'active' : ''}`} onClick={handleCycleAspect} title={currentAspect.title}><Ratio size={13}/><span>{currentAspect.label}</span></button>
@@ -152,7 +154,7 @@ export function SangtianPlayerWindow({
             <div className="terminal-footer"><button className="terminal-back-btn" onClick={()=>setShowTerminal(false)}><Play size={13}/><span>返回视频播放</span></button></div></div>
         ) : (
           <>
-            {children}
+            {renderedChildren}
             {!resolvedInput && candidate && status !== 'error' && <div className="sangtian-video-overlay"><div className="sangtian-loading-spinner"/><span>{isLive ? '正在连接直播直链…' : '正在解析视频播放地址…'}</span></div>}
             {resolvedInput && status !== 'error' && !isPlaying && <div className="sangtian-video-overlay compact"><div className="sangtian-loading-spinner"/><span>正在缓冲…</span></div>}
             {status === 'error' && <div className="sangtian-video-error"><b>{isLive ? '直播直连失败' : '播放解析失败'}</b><span>{error || '当前播放链路没有可用候选。'}</span><div className="sangtian-error-btns"><button className="sangtian-btn-red" onClick={onRetry}>重新播放</button>{onSwitchCandidate && <button className="sangtian-btn-sand" onClick={onSwitchCandidate}>切换备用线路</button>}</div></div>}
@@ -162,16 +164,21 @@ export function SangtianPlayerWindow({
                 <div className="sangtian-fullscreen-topbar"><span>{request?.metadata?.title || candidate?.label || '正在播放'}</span><button onClick={handleToggleFullscreen}><Minimize2 size={18}/></button></div>
                 <div className="sangtian-fullscreen-center"><button onClick={handlePlayPause} className="fullscreen-play-btn">{isPlaying ? '暂停' : '播放'}</button></div>
                 <div className="sangtian-fullscreen-bottombar">
-                  <div className="sangtian-fullscreen-progress">
-                    <span>{formatTime(currentTime)}</span>
-                    <input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime,duration||0)} onChange={e=>handleSeek(e.target.value)} aria-label="播放进度"/>
-                    <span>{formatTime(duration)}</span>
-                  </div>
-                  <div className="sangtian-fullscreen-metrics"><span>缓冲 {bufferPct.toFixed(0)}%</span><span>加载 {loadSpeed}</span><span>网络 {networkDownlink != null ? networkDownlink+' Mbps' : '—'}</span></div>
+                  {!isLive && (
+                    <>
+                      <div className="sangtian-fullscreen-progress">
+                        <span>{formatTime(currentTime)}</span>
+                        <input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime,duration||0)} onChange={e=>handleSeek(e.target.value)} aria-label="播放进度"/>
+                        <span>{formatTime(duration)}</span>
+                      </div>
+                      <div className="sangtian-fullscreen-metrics"><span>缓冲 {bufferPct.toFixed(0)}%</span><span>加载 {loadSpeed}</span><span>网络 {networkDownlink != null ? networkDownlink+' Mbps' : '—'}</span></div>
+                    </>
+                  )}
+                  {isLive && <div className="sangtian-fullscreen-live-status"><span className="live-pill">● LIVE</span><span>{status === 'buffering' ? '正在缓冲' : status === 'error' ? '播放失败' : isPlaying ? '直播中' : '已暂停'}</span></div>}
                   <div className="sangtian-fullscreen-actions">
                     <button onClick={handleToggleLandscape}><RotateCw size={15}/>{isLandscape ? '竖屏' : '横屏'}</button>
                     <button onClick={handleCycleAspect}><Ratio size={15}/>{currentAspect.label}</button>
-                    <button onClick={()=>{const next=playbackRate>=2?0.75:playbackRate+0.25;onChangePlaybackRate?.(Number(next.toFixed(2)));}}><Clock3 size={15}/>{playbackRate.toFixed(2)}x</button>
+                    {!isLive && <button onClick={()=>{const next=playbackRate>=2?0.75:playbackRate+0.25;onChangePlaybackRate?.(Number(next.toFixed(2)));}}><Play size={15}/>{playbackRate.toFixed(2)}x</button>}
                     <button onClick={()=>setShowFullscreenBar(false)}><Minimize2 size={15}/>收起</button>
                   </div>
                 </div>
