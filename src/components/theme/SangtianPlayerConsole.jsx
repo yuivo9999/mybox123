@@ -8,6 +8,7 @@ import {
 export function SangtianPlayerWindow({
   videoRef, status, error, resolvedInput, candidate, request, onRetry, onSwitchCandidate,
   onFullscreen, terminalTag = 'BASH', children, videoContainerRef, isLive = false,
+  playbackRate = 1.0, onChangePlaybackRate,
 }) {
   const [showTerminal, setShowTerminal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -65,10 +66,12 @@ export function SangtianPlayerWindow({
     const timer = window.setInterval(update, 500);
     update();
     return () => { events.forEach(event => video.removeEventListener(event, update)); window.clearInterval(timer); };
-  });
+  }, [videoRef]);
 
   React.useEffect(() => {
-    const connection = navigator?.connection || navigator?.mozConnection || navigator?.webkitConnection;
+    const connection = typeof navigator !== 'undefined'
+      ? (navigator.connection || navigator.mozConnection || navigator.webkitConnection)
+      : null;
     const update = () => setNetworkDownlink(Number.isFinite(Number(connection?.downlink)) ? Number(connection.downlink) : null);
     update();
     connection?.addEventListener?.('change', update);
@@ -257,11 +260,7 @@ export function SangtianConsoleCard({
   isLive = false,
 }) {
   const [activeTab, setActiveTab] = useState('episodes'); // 'episodes' | 'info' | 'sources'
-  const [smartDecode, setSmartDecode] = useState(true);
-  const [autoNext, setAutoNext] = useState(true);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [showPosterModal, setShowPosterModal] = useState(false);
-  const [pingStatus, setPingStatus] = useState('');
 
   const handleCopyStream = () => {
     if (navigator?.clipboard?.writeText && streamUrl) {
@@ -269,12 +268,6 @@ export function SangtianConsoleCard({
     }
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2200);
-  };
-
-  const handlePingSource = () => {
-    const label = playerStatus === 'playing' ? '✓ 当前播放正常' : playerStatus === 'buffering' ? '⏳ 当前正在缓冲' : playerStatus === 'reconnecting' ? '↻ 正在自动重连' : playerStatus === 'error' ? '× 当前播放失败' : '• 当前链路未就绪';
-    setPingStatus(label);
-    setTimeout(() => setPingStatus(''), 2600);
   };
 
   return (
@@ -288,7 +281,7 @@ export function SangtianConsoleCard({
           </div>
           <div className="console-toggle-item">
             <span className="toggle-label"><Sparkles size={12} className="sparkle-gold" /><span>{isLive ? '直播链路' : '播放模式'}</span></span>
-            <span className="switch-badge active">{isLive ? '直连' : (smartDecode ? '智能' : '标准')}</span>
+            <span className="switch-badge active">{isLive ? '直连' : '解析'}</span>
           </div>
         </div>
 
@@ -452,44 +445,14 @@ export function SangtianConsoleCard({
         <div className="console-action-icons">
           <button
             className="action-icon-btn"
-            onClick={handleCopyStream}
-            title="复制播放链接"
-          >
-            <Paperclip size={18} />
-          </button>
-          <button
-            className="action-icon-btn"
-            onClick={() => setShowPosterModal(true)}
-            title="查看原图与封面"
-          >
-            <ImageIcon size={18} />
-          </button>
-          <button
-            className="action-icon-btn"
-            onClick={handlePingSource}
-            title="查看当前播放状态"
-          >
-            <Globe size={18} />
-          </button>
-          <button
-            className="action-icon-btn"
             onClick={onTogglePip}
             title="画中画模式"
           >
             <Play size={18} />
           </button>
-          <button
-            className="action-icon-btn"
-            onClick={() => setActiveTab('info')}
-            title="查看播放参数"
-          >
-            <Clock3 size={18} />
-          </button>
+
         </div>
 
-        {pingStatus && (
-          <div className="console-ping-tag">{pingStatus}</div>
-        )}
 
         <button
           className="sangtian-submit-btn"
@@ -501,19 +464,6 @@ export function SangtianConsoleCard({
         </button>
       </div>
 
-      {showPosterModal && (
-        <div className="sangtian-modal-backdrop" onClick={() => setShowPosterModal(false)}>
-          <div className="sangtian-modal" onClick={e => e.stopPropagation()}>
-            <h4>“桑田山河” 视听档案</h4>
-            <p><strong>片名：</strong>{title}</p>
-            <p><strong>状态：</strong>播放链路畅通</p>
-            <p><strong>播放直链：</strong><code>{streamUrl}</code></p>
-            <button className="primary" onClick={() => setShowPosterModal(false)}>
-              关闭
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
