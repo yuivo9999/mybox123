@@ -17,6 +17,7 @@ import { PlaybackPage } from '../pages/PlaybackPage.jsx';
 import { LoadingState, ErrorState } from '../components/StateViews.jsx';
 import { getFontById } from '../config/fontCatalog.js';
 import { ensureFont } from '../services/fontLoader.js';
+import { getGestureDirection, getTopLevelSwipeTarget, getParentForRoute, isSwipeExcludedTarget } from './navigationGesture.js';
 
 export function App(){
  const session=useSessionState(); const persistent=usePersistentState(); const {tab,route,selected}=session;
@@ -159,58 +160,43 @@ export function App(){
  };
  const nav=(key)=>sessionStateStore.patch({tab:key,route:null,selected:null});
 
- // 直播页专用横向手势：右滑回到首页，左滑进入设置。
- // 双向手势都在应用内部完成导航，绝不把横向手势交给“退出应用”逻辑。
- const swipeRef = React.useRef({active:false,startX:0,startY:0,pointerId:null});
+ // 全局 Android 风格横向导航：顶层五页使用左右切页；下一级页面右滑返回父级。
+ const swipeRef = useRef({active:false,startX:0,startY:0,pointerId:null});
  const handleSwipePointerDown = (event) => {
-   if (event.pointerType === 'mouse' || event.isPrimary === false) return;
+   if (event.pointerType === 'mouse' || event.isPrimary === false || isSwipeExcludedTarget(event.target)) return;
    swipeRef.current = {active:true,startX:event.clientX,startY:event.clientY,pointerId:event.pointerId};
  };
  const handleSwipePointerUp = (event) => {
    const gesture = swipeRef.current;
    swipeRef.current = {active:false,startX:0,startY:0,pointerId:null};
-   if (!gesture.active || event.pointerId !== gesture.pointerId) return;
+   if (!gesture.active || event.pointerId !== gesture.pointerId || isSwipeExcludedTarget(event.target)) return;
+   const direction = getGestureDirection(event.clientX - gesture.startX, event.clientY - gesture.startY);
+   if (!direction) return;
 
-   const dx = event.clientX - gesture.startX;
-   const dy = event.clientY - gesture.startY;
-   // 只认明显的横向滑动，避免干扰正常上下滚动。
-   if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
+   // 全屏/播放器状态优先退出全屏，不触发页面切换。
+   if (typeof document !== 'undefined' && document.fullscreenElement) {
+     void document.exitFullscreen?.().catch?.(() => {});
+     return;
+   }
 
-   const target = event.target;
-   if (target instanceof Element && target.closest('input,textarea,select,button,[data-swipe-ignore="true"],[data-horizontal-scroll="true"]')) return;
-
-   // 直播界面的左右滑动永远是应用内导航：
-   // 右滑 -> 首页；左滑 -> 设置。这里不调用任何退出 App 的 API。
-   if (tab === 'live') {
-     if (dx > 0) {
-       nav('home');
-     } else {
-       nav('settings');
+   // 子页面只把“右滑”定义为 Android 返回手势；左滑不改变页面层级。
+   if (route) {
+     if (direction !== 'right') return;
+     if (route === 'movie-play') {
+       sessionStateStore.patch({route:selected?.metadata?.returnRoute||'detail',selected:selected?.metadata?.returnRoute==='detail'?selected:null});
+     } else if (route === 'detail' || route === 'search') {
+       sessionStateStore.patch({route:null,selected:null});
+     } else if (route === 'live-play') {
+       sessionStateStore.patch({route:'live-channel',selected:contentState.channels.find(c => c.channelId === selected?.channelId) ?? null});
+     } else if (route === 'live-channel') {
+       sessionStateStore.patch({route:null,selected:null});
      }
      return;
    }
 
-   // 其他页面保留原有的应用内返回行为；没有匹配路由时什么都不做，
-   // 不把手势升级成 Activity finish/退出应用。
-   if (typeof document !== 'undefined' && document.fullscreenElement) {
-     const exitFullscreen = document.exitFullscreen?.();
-     if (exitFullscreen?.catch) exitFullscreen.catch(() => {});
-     return;
-   }
-   if (route === 'movie-play') {
-     sessionStateStore.patch({route:selected?.metadata?.returnRoute||'detail',selected:(selected?.metadata?.returnRoute==='movies'||selected?.metadata?.returnRoute==='search')?null:selected});
-   } else if (route === 'detail') {
-     sessionStateStore.patch({route:null,selected:null});
-   } else if (route === 'live-play') {
-     sessionStateStore.patch({
-       route:'live-channel',
-       selected:contentState.channels.find(c => c.channelId === selected?.channelId) ?? null,
-     });
-   } else if (route === 'live-channel') {
-     sessionStateStore.patch({route:null,selected:null});
-   } else if (route === 'search') {
-     sessionStateStore.patch({route:null,selected:null});
-   }
+   // 顶层五页统一为 Android 横向分页：左滑下一页，右滑上一页。
+   const targetTab = getTopLevelSwipeTarget(tab, direction);
+   if (targetTab) nav(targetTab);
  };
  const openSearchHistory=(keyword)=>{pageStateStore.patch('search',{query:keyword});sessionStateStore.patch({tab:'movies',route:'search',selected:null});};
  const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
