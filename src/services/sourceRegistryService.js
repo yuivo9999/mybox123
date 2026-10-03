@@ -25,8 +25,8 @@ export const sourceRegistryService = {
     return adapter.healthCheck(options);
   },
 
-  async syncMovieSources(sources) {
-    return syncMovieSources(sources);
+  async syncMovieSources(sources, selectedSourceId = null) {
+    return syncMovieSources(sources, selectedSourceId);
   },
 
   async registerAll(sources) {
