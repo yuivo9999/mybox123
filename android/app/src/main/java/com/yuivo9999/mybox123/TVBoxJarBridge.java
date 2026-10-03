@@ -86,13 +86,24 @@ public final class TVBoxJarBridge {
 
         String fileName = safeFileName(data.optString("name", "spider")) + ".jar";
         File target = new File(dir, fileName);
-        try {
-            download(url, target);
-        } catch (Throwable error) {
-            // Never retain a partial or over-sized artifact after a failed download.
-            //noinspection ResultOfMethodCallIgnored
-            target.delete();
-            throw error;
+        boolean reused = false;
+        if (target.isFile() && target.length() > 0 && !expectedMd5.isEmpty()) {
+            String cachedMd5 = md5(target);
+            reused = expectedMd5.equals(cachedMd5);
+            if (!reused) {
+                //noinspection ResultOfMethodCallIgnored
+                target.delete();
+            }
+        }
+        if (!reused) {
+            try {
+                download(url, target);
+            } catch (Throwable error) {
+                // Never retain a partial or over-sized artifact after a failed download.
+                //noinspection ResultOfMethodCallIgnored
+                target.delete();
+                throw error;
+            }
         }
         String actualMd5 = md5(target);
         if (!expectedMd5.isEmpty() && !expectedMd5.equals(actualMd5)) {
@@ -109,6 +120,7 @@ public final class TVBoxJarBridge {
         result.put("size", target.length());
         result.put("md5", actualMd5);
         result.put("executionEnabled", true);
+        result.put("reused", reused);
         return result.toString();
     }
 
