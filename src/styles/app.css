@@ -1227,11 +1227,11 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
 .source-selector-trigger-copy small,.source-selector-hint{display:block;color:#8f9aaa;font-size:11px;line-height:1.4}
 .source-selector-chevron{transition:transform .16s ease;flex:0 0 auto}
 .source-selector-chevron.open{transform:rotate(90deg)}
-.source-selector-popover{position:fixed;left:50%;transform:translateX(-50%);bottom:92px;width:min(calc(100vw - 28px),492px);max-height:min(62vh,520px);display:flex;flex-direction:column;background:var(--source-selector-bg,#11141b);border:1px solid var(--source-selector-border,#303744);border-radius:18px;box-shadow:0 18px 55px rgba(0,0,0,.32);overflow:hidden;z-index:40}
+.source-selector-popover{position:fixed;left:50%;transform:translateX(-50%);bottom:92px;width:min(calc(100vw - 28px),492px);max-height:calc(100vh - 108px);display:flex;flex-direction:column;background:var(--source-selector-bg,#11141b);border:1px solid var(--source-selector-border,#303744);border-radius:18px;box-shadow:0 18px 55px rgba(0,0,0,.32);overflow:hidden;z-index:40}
 .source-selector-popover-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 14px 10px;border-bottom:1px solid var(--source-selector-border,#303744);flex:0 0 auto}
 .source-selector-popover-head b{display:block;font-size:15px}
 .source-selector-popover-head small{display:block;color:#8f9aaa;font-size:11px;line-height:1.45;margin-top:3px}
-.source-selector-list{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.source-selector-list{min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:10px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .source-selector-item{min-width:0;min-height:56px;padding:10px 10px 10px 12px;border:1px solid var(--source-selector-border,#303744);background:var(--source-selector-item-bg,#171b23);border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:9px;text-align:left}
 .source-selector-item.selected{border-color:var(--source-selector-accent,#992c22);background:var(--source-selector-selected-bg,rgba(153,44,34,.09))}
 .source-selector-name{min-width:0;flex:1;white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.38;font-size:13px}
