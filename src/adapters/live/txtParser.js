@@ -116,6 +116,138 @@ export function parseTXTLive(text) {
   return channelsList;
 }
 
+
+export function parseTXTLiveMetadata(text) {
+  if (!text) return [];
+  const cleanText = String(text).replace(/^\uFEFF/, '');
+  const lines = cleanText.split(/\r?\n/);
+  let currentCategory = '默认频道';
+  const seen = new Set();
+  const channels = [];
+
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    const line = lines[lineIndex].trim();
+    if (!line) continue;
+    if (line.includes('#genre#') || /^\[.*\]$/.test(line)) {
+      let cat = line.replace(/[,，]?\s*#genre#.*$/i, '').trim();
+      const bracket = cat.match(/^\[(.*)\]$/);
+      if (bracket) cat = bracket[1].trim();
+      if (cat) currentCategory = cat;
+      continue;
+    }
+    if (line.startsWith('#') || line.startsWith('//')) continue;
+
+    const commaIndex = line.search(/[,，]/);
+    let name = '';
+    if (commaIndex !== -1) name = line.slice(0, commaIndex).trim();
+    else name = line.match(/^([^\s]+)\s+/)?.[1]?.trim() || '';
+    if (!name) continue;
+
+    const key = currentCategory + ':::' + name;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    channels.push({
+      sourceItemId: 'txt-' + (channels.length + 1) + '-' + name,
+      canonicalId: name,
+      channelKey: name,
+      name,
+      logo: '',
+      categoryId: currentCategory,
+      category: currentCategory,
+      sourceOrder: channels.length,
+      streams: [],
+      epg: [],
+      currentProgram: null,
+      upcomingProgram: null,
+      deferredRef: { lineIndex },
+    });
+  }
+  return channels;
+}
+
+export function parseTXTLiveLineStreams(line) {
+  const value = String(line || '').trim();
+  if (!value) return [];
+  const commaIndex = value.search(/[,，]/);
+  let rawUrls = '';
+  if (commaIndex !== -1) rawUrls = value.slice(commaIndex + 1).trim();
+  else rawUrls = value.match(/^[^\s]+\s+(.+)$/)?.[1]?.trim() || '';
+  if (!rawUrls) return [];
+
+  return rawUrls.split('#').map((candidate, index) => {
+    let streamUrl = candidate.trim();
+    if (!streamUrl) return null;
+    let label = '线路 ' + (index + 1);
+    if (streamUrl.includes('(text) {
+  if (!text || typeof text !== 'string') return false;
+  if (/#genre#/i.test(text)) return true;
+  
+  const sampleLines = text.split(/\r?\n/).slice(0, 30).filter(Boolean);
+  let matchCount = 0;
+  for (const line of sampleLines) {
+    if (/[^,，\r\n]+[,，]\s*(?:https?|rtmp|rtsp):\/\//i.test(line)) {
+      matchCount++;
+    } else if (/^[^\s]+\s+(?:https?|rtmp|rtsp):\/\//i.test(line)) {
+      matchCount++;
+    }
+  }
+  return matchCount >= 2;
+}
+)) {
+      const parts = streamUrl.split('(text) {
+  if (!text || typeof text !== 'string') return false;
+  if (/#genre#/i.test(text)) return true;
+  
+  const sampleLines = text.split(/\r?\n/).slice(0, 30).filter(Boolean);
+  let matchCount = 0;
+  for (const line of sampleLines) {
+    if (/[^,，\r\n]+[,，]\s*(?:https?|rtmp|rtsp):\/\//i.test(line)) {
+      matchCount++;
+    } else if (/^[^\s]+\s+(?:https?|rtmp|rtsp):\/\//i.test(line)) {
+      matchCount++;
+    }
+  }
+  return matchCount >= 2;
+}
+);
+      streamUrl = parts.shift()?.trim() || '';
+      if (parts.join('(text) {
+  if (!text || typeof text !== 'string') return false;
+  if (/#genre#/i.test(text)) return true;
+  
+  const sampleLines = text.split(/\r?\n/).slice(0, 30).filter(Boolean);
+  let matchCount = 0;
+  for (const line of sampleLines) {
+    if (/[^,，\r\n]+[,，]\s*(?:https?|rtmp|rtsp):\/\//i.test(line)) {
+      matchCount++;
+    } else if (/^[^\s]+\s+(?:https?|rtmp|rtsp):\/\//i.test(line)) {
+      matchCount++;
+    }
+  }
+  return matchCount >= 2;
+}
+).trim()) label = parts.join('(text) {
+  if (!text || typeof text !== 'string') return false;
+  if (/#genre#/i.test(text)) return true;
+  
+  const sampleLines = text.split(/\r?\n/).slice(0, 30).filter(Boolean);
+  let matchCount = 0;
+  for (const line of sampleLines) {
+    if (/[^,，\r\n]+[,，]\s*(?:https?|rtmp|rtsp):\/\//i.test(line)) {
+      matchCount++;
+    } else if (/^[^\s]+\s+(?:https?|rtmp|rtsp):\/\//i.test(line)) {
+      matchCount++;
+    }
+  }
+  return matchCount >= 2;
+}
+).trim();
+    }
+    return streamUrl ? { url: streamUrl, label, quality: '', resolution: '' } : null;
+  }).filter(Boolean);
+}
+
 export function isTXTGenreFormat(text) {
   if (!text || typeof text !== 'string') return false;
   if (/#genre#/i.test(text)) return true;
