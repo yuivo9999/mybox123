@@ -1,5 +1,5 @@
 import { requestAdapter } from './requestAdapter.js';
-import { parseTXTLiveMetadata, parseTXTLiveLineStreams } from '../adapters/live/txtParser.js';
+import { parseTXTLiveMetadataStream, parseTXTLiveLineStreams } from '../adapters/live/txtParser.js';
 import { normalizeLiveChannel } from '../adapters/live/normalizeLive.js';
 
 function isTv1Source(source) {
@@ -38,19 +38,20 @@ export const tv1LiveService = {
     const session = createSession(source, body);
     const capabilities = { search: true, categories: true, multiStream: true, epg: false, currentProgram: false, upcomingProgram: false };
     const result = [];
-    for (const item of session.metadata) {
+    session.metadata = [];
+    await parseTXTLiveMetadataStream(body, async item => {
       if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-      result.push(normalizeLiveChannel({
+      session.metadata.push(item);
+      const channel = normalizeLiveChannel({
         sourceId: source.sourceId,
         item,
         index: result.length,
         capabilities,
-      }));
-      if (typeof options.onChannel === 'function') {
-        options.onChannel(result[result.length - 1]);
-        await new Promise(resolve => setTimeout(resolve, 0));
-      }
-    }
+      });
+      result.push(channel);
+      if (typeof options.onChannel === 'function') options.onChannel(channel);
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
     return result;
   },
 
