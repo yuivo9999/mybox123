@@ -111,6 +111,7 @@ export function createTVBoxConfiguredParser(config = {}) {
         headers: buildHeaders(parse, candidate),
         signal: context.signal,
         timeoutMs: candidate.timeoutMs ?? context.timeoutMs,
+        doh: selectDoH(config),
       });
       if (!response?.ok) throw new Error(`PARSER_HTTP_${response?.status ?? 0}`);
 
