@@ -31,7 +31,7 @@ public final class TVBoxJarExecutor {
         this.context = context.getApplicationContext();
     }
 
-    public String invoke(File jarFile, String className, String operation, JSONObject payload) throws Exception {
+    public synchronized String invoke(File jarFile, String className, String operation, JSONObject payload) throws Exception {
         File cache = new File(context.getCacheDir(), "tvbox/jar").getCanonicalFile();
         File file = jarFile.getCanonicalFile();
         if (!file.getPath().startsWith(cache.getPath() + File.separator)) {
@@ -60,7 +60,10 @@ public final class TVBoxJarExecutor {
 
         JSONObject data = payload == null ? new JSONObject() : payload;
         try {
-            String extend = data.optString("ext", "");
+            String extend = data.has("ext") ? data.opt("ext").toString() : "";
+            if (extend.isEmpty() && data.has("extend")) {
+                extend = data.opt("extend").toString();
+            }
             spider.init(context, extend);
             Object result = call(spider, operation, data);
             JSONObject output = new JSONObject();
