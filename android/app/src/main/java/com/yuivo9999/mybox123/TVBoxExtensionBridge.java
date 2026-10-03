@@ -34,7 +34,7 @@ public final class TVBoxExtensionBridge {
             result.put("contractVersion", CONTRACT_VERSION);
             result.put("available", true);
             result.put("supportedKinds", new JSONArray().put("drpy-js"));
-            result.put("supportedOperations", new JSONArray().put("load").put("request").put("search").put("detail").put("episodes").put("playUrl"));
+            result.put("supportedOperations", new JSONArray().put("healthCheck").put("load").put("request").put("search").put("detail").put("episodes").put("playUrl"));
             result.put("runtimeVersion", "drpy-sandbox-4-dom");
             result.put("reason", "DRPY_SANDBOX_RULE_OPERATIONS");
             return result.toString();
@@ -60,6 +60,16 @@ public final class TVBoxExtensionBridge {
             }
 
             JSONObject payloadObject = input.optJSONObject("payload");
+            if ("healthCheck".equals(operation)) {
+                JSONObject result = new JSONObject();
+                result.put("ok", true);
+                result.put("operation", operation);
+                result.put("kind", kind);
+                result.put("contractVersion", CONTRACT_VERSION);
+                result.put("status", "healthy");
+                result.put("runtimeVersion", "drpy-sandbox-4-dom");
+                return result.toString();
+            }
             if ("load".equals(operation)) {
                 String script = payloadObject == null ? "" : payloadObject.optString("script", "");
                 String ruleJson = DrpySandboxRuntime.evaluate(script, DrpyHttpRuntime::request);
