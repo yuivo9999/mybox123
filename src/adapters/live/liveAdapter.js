@@ -1,7 +1,7 @@
 import { parseJSONLive } from './jsonParser.js';
 import { parseM3U } from './m3uParser.js';
 import { parseXMLLive, parseXMLEPG } from './xmlParser.js';
-import { parseTXTLive, isTXTGenreFormat } from './txtParser.js';
+import { parseTXTLive, parseTXTLiveMetadata, parseTXTLiveLineStreams, isTXTGenreFormat } from './txtParser.js';
 import { normalizeLiveChannel } from './normalizeLive.js';
 import { defaultLiveCapabilities, normalizeLiveCapabilities } from './liveCapabilities.js';
 import { requestAdapter } from '../../services/requestAdapter.js';
@@ -70,7 +70,7 @@ export function createLiveAdapter(config, transport = null) {
         : format === 'xml'
         ? parseXMLLive(body)
         : format === 'txt'
-        ? parseTXTLive(body)
+        ? parseTXTLiveMetadata(body)
         : parseJSONLive(body);
       const epgPrograms = format === 'xml' ? parseXMLEPG(body) : [];
       const withEPG = raw.map((item) => ({
@@ -96,11 +96,33 @@ export function createLiveAdapter(config, transport = null) {
     capabilities,
     getChannels: load,
     getCategories: async () => [...new Set(current().map((channel) => channel.category))],
-    getStreams: async (channelRef) => {
+    getStreams: async (channelRef, options = {}) => {
       const channels = current();
       const sourceRef = channelRef?.sourceRefs?.find((ref) => ref.sourceId === sourceId);
       const channel = channels.find((item) => item.channelId === channelRef?.channelId || item.sourceRefs?.some((ref) => ref.sourceChannelId === sourceRef?.sourceChannelId));
-      return channel?.streams ?? [];
+      if (!channel) return [];
+      if (detectedFormat === 'txt' && channel.deferredRef?.lineIndex != null) {
+        const body = config.localContent != null
+          ? String(config.localContent)
+          : await (await requestAdapter.request(config.sourceRef, {
+              headers: config.headers ?? {},
+              signal: options.signal,
+              timeoutMs: options.timeoutMs,
+              transport,
+            })).text();
+        return parseTXTLiveLineStreams(String(body).replace(/^\uFEFF/, '').split(/\r?\n/)[channel.deferredRef.lineIndex]).map((stream, index) => ({
+          ...stream,
+          streamId: 'stream:' + sourceId + ':' + channel.sourceItemId + ':' + (index + 1),
+          sourceId,
+          sourceItemId: channel.sourceItemId,
+          sourceChannelId: sourceId + ':' + channel.sourceItemId,
+          protocol: /\.m3u8(?:[?#]|$)/i.test(stream.url) ? 'hls' : 'http',
+          priority: index,
+          status: 'unknown',
+          updatedAt: Date.now(),
+        }));
+      }
+      return channel.streams ?? [];
     },
     getEPG: async (channelRef, range = {}) => {
       const channels = current();
