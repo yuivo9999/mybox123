@@ -342,7 +342,8 @@ function normalizeTVBoxParseConfig(parsed = {}) {
         header: item.ext.header && typeof item.ext.header === 'object' ? { ...item.ext.header } : {},
       } : {},
     }))
-    .filter(item => item.url || item.id);
+    .filter(item => item.url || item.id)
+    : [];
 
   const flags = Array.isArray(parsed?.flags)
     ? [...new Set(parsed.flags.map(value => String(value).replace(/\\r?\\n/g, '').trim()).filter(Boolean))]
