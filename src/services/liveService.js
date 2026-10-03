@@ -41,9 +41,14 @@ async function loadSourceChannels(adapter) {
 
   try {
     const value = await requestManager.run(`live:channels:${adapter.sourceId}`, (signal) => adapter.getChannels({ signal }));
+    const detectedFormat = adapter.getSnapshotState?.().detectedFormat ?? null;
+    if (detectedFormat === 'txt') {
+      cacheStorage.remove(CacheNamespace.LIVE_SOURCE, key);
+      return { value: Array.isArray(value) ? value : [], cached: false, runtimeType: 'tv1', detectedFormat };
+    }
     if (Array.isArray(value) && value.length) {
       cacheStorage.set(CacheNamespace.LIVE_SOURCE, key, value);
-      return { value, cached: false };
+      return { value, cached: false, runtimeType: 'generic', detectedFormat };
     }
     if (cached.hit) return { value: cached.value, cached: true, stale: true };
     throw errorService.normalize(new Error('LIVE_SOURCE_EMPTY'), { code: 'SourceEmptyError', context: { sourceId: adapter.sourceId, scope: 'live-source' } });
@@ -89,6 +94,8 @@ export const liveService = {
           stale: loaded.stale ?? false,
           capabilities: adapter.capabilities,
           adapterStatus: adapter.getSnapshotState?.() ?? null,
+          runtimeType: loaded.runtimeType ?? 'generic',
+          detectedFormat: loaded.detectedFormat ?? adapter.getSnapshotState?.().detectedFormat ?? null,
         };
       } catch (reason) {
         return {
@@ -100,7 +107,7 @@ export const liveService = {
         };
       }
     }));
-    const channels = settled.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
+    const channels = settled.flatMap((result) => result.status === 'fulfilled' && result.runtimeType !== 'tv1' ? result.value : []);
     return { channels: mergeLiveChannels(channels), results: settled };
   },
 
