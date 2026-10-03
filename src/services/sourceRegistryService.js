@@ -12,7 +12,7 @@ export const sourceRegistryService = {
     liveRegistry.clear();
   },
 
-  registerLiveSource(source, transport = fetch) {
+  registerLiveSource(source, transport = null) {
     const normalized = normalizeSource(source);
     const adapter = createLiveAdapter(normalized, transport);
     liveRegistry.register(adapter);
@@ -21,7 +21,7 @@ export const sourceRegistryService = {
 
   async testLiveSource(source, options = {}) {
     const normalized = normalizeSource(source);
-    const adapter = createLiveAdapter(normalized, options.transport ?? fetch);
+    const adapter = createLiveAdapter(normalized, options.transport);
     return adapter.healthCheck(options);
   },
 
