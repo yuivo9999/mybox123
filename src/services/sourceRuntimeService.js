@@ -31,7 +31,7 @@ export async function testSource(source, options = {}) {
 }
 
 export async function syncAllSources({ movieSourceId = null } = {}) {
-  const sources = sourceRepository.getAll().filter(source => source.enabled !== false);
+  let sources = sourceRepository.getAll().filter(source => source.enabled !== false);
   const movieResult = await sourceRegistryService.syncMovieSources(sources, movieSourceId);
 
   sourceRegistryService.clear();
@@ -55,6 +55,7 @@ export async function syncAllSources({ movieSourceId = null } = {}) {
         : source
     ));
     sourceRepository.saveAll(promotedSources);
+    sources = promotedSources.filter(source => source.enabled !== false);
   }
 
   const resultBySource = new Map(
