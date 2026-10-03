@@ -177,6 +177,7 @@ export function createMovieAdapter(config, transport = null) {
               userAgent: config.userAgent,
               referer: config.referer,
               cookies: config.cookies,
+              tvboxParseConfig: config.tvboxParseConfig,
             },
           });
         } catch (error) {
