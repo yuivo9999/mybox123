@@ -229,10 +229,11 @@ export function App(){
 
  if(!persistent.settings?.initialized) return <FirstLaunch onLater={()=>persistent.saveSettings({...persistent.settings,initialized:true,initializedAt:Date.now()})} onSources={()=>{persistent.saveSettings({...persistent.settings,initialized:true,initializedAt:Date.now()});nav('sources')}}/>;
  
+ const selectedFont=getFontById(persistent.settings?.fontFamily);
  const appearanceClass=`theme-${persistent.settings?.theme||'sangtian'} font-${persistent.settings?.fontSize||'medium'} app-font-${persistent.settings?.fontFamily||'noto-sans-sc'} cards-${persistent.settings?.cardStyle||'poster'} density-${persistent.settings?.density||'comfortable'}`;
 
  return (
-  <div className={`app-shell ${appearanceClass}`} onPointerDown={handleSwipePointerDown} onPointerUp={handleSwipePointerUp} onPointerCancel={() => { swipeRef.current = {active:false,startX:0,startY:0,pointerId:null}; }}>
+  <div className={`app-shell ${appearanceClass}`} style={{'--app-font-family':`"${selectedFont.family}",Inter,ui-sans-serif,system-ui,sans-serif`}} onPointerDown={handleSwipePointerDown} onPointerUp={handleSwipePointerUp} onPointerCancel={() => { swipeRef.current = {active:false,startX:0,startY:0,pointerId:null}; }}>
     <div className="screen">
       {(() => {
         // 1. If in a management tab, always show it
