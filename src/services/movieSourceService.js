@@ -52,7 +52,7 @@ export async function testMovieSource(source, options = {}) {
   const adapter = createMovieAdapter({
     ...source,
     sourceRef: source?.sourceRef || source?.url,
-  }, options.transport ?? fetch);
+  }, options.transport);
 
   return adapter.healthCheck({ signal: options.signal });
 }
