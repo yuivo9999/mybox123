@@ -232,7 +232,7 @@ public final class DrpySandboxRuntime {
     }
 
     public interface HttpRequestHandler {
-        DrpyHttpRuntime.Response request(String method, String url, String body, String contentType) throws IOException;
+        DrpyHttpRuntime.Response request(String method, String url, String body, String contentType, java.util.Map<String, String> headers) throws IOException;
     }
 
     private static final class HttpRequestFunction extends BaseFunction {
@@ -245,6 +245,7 @@ public final class DrpySandboxRuntime {
             String method = "GET";
             String body = "";
             String contentType = "application/x-www-form-urlencoded; charset=UTF-8";
+            java.util.Map<String, String> headers = new java.util.LinkedHashMap<>();
 
             if (args.length > 1 && args[1] instanceof Scriptable) {
                 Scriptable options = (Scriptable) args[1];
@@ -254,10 +255,18 @@ public final class DrpySandboxRuntime {
                 if (value != Scriptable.NOT_FOUND && value != null) body = Context.toString(value);
                 value = ScriptableObject.getProperty(options, "contentType");
                 if (value != Scriptable.NOT_FOUND && value != null) contentType = Context.toString(value);
+                value = ScriptableObject.getProperty(options, "headers");
+                if (value instanceof Scriptable) {
+                    for (Object key : ((Scriptable) value).getIds()) {
+                        String name = Context.toString(key);
+                        Object headerValue = ScriptableObject.getProperty((Scriptable) value, name);
+                        if (headerValue != Scriptable.NOT_FOUND && headerValue != null) headers.put(name, Context.toString(headerValue));
+                    }
+                }
             }
 
             try {
-                DrpyHttpRuntime.Response response = handler.request(method, url, body, contentType);
+                DrpyHttpRuntime.Response response = handler.request(method, url, body, contentType, headers);
                 NativeObject result = new NativeObject();
                 result.put("status", result, response.status);
                 result.put("statusCode", result, response.status);
