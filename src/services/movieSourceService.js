@@ -19,6 +19,7 @@ function cacheKey(sourceId) {
 async function load(adapter) {
   const key = cacheKey(adapter.sourceId);
   const cached = cacheStorage.get(CacheNamespace.SOURCE, key, { allowStale: true });
+  if (cached.hit && !cached.stale) return { value: cached.value, stale: false, fromCache: true };
 
   try {
     const value = await requestManager.run(
