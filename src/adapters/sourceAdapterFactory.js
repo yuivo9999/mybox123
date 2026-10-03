@@ -15,7 +15,8 @@ function isSafeExtJsonSource(source) {
   if (source?.tvboxExt && typeof source.tvboxExt === 'object' && !Array.isArray(source.tvboxExt)) return true;
   if (typeof source?.tvboxExt !== 'string') return false;
   const value = source.tvboxExt.trim();
-  return /^https?:\/\//i.test(value) && /\.json(?:[?#].*)?$/i.test(value);
+  if (/^https?:\/\//i.test(value)) return /\.json(?:[?#].*)?$/i.test(value);
+  return (value.startsWith('{') || value.startsWith('[')) && value.length <= 5 * 1024 * 1024;
 }
 
 export function createSourceAdapter(source, options = {}) {
