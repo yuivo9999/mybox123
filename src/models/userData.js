@@ -14,6 +14,14 @@ export function createSearchId(keyword) {
   return `search:${encodeURIComponent(keyword.trim().toLowerCase())}`;
 }
 
+export const defaultPlaybackSettings = () => ({
+  moviePlayer: 'exo',
+  livePlayer: 'exo',
+  fallbackEnabled: true,
+  fallbackOrder: ['exo', 'ijk', 'native'],
+  decoder: { exo: 'auto', ijk: 'auto', native: 'system' },
+});
+
 export const defaultSettings = () => ({
   initialized: false,
   autoplayResume: true,
@@ -23,12 +31,33 @@ export const defaultSettings = () => ({
   fontSize: 'medium',
   cardStyle: 'poster',
   density: 'comfortable',
+  playback: defaultPlaybackSettings(),
 });
 
-export const normalizeSettings = (value = {}) => ({
-  ...defaultSettings(),
-  ...(value && typeof value === 'object' ? value : {}),
-});
+export const normalizePlaybackSettings = (value = {}) => {
+  const input = value && typeof value === 'object' ? value : {};
+  const decoder = input.decoder && typeof input.decoder === 'object' ? input.decoder : {};
+  const order = Array.isArray(input.fallbackOrder) ? input.fallbackOrder.filter(item => ['exo', 'ijk', 'native'].includes(item)) : [];
+  const fallbackOrder = [...new Set([...order, 'exo', 'ijk', 'native'])].slice(0, 3);
+  return {
+    ...defaultPlaybackSettings(),
+    ...input,
+    moviePlayer: ['exo', 'ijk', 'native'].includes(input.moviePlayer) ? input.moviePlayer : 'exo',
+    livePlayer: ['exo', 'ijk', 'native'].includes(input.livePlayer) ? input.livePlayer : 'exo',
+    fallbackEnabled: input.fallbackEnabled !== false,
+    fallbackOrder,
+    decoder: {
+      exo: 'auto',
+      ijk: ['auto', 'hardware', 'software'].includes(decoder.ijk) ? decoder.ijk : 'auto',
+      native: 'system',
+    },
+  };
+};
+
+export const normalizeSettings = (value = {}) => {
+  const input = value && typeof value === 'object' ? value : {};
+  return { ...defaultSettings(), ...input, playback: normalizePlaybackSettings(input.playback) };
+};
 
 export const emptyUserData = () => ({
   favorites: [],
