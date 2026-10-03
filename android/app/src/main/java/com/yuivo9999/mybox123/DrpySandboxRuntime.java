@@ -6,8 +6,6 @@ import org.mozilla.javascript.ContextFactory;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
 /**
  * Minimal sandbox for evaluating a Drpy JavaScript definition.
  *
