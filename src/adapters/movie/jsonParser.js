@@ -13,7 +13,7 @@ function splitRoutes(value) {
   return String(value ?? '').split('$$$').map(item => item.trim()).filter(Boolean);
 }
 
-function parseRouteEpisodes(route, routeIndex = 0) {
+function parseRouteEpisodes(route, routeIndex = 0, routeLabel = '') {
   return String(route ?? '')
     .split('#')
     .map((entry, index) => {
@@ -26,7 +26,7 @@ function parseRouteEpisodes(route, routeIndex = 0) {
       return {
         title,
         episodeNumber: index + 1,
-        playbackCandidates: url ? [{ mediaUrl: url, label: `线路${routeIndex + 1}` }] : [],
+        playbackCandidates: url ? [{ mediaUrl: url, label: routeLabel || `线路${routeIndex + 1}` }] : [],
       };
     })
     .filter(Boolean);
@@ -39,7 +39,8 @@ function asEpisodes(item) {
     return raw.split(/\s*[|,]\s*/).filter(Boolean).map(title => ({ title }));
   }
   const routes = splitRoutes(item?.vod_play_url);
-  if (routes.length) return routes.flatMap((route, index) => parseRouteEpisodes(route, index));
+  if (routes.length) const routeLabels = splitRoutes(item?.vod_play_from);
+  return routes.flatMap((route, index) => parseRouteEpisodes(route, index, routeLabels[index] || ''));
   return [];
 }
 
