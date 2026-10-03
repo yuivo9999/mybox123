@@ -40,6 +40,17 @@ export function createMovieAdapter(config, transport = null) {
   let status = config.enabled === false ? 'disabled' : String(config.status ?? 'unknown');
 
   const request = async (options = {}) => {
+    if (sourceDefinition.adapterType === 'tvbox-extension') {
+      throw toAppError(new Error('TVBOX_EXTENSION_UNSUPPORTED'), {
+        code: ErrorCode.SOURCE,
+        scope: 'movie-source-adapter',
+        context: {
+          sourceId,
+          sourceCapability: sourceDefinition.sourceCapability,
+          tvboxAdapterKind: sourceDefinition.tvboxAdapterKind,
+        },
+      });
+    }
     if (!sourceDefinition.endpoint) {
       throw toAppError(new Error('MOVIE_SOURCE_ENDPOINT_REQUIRED'), {
         code: ErrorCode.SOURCE,
@@ -278,6 +289,23 @@ export function createMovieAdapter(config, transport = null) {
   };
 
   const healthCheck = async (options = {}) => {
+    if (sourceDefinition.adapterType === 'tvbox-extension') {
+      return {
+        ok: false,
+        sourceId,
+        status: 'unsupported',
+        checkedAt: Date.now(),
+        error: toAppError(new Error('TVBOX_EXTENSION_UNSUPPORTED'), {
+          code: ErrorCode.SOURCE,
+          scope: 'movie-source-adapter',
+          context: {
+            sourceId,
+            sourceCapability: sourceDefinition.sourceCapability,
+            tvboxAdapterKind: sourceDefinition.tvboxAdapterKind,
+          },
+        }),
+      };
+    }
     try {
       await load(options);
       return {
