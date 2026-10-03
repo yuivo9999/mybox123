@@ -188,6 +188,25 @@ public final class DrpySandboxRuntime {
 
     /** Bounded, side-effect-free helpers commonly used by TVBox/Drpy rules. */
     private static void installCompatibilityHelpers(Context cx, Scriptable scope) {
+        ScriptableObject.putProperty(scope, "parseJSON", new BaseFunction() {
+            @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+                String value = args.length > 0 ? Context.toString(args[0]) : "";
+                try {
+                    return cx.evaluateString(scope, "JSON.parse(" + JSONObject.quote(value) + ")", "drpy-parse-json", 1, null);
+                } catch (Exception e) {
+                    throw new IllegalArgumentException("DRPY_PARSE_JSON_ERROR");
+                }
+            }
+        });
+        ScriptableObject.putProperty(scope, "stringifyJSON", new BaseFunction() {
+            @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+                Object value = args.length > 0 ? args[0] : null;
+                ScriptableObject.putProperty(scope, "__drpyJsonHelper", value);
+                Object result = cx.evaluateString(scope, "JSON.stringify(__drpyJsonHelper)", "drpy-stringify-json", 1, null);
+                ScriptableObject.deleteProperty(scope, "__drpyJsonHelper");
+                return result == null ? "" : Context.toString(result);
+            }
+        });
         ScriptableObject.putProperty(scope, "urljoin", new BaseFunction() {
             @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
                 String base = args.length > 0 ? Context.toString(args[0]) : "";
