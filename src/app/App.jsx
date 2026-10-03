@@ -60,7 +60,7 @@ export function App(){
      applySourceResult(result,generation);
    }catch(error){
      if(generation!==reloadGenerationRef.current)return;
-     setContentState(state=>({status:background?'success':'error',movies:background?state.movies:[],channels:state.channels,error,sourceLoading:false}));
+     setContentState(state=>({status:background?'success':'error',movies:background?state.movies:[],channels:state.channels,error,sourceLoading:false,movieCategoryLoading:false}));
    }
  };
  useEffect(()=>{cacheService.prune();},[]);
