@@ -4,7 +4,8 @@ import { syncAllSources, testSource } from './sourceRuntimeService.js';
 
 export const sourceManagementService = {
   async reload(options = {}) {
-    return syncAllSources(options);
+    const selected = userDataService.getSnapshot().selectedSources;
+    return syncAllSources({ ...options, movieSourceId: options.movieSourceId ?? selected.movie ?? null });
   },
   async save(sources) {
     sourceRepository.saveAll(sources);
