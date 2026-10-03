@@ -29,7 +29,8 @@ export function App(){
    const result=await sourceManagementService.reload({ movieSourceId: selectedMovieSourceId });
      const movies=contentService.getMovies(result.movies);
      const failed=result.results.filter(item=>item.status==='rejected');
-     setContentState({status:failed.length&&!movies.length&&!result.channels.length?'error':'success',movies,channels:result.channels,error:failed.length?failed:null});
+     const selectedMovieFailed = Boolean(selectedMovieSourceId) && failed.some(item => item.sourceId === selectedMovieSourceId);
+     setContentState({status:selectedMovieFailed&&!movies.length?'error':'success',movies,channels:result.channels,error:failed.length?failed:null});
      persistent.reload?.();
    }catch(error){
      setContentState({status:'error',movies:[],channels:[],error});
