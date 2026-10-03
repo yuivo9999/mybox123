@@ -27,6 +27,7 @@ public final class TVBoxJarIsolatedClient implements AutoCloseable {
     private final java.util.Map<String, String> responses = new java.util.HashMap<>();
     private Messenger remote;
     private boolean bound;
+    private ServiceConnection connection;
 
     public TVBoxJarIsolatedClient(Context context) { this.context = context.getApplicationContext(); }
 
@@ -34,10 +35,11 @@ public final class TVBoxJarIsolatedClient implements AutoCloseable {
         if (bound && remote != null) return;
         CountDownLatch latch = new CountDownLatch(1);
         Intent intent = new Intent(context, TVBoxJarExecutionService.class);
-        context.bindService(intent, new ServiceConnection() {
+        connection = new ServiceConnection() {
             @Override public void onServiceConnected(ComponentName name, android.os.IBinder service) { synchronized (TVBoxJarIsolatedClient.this) { remote = new Messenger(service); bound = true; } latch.countDown(); }
             @Override public void onServiceDisconnected(ComponentName name) { synchronized (TVBoxJarIsolatedClient.this) { remote = null; bound = false; } }
-        }, Context.BIND_AUTO_CREATE);
+        };
+        context.bindService(intent, connection, Context.BIND_AUTO_CREATE);
         if (!latch.await(DEFAULT_TIMEOUT_MS, TimeUnit.MILLISECONDS)) throw new IllegalStateException("TVBOX_JAR_ISOLATED_CONNECT_TIMEOUT");
     }
 
@@ -65,7 +67,8 @@ public final class TVBoxJarIsolatedClient implements AutoCloseable {
 
     @Override public synchronized void close() {
         if (!bound) return;
-        try { context.unbindService(new NoopConnection()); } catch (Exception ignored) { }
+        try { if (connection != null) context.unbindService(connection); } catch (Exception ignored) { }
+        connection = null;
         remote = null; bound = false;
     }
 
