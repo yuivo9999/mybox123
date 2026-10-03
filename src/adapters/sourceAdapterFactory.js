@@ -23,7 +23,7 @@ function isSafeExtJsonSource(source) {
   }
   if (typeof ext !== 'string') return false;
   const value = ext.trim();
-  if (/^https?:\/\//i.test(value)) return /\.json(?:[?#].*)?$/i.test(value);
+  if (/^https?:\/\//i.test(value)) return source?.tvboxExtFormat === 'remote-resource' || /\.json(?:[?#].*)?$/i.test(value);
   return (value.startsWith('{') || value.startsWith('[')) && value.length <= 5 * 1024 * 1024;
 }
 
