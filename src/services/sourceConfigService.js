@@ -211,11 +211,7 @@ function resolveLiveSourceRef(value) {
   return '';
 }
 
-function classifyTVBoxSite(site = {}) {
-  const name = String(site.name || site.key || '').trim();
-  const key = String(site.key || '').trim();
-  const api = String(site.api || '').trim();
-  const text = `${name} ${key} ${api}`;
+function classifyTVBoxSite() {
   // TVBox 的 `sites` 始终是影视/内容站点定义；真正的直播源位于顶层 `lives`。
   // 不能因为站点名称包含“直播/体育”等字样就把它注册到 Live Registry，
   // 否则 csp/CSP、Drpy、ext 等内容提供器会污染直播源集合。
@@ -329,7 +325,7 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
         tvboxDefinition: { ...site },
         tvboxUnsupportedReason: isSupportedDirect ? null : (
           !api ? '缺少 api' :
-            : capability.kind === 'drpy-js' ? 'Drpy JS 源当前未适配执行器'
+            capability.kind === 'drpy-js' ? 'Drpy JS 源当前未适配执行器'
             : capability.kind === 'csp' ? 'CSP 源当前未适配执行器'
             : capability.kind === 'jar' || capability.kind === 'http-vod-with-jar' ? '该源依赖 JAR 扩展，当前未适配 JAR 执行器'
             : capability.kind === 'ext' ? '该源依赖 ext 扩展配置，当前未适配'
