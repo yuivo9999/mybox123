@@ -6,211 +6,172 @@ import {
 } from 'lucide-react';
 
 export function SangtianPlayerWindow({
-  videoRef,
-  status,
-  error,
-  resolvedInput,
-  candidate,
-  request,
-  onRetry,
-  onSwitchCandidate,
-  onFullscreen,
-  terminalTag = 'BASH',
-  children,
-  videoContainerRef,
-  isLive = false,
+  videoRef, status, error, resolvedInput, candidate, request, onRetry, onSwitchCandidate,
+  onFullscreen, terminalTag = 'BASH', children, videoContainerRef, isLive = false,
 }) {
   const [showTerminal, setShowTerminal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
   const [isWebFullscreen, setIsWebFullscreen] = useState(false);
+  const [isSystemFullscreen, setIsSystemFullscreen] = useState(false);
   const [aspectMode, setAspectMode] = useState('original');
-  const [videoAspectRatio, setVideoAspectRatio] = useState(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [bufferedSeconds, setBufferedSeconds] = useState(0);
+  const [bufferRate, setBufferRate] = useState(0);
+  const [networkDownlink, setNetworkDownlink] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showFullscreenBar, setShowFullscreenBar] = useState(true);
+  const lastBufferRef = React.useRef({time: 0, buffered: 0});
 
   const streamUrl = resolvedInput?.url || candidate?.mediaUrl || candidate?.url || candidate?.metadata?.url || '';
-
   const aspectOptions = [
-    { id: 'original', label: '原始', title: '原始比例（保持视频源比例）' },
-    { id: '16:9', label: '16:9', title: '16:9 画面比例' },
-    { id: '4:3', label: '4:3', title: '4:3 画面比例' },
-    { id: 'fill', label: '铺满', title: '铺满全屏（可能裁切画面）' },
+    { id: 'original', label: '原始', title: '保持视频源比例' },
+    { id: '16:9', label: '16:9', title: '16:9' },
+    { id: '4:3', label: '4:3', title: '4:3' },
+    { id: 'fill', label: '铺满', title: '铺满画面（可能裁切）' },
   ];
-
   const currentAspect = aspectOptions.find(item => item.id === aspectMode) || aspectOptions[0];
 
-  const handleCycleAspect = () => {
-    setAspectMode(prev => {
-      const index = aspectOptions.findIndex(item => item.id === prev);
-      return aspectOptions[(index + 1) % aspectOptions.length].id;
-    });
+  const formatTime = value => {
+    if (!Number.isFinite(value)) return '00:00';
+    const total = Math.max(0, Math.floor(value));
+    return `${Math.floor(total / 3600) ? String(Math.floor(total / 3600)).padStart(2,'0') + ':' : ''}${String(Math.floor((total % 3600) / 60)).padStart(2,'0')}:${String(total % 60).padStart(2,'0')}`;
   };
-
-  const handleVideoMetadata = event => {
-    const video = event.currentTarget;
-    if (video.videoWidth > 0 && video.videoHeight > 0) {
-      setVideoAspectRatio(video.videoWidth / video.videoHeight);
+  const syncMediaMetrics = () => {
+    const video = videoRef?.current;
+    if (!video) return;
+    setCurrentTime(Number(video.currentTime) || 0);
+    setDuration(Number(video.duration) || 0);
+    let buffered = 0;
+    try {
+      if (video.buffered?.length) buffered = video.buffered.end(video.buffered.length - 1);
+    } catch {}
+    setBufferedSeconds(buffered);
+    const now = performance.now();
+    const previous = lastBufferRef.current;
+    if (previous.time > 0 && now > previous.time && buffered >= previous.buffered) {
+      setBufferRate((buffered - previous.buffered) / ((now - previous.time) / 1000));
     }
+    lastBufferRef.current = {time: now, buffered};
   };
 
+  React.useEffect(() => {
+    const video = videoRef?.current;
+    if (!video) return undefined;
+    const events = ['timeupdate','progress','loadedmetadata','durationchange','playing','pause','waiting','canplay','seeking','seeked'];
+    const update = () => { syncMediaMetrics(); setIsPlaying(!video.paused && !video.ended); };
+    events.forEach(event => video.addEventListener(event, update));
+    const timer = window.setInterval(update, 500);
+    update();
+    return () => { events.forEach(event => video.removeEventListener(event, update)); window.clearInterval(timer); };
+  });
+
+  React.useEffect(() => {
+    const connection = navigator?.connection || navigator?.mozConnection || navigator?.webkitConnection;
+    const update = () => setNetworkDownlink(Number.isFinite(Number(connection?.downlink)) ? Number(connection.downlink) : null);
+    update();
+    connection?.addEventListener?.('change', update);
+    return () => connection?.removeEventListener?.('change', update);
+  }, []);
+
+  React.useEffect(() => {
+    const onFullscreen = () => setIsSystemFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onFullscreen);
+    onFullscreen();
+    return () => document.removeEventListener('fullscreenchange', onFullscreen);
+  }, []);
+
+  const handleCycleAspect = () => setAspectMode(prev => aspectOptions[(aspectOptions.findIndex(item => item.id === prev) + 1) % aspectOptions.length].id);
   const handleCopyLink = () => {
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(streamUrl).catch(() => {});
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (navigator?.clipboard?.writeText && streamUrl) navigator.clipboard.writeText(streamUrl).catch(() => {});
+    setCopied(true); window.setTimeout(() => setCopied(false), 1800);
   };
-
-  const handleToggleFullscreen = () => {
-    if (onFullscreen) {
-      onFullscreen();
-      return;
-    }
+  const handleToggleFullscreen = async () => {
+    if (onFullscreen) { onFullscreen(); return; }
     const elem = videoRef?.current?.parentElement || videoRef?.current;
     if (!elem) return;
     if (!document.fullscreenElement) {
-      elem.requestFullscreen?.().catch(() => {});
+      try { await elem.requestFullscreen?.(); } catch {}
+      try { await screen.orientation?.lock?.(isLandscape ? 'landscape' : 'portrait'); } catch {}
     } else {
-      document.exitFullscreen?.().catch(() => {});
+      try { await document.exitFullscreen?.(); } catch {}
+      try { screen.orientation?.unlock?.(); } catch {}
     }
   };
-
-  const handleToggleLandscape = () => {
-    setIsLandscape(prev => {
-      const next = !prev;
-      if (next) {
-        if (typeof screen !== 'undefined' && screen.orientation?.lock) {
-          screen.orientation.lock('landscape').catch(() => {});
-        }
-      } else {
-        if (typeof screen !== 'undefined' && screen.orientation?.unlock) {
-          screen.orientation.unlock().catch(() => {});
-        }
-      }
-      return next;
-    });
+  const handleToggleLandscape = async () => {
+    const next = !isLandscape;
+    setIsLandscape(next);
+    try { await screen.orientation?.lock?.(next ? 'landscape' : 'portrait'); } catch {}
   };
-
-  const handleToggleWebFullscreen = () => {
-    setIsWebFullscreen(prev => !prev);
+  const handleSeek = value => {
+    const video = videoRef?.current;
+    if (!video || !Number.isFinite(video.duration)) return;
+    video.currentTime = Number(value);
+    setCurrentTime(Number(value));
   };
+  const handlePlayPause = () => {
+    const video = videoRef?.current;
+    if (!video) return;
+    if (video.paused) video.play().catch(() => {}); else video.pause();
+  };
+  const fullscreen = isSystemFullscreen || isWebFullscreen;
+  const progressPct = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
+  const bufferPct = duration > 0 ? Math.min(100, (bufferedSeconds / duration) * 100) : 0;
+  const loadSpeed = bufferRate > 0 ? `${bufferRate.toFixed(1)} 秒/秒` : '—';
 
   return (
-    <div className={`sangtian-window ${isLive ? 'is-live-direct' : ''} ${isLandscape ? 'is-landscape' : ''} ${isWebFullscreen ? 'is-web-fullscreen' : ''} aspect-${aspectMode.replace(':', '-')}`}>
-      {/* Top Header Bar of the Window - Exactly matching screenshot */}
-      <div className="sangtian-window-bar">
-        <div className="sangtian-window-tag">
-          <span>{terminalTag}</span>
-        </div>
+    <div className={`sangtian-window ${isLive ? 'is-live-direct' : ''} ${isLandscape ? 'is-landscape' : ''} ${isWebFullscreen ? 'is-web-fullscreen' : ''} ${isSystemFullscreen ? 'is-system-fullscreen' : ''} aspect-${aspectMode.replace(':','-')}`}>
+      {!fullscreen && <div className="sangtian-window-bar">
+        <div className="sangtian-window-tag"><span>{terminalTag}</span></div>
         <div className="sangtian-window-actions">
-          <button
-            className="sangtian-window-btn"
-            onClick={handleCopyLink}
-            title="复制播放链接"
-          >
-            {copied ? <Check size={13} color="#55c370" /> : <Copy size={13} />}
-            <span>{copied ? '已复制' : '复制'}</span>
-          </button>
-
-          <button
-            className={`sangtian-window-btn ${showTerminal ? 'active' : ''}`}
-            onClick={() => setShowTerminal(v => !v)}
-            title="切换终端参数/视频画面"
-          >
-            {showTerminal ? <Play size={13} /> : <Download size={13} />}
-            <span>{showTerminal ? '画面' : '信息'}</span>
-          </button>
-
-          <button
-            className={`sangtian-window-btn ${isLandscape ? 'active' : ''}`}
-            onClick={handleToggleLandscape}
-            title="横屏切换"
-          >
-            <RotateCw size={13} />
-            <span>{isLandscape ? '竖屏' : '横屏'}</span>
-          </button>
-
-          <button
-            className={`sangtian-window-btn ${isWebFullscreen ? 'active' : ''}`}
-            onClick={handleToggleWebFullscreen}
-            title="网页全屏播放"
-          >
-            <Tv size={13} />
-            <span>{isWebFullscreen ? '还原' : '网页全屏'}</span>
-          </button>
-
-          <button
-            className={`sangtian-window-btn ${aspectMode !== 'original' ? 'active' : ''}`}
-            onClick={handleCycleAspect}
-            title={currentAspect.title}
-          >
-            <Ratio size={13} />
-            <span>{currentAspect.label}</span>
-          </button>
-
-          <button
-            className="sangtian-window-btn icon-only"
-            onClick={handleToggleFullscreen}
-            title="系统全屏"
-          >
-            <Maximize2 size={13} />
-          </button>
+          <button className="sangtian-window-btn" onClick={handleCopyLink} title="复制播放链接">{copied ? <Check size={13}/> : <Copy size={13}/>}<span>{copied ? '已复制' : '复制'}</span></button>
+          <button className={`sangtian-window-btn ${showTerminal ? 'active' : ''}`} onClick={() => setShowTerminal(v=>!v)} title="播放信息">{showTerminal ? <Play size={13}/> : <Download size={13}/>}<span>{showTerminal ? '画面' : '信息'}</span></button>
+          <button className={`sangtian-window-btn ${isLandscape ? 'active' : ''}`} onClick={handleToggleLandscape} title="方向"><RotateCw size={13}/><span>{isLandscape ? '竖屏' : '横屏'}</span></button>
+          <button className={`sangtian-window-btn ${isWebFullscreen ? 'active' : ''}`} onClick={()=>setIsWebFullscreen(v=>!v)} title="窗口全屏"><Tv size={13}/><span>{isWebFullscreen ? '还原' : '全屏'}</span></button>
+          <button className={`sangtian-window-btn ${aspectMode !== 'original' ? 'active' : ''}`} onClick={handleCycleAspect} title={currentAspect.title}><Ratio size={13}/><span>{currentAspect.label}</span></button>
+          <button className="sangtian-window-btn icon-only" onClick={handleToggleFullscreen} title="系统全屏"><Maximize2 size={13}/></button>
         </div>
-      </div>
+      </div>}
 
-      {/* Window Body - Video / Terminal */}
       <div ref={videoContainerRef} className="sangtian-window-body">
-        {(isLandscape || isWebFullscreen) && (
-          <div className="fullscreen-quick-exit">
-            {isLandscape && (
-              <button className="sangtian-window-btn active" onClick={handleToggleLandscape}>
-                <RotateCw size={12} /> 退出横屏
-              </button>
-            )}
-            {isWebFullscreen && (
-              <button className="sangtian-window-btn active" onClick={handleToggleWebFullscreen}>
-                <Minimize2 size={12} /> 退出网页全屏
-              </button>
-            )}
-          </div>
-        )}
         {showTerminal ? (
-          <div className="sangtian-terminal-panel">
-            <pre className="terminal-code">{`播放信息
+          <div className="sangtian-terminal-panel"><pre className="terminal-code">{`播放信息
 
 模式：${isLive ? 'Live 直连' : '影视解析'}
 协议：${resolvedInput?.protocol || candidate?.protocol || '未知'}
 源：${candidate?.sourceId || '—'}
 状态：${status || 'idle'}
+播放进度：${formatTime(currentTime)} / ${formatTime(duration)}
+已缓冲：${formatTime(bufferedSeconds)}
+加载速率：${loadSpeed}
+网络估速：${networkDownlink != null ? networkDownlink + ' Mbps' : '不可用'}
 播放地址：${streamUrl || '等待地址…'}`}</pre>
-            <div className="terminal-footer">
-              <button className="terminal-back-btn" onClick={() => setShowTerminal(false)}>
-                <Play size={13} />
-                <span>返回视频播放</span>
-              </button>
-            </div>
-          </div>
+            <div className="terminal-footer"><button className="terminal-back-btn" onClick={()=>setShowTerminal(false)}><Play size={13}/><span>返回视频播放</span></button></div></div>
         ) : (
           <>
             {children}
-            {!resolvedInput && candidate && status !== 'error' && (
-              <div className="sangtian-video-overlay">
-                <div className="sangtian-loading-spinner" />
-                <span>{isLive ? '正在连接直播直链…' : '正在解析视频播放地址…'}</span>
-              </div>
-            )}
-            {status === 'error' && (
-              <div className="sangtian-video-error">
-                <b>{isLive ? '直播直连失败' : '播放解析失败'}</b>
-                <span>{error || (isLive ? '当前直播直链暂时无法连接。' : '当前播放链路没有可用候选。')}</span>
-                <div className="sangtian-error-btns">
-                  <button className="sangtian-btn-red" onClick={onRetry}>
-                    重新播放
-                  </button>
-                  {onSwitchCandidate && (
-                    <button className="sangtian-btn-sand" onClick={onSwitchCandidate}>
-                      切换备用线路
-                    </button>
-                  )}
+            {!resolvedInput && candidate && status !== 'error' && <div className="sangtian-video-overlay"><div className="sangtian-loading-spinner"/><span>{isLive ? '正在连接直播直链…' : '正在解析视频播放地址…'}</span></div>}
+            {resolvedInput && status !== 'error' && !isPlaying && <div className="sangtian-video-overlay compact"><div className="sangtian-loading-spinner"/><span>正在缓冲…</span></div>}
+            {status === 'error' && <div className="sangtian-video-error"><b>{isLive ? '直播直连失败' : '播放解析失败'}</b><span>{error || '当前播放链路没有可用候选。'}</span><div className="sangtian-error-btns"><button className="sangtian-btn-red" onClick={onRetry}>重新播放</button>{onSwitchCandidate && <button className="sangtian-btn-sand" onClick={onSwitchCandidate}>切换备用线路</button>}</div></div>}
+            {fullscreen && (
+              <div className={`sangtian-fullscreen-controls ${isLandscape ? 'landscape' : 'portrait'} ${showFullscreenBar ? 'visible' : ''}`}
+                   onClick={()=>setShowFullscreenBar(true)}>
+                <div className="sangtian-fullscreen-topbar"><span>{request?.metadata?.title || candidate?.label || '正在播放'}</span><button onClick={handleToggleFullscreen}><Minimize2 size={18}/></button></div>
+                <div className="sangtian-fullscreen-center"><button onClick={handlePlayPause} className="fullscreen-play-btn">{isPlaying ? '暂停' : '播放'}</button></div>
+                <div className="sangtian-fullscreen-bottombar">
+                  <div className="sangtian-fullscreen-progress">
+                    <span>{formatTime(currentTime)}</span>
+                    <input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime,duration||0)} onChange={e=>handleSeek(e.target.value)} aria-label="播放进度"/>
+                    <span>{formatTime(duration)}</span>
+                  </div>
+                  <div className="sangtian-fullscreen-metrics"><span>缓冲 {bufferPct.toFixed(0)}%</span><span>加载 {loadSpeed}</span><span>网络 {networkDownlink != null ? networkDownlink+' Mbps' : '—'}</span></div>
+                  <div className="sangtian-fullscreen-actions">
+                    <button onClick={handleToggleLandscape}><RotateCw size={15}/>{isLandscape ? '竖屏' : '横屏'}</button>
+                    <button onClick={handleCycleAspect}><Ratio size={15}/>{currentAspect.label}</button>
+                    <button onClick={()=>{const v=videoRef?.current;if(v) v.playbackRate=v.playbackRate>=2?1:v.playbackRate+0.25;}}><Clock3 size={15}/>{videoRef?.current?.playbackRate?.toFixed?.(2) || '1.00'}x</button>
+                    <button onClick={()=>setShowFullscreenBar(false)}><Minimize2 size={15}/>收起</button>
+                  </div>
                 </div>
               </div>
             )}
