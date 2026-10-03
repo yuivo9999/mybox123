@@ -3,6 +3,7 @@ import { testMovieSource } from './movieSourceService.js';
 import { liveService } from './liveService.js';
 import { sourceRegistryService } from './sourceRegistryService.js';
 import { userDataService } from './userDataService.js';
+import { tv1LiveService } from './tv1LiveService.js';
 
 export async function testSource(source, options = {}) {
   if (!source?.sourceId) throw new Error('SOURCE_ID_REQUIRED');
@@ -12,6 +13,7 @@ export async function testSource(source, options = {}) {
   }
 
   if (source.sourceType === 'live') {
+    if (source.liveMode === 'tv1') return tv1LiveService.healthCheck(source, options);
     return sourceRegistryService.testLiveSource(source, options);
   }
 
@@ -24,7 +26,7 @@ export async function syncAllSources({ movieSourceId = null } = {}) {
 
   sourceRegistryService.clear();
   sources
-    .filter(source => source.sourceType === 'live' && (source.sourceRef || source.url))
+     .filter(source => source.sourceType === 'live' && source.liveMode !== 'tv1' && (source.sourceRef || source.url))
     .forEach(source => sourceRegistryService.registerLiveSource(source));
 
   const liveResult = await liveService.sync();
