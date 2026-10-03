@@ -46,6 +46,9 @@ export async function syncAllSources({ movieSourceId = null } = {}) {
   const movieResult = await sourceRegistryService.syncMovieSources(sources, movieSourceId);
 
   sourceRegistryService.clear();
+  // 停用/删除/重新导入 Live 源后，不允许旧频道、旧播放地址或旧 EPG
+  // 从运行时缓存重新进入当前源集合；影视 SOURCE 缓存保持不动。
+  liveService.clearRuntimeCache();
   sources
      .filter(source => source.sourceType === 'live' && source.liveMode !== 'tv1' && (source.sourceRef || source.url))
     .forEach(source => sourceRegistryService.registerLiveSource(source));
