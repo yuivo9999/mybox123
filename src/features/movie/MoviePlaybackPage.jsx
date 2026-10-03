@@ -30,7 +30,7 @@ export function MoviePlaybackPage({
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sourceModalOpen, setSourceModalOpen] = useState(false);
-  const videoRef = useRef(null);
+  const videoRef = useRef(null);\n  const videoContainerRef = useRef(null);
 
   const movie = movies.find(item => item.contentId === request?.contentId);
   const episodes = movie?.episodes ?? request?.metadata?.episodes ?? [];
