@@ -345,6 +345,7 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
       const extFormat = capability.kind === 'ext' ? classifyTVBoxExtFormat(site) : null;
       const safeExtJson = sourceType === 'movie' && capability.kind === 'ext' && isSafeTVBoxExtJson(site);
       const isSupportedDirect = sourceType === 'movie' && directMovie;
+      const isSupportedJar = sourceType === 'movie' && capability.requiresJar === true;
       const isTVBoxLiveProvider = sourceType === 'live' && capability.adapterType === 'tvbox-extension';
       const adapterType = isTVBoxLiveProvider ? 'tvbox-live-extension' : capability.adapterType;
 
@@ -363,8 +364,8 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
         // 导入后所有合法 site 都保留并默认启用；真正请求时由 movieSourceService
         // 再依据 sourceCapability/adapterType 判断是否存在可执行适配器。
         enabled: true,
-        status: isSupportedDirect || safeExtJson ? '未测试' : '待适配',
-        runtimeSupported: isSupportedDirect || safeExtJson,
+        status: isSupportedDirect || safeExtJson || isSupportedJar ? '未测试' : '待适配',
+        runtimeSupported: isSupportedDirect || safeExtJson || isSupportedJar,
         sourceCapability: isTVBoxLiveProvider ? 'tvbox-live-provider' : capability.sourceCapability,
         adapterType,
         tvboxAdapterKind: capability.kind,
@@ -375,7 +376,7 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
         tvboxApi: api,
         tvboxDefinition: { ...site },
         ...(isTVBoxLiveProvider ? { tvboxLiveProvider: true } : {}),
-        tvboxUnsupportedReason: isSupportedDirect || safeExtJson ? null : (
+        tvboxUnsupportedReason: isSupportedDirect || safeExtJson || isSupportedJar ? null : (
           isTVBoxLiveProvider ? 'TVBox Live Provider 当前未适配执行器' :
           !api ? '缺少 api' :
             capability.requiresJar ? '该源依赖 JAR 扩展，已进入 CatVod Spider 执行阶段；首次请求时自动准备并校验 JAR' :
