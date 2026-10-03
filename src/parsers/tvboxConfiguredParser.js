@@ -1,5 +1,6 @@
 import { requestAdapter } from '../services/requestAdapter.js';
 import { createResolvedMediaInput } from '../models/parser.js';
+import { applyTVBoxNetworkPolicy } from '../services/tvboxNetworkPolicy.js';
 
 function normalizeFlag(value) {
   return String(value ?? '').replace(/\r?\n/g, '').trim().toLowerCase();
@@ -100,7 +101,10 @@ export function createTVBoxConfiguredParser(config = {}) {
       });
       if (!response?.ok) throw new Error(`PARSER_HTTP_${response?.status ?? 0}`);
 
-      const resolvedUrl = extractUrl(await response.text());
+      const rawBody = await response.text();
+      const policyResponse = applyTVBoxNetworkPolicy(config, parseUrl, { ...response, body: rawBody });
+      if (policyResponse.policyBlocked) throw new Error('TVBOX_AD_BLOCKED');
+      const resolvedUrl = extractUrl(policyResponse.body);
       if (!resolvedUrl) throw new Error('TVBOX_CONFIGURED_PARSE_EMPTY');
 
       return createResolvedMediaInput({
