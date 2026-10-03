@@ -96,6 +96,7 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
     healthCheck,
     execute,
     load: (payload, options) => execute('load', payload, options),
+    request: (payload, options) => execute('request', payload, options),
     search: (payload, options) => execute('search', payload, options),
     detail: (payload, options) => execute('detail', payload, options),
     episodes: (payload, options) => execute('episodes', payload, options),
