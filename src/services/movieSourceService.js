@@ -28,24 +28,30 @@ export function canUseHttpMovieAdapter(source = {}) {
   return capability === 'direct-http-vod' && adapterType === 'http-vod';
 }
 
-function cacheKey(sourceId) {
+function cacheKey(sourceId, params = {}) {
   return createCacheKey({
     namespace: CacheNamespace.SOURCE,
     sourceId,
     contentId: 'movies',
-    params: { type: 'movies' },
+    params: {
+      type: 'movies',
+      categoryId: params.categoryId ?? '',
+      page: Number(params.page) || 1,
+      pageSize: Number(params.pageSize) || 24,
+      keyword: String(params.keyword ?? ''),
+    },
   });
 }
 
-async function load(adapter) {
-  const key = cacheKey(adapter.sourceId);
+async function load(adapter, options = {}) {
+  const key = cacheKey(adapter.sourceId, options);
   const cached = cacheStorage.get(CacheNamespace.SOURCE, key, { allowStale: true });
   if (cached.hit && !cached.stale) return { value: cached.value, stale: false, fromCache: true };
 
   try {
     const value = await requestManager.run(
       `movie:source:${adapter.sourceId}`,
-      signal => adapter.getMovies({ signal }),
+      signal => adapter.getMovies({ ...options, signal, page: options.page ?? 1, limit: options.pageSize ?? options.limit ?? 24 }),
     );
 
     if (Array.isArray(value) && value.length) {
@@ -79,10 +85,9 @@ export async function testMovieSource(source, options = {}) {
   return adapter.healthCheck({ signal: options.signal });
 }
 
-export async function syncMovieSources(sourceConfigs = [], selectedSourceId = null) {
+export async function syncMovieSources(sourceConfigs = [], selectedSourceId = null, options = {}) {
   movieRegistry.clear();
 
-  // 影视源采用按需加载：没有明确选择时不请求任何影视源。
   const selected = sourceConfigs.filter(source =>
     source.enabled !== false
     && source.sourceType === 'movie'
@@ -116,12 +121,56 @@ export async function syncMovieSources(sourceConfigs = [], selectedSourceId = nu
 
   const settled = await Promise.all(movieRegistry.list().map(async adapter => {
     try {
-      const result = await load(adapter);
+      // 第一阶段只取得分类索引；第二阶段只请求当前分类第一页。
+      const categories = typeof adapter.getCategories === 'function'
+        ? await adapter.getCategories({ signal: options.signal, timeoutMs: options.timeoutMs ?? 5000 })
+        : [];
+      const normalizedCategories = (Array.isArray(categories) ? categories : [])
+        .map((item, index) => ({
+          id: String(item?.id ?? item?.type_id ?? '').trim(),
+          name: String(item?.name ?? item?.type_name ?? item?.label ?? item ?? '').trim(),
+          sourceId: adapter.sourceId,
+        }))
+        .filter(item => item.name);
+
+      const requestedCategoryId = options.categoryId != null ? String(options.categoryId).trim() : '';
+      const requestedCategoryName = String(options.categoryName ?? '').trim();
+      const activeCategory = normalizedCategories.find(item =>
+        (requestedCategoryId && item.id === requestedCategoryId)
+        || (requestedCategoryName && item.name === requestedCategoryName)
+      ) || normalizedCategories[0] || null;
+
+      if (!activeCategory) {
+        return {
+          status: 'fulfilled',
+          sourceId: adapter.sourceId,
+          value: [],
+          categories: [],
+          activeCategory: null,
+          stale: false,
+          capabilities: adapter.getCapabilities(),
+          definition: adapter.getDefinition(),
+          adapterStatus: adapter.getStatus(),
+        };
+      }
+
+      const result = await load(adapter, {
+        categoryId: activeCategory.id,
+        categoryName: activeCategory.name,
+        page: Number(options.page) || 1,
+        pageSize: Number(options.pageSize) || 24,
+        timeoutMs: options.timeoutMs,
+        signal: options.signal,
+      });
+
       return {
         status: 'fulfilled',
         sourceId: adapter.sourceId,
         value: result.value,
+        categories: normalizedCategories,
+        activeCategory,
         stale: result.stale,
+        fromCache: result.fromCache,
         capabilities: adapter.getCapabilities(),
         definition: adapter.getDefinition(),
         adapterStatus: adapter.getStatus(),
@@ -134,6 +183,8 @@ export async function syncMovieSources(sourceConfigs = [], selectedSourceId = nu
           scope: 'movie-source',
           sourceId: adapter.sourceId,
         }),
+        categories: [],
+        activeCategory: null,
         capabilities: adapter.getCapabilities(),
         definition: adapter.getDefinition(),
         adapterStatus: adapter.getStatus(),
@@ -145,9 +196,13 @@ export async function syncMovieSources(sourceConfigs = [], selectedSourceId = nu
     movies: contentService.getMovies(
       settled.flatMap(result => result.status === 'fulfilled' ? result.value : []),
     ),
+    categories: settled.flatMap(result => result.status === 'fulfilled' ? result.categories : []),
+    activeCategory: settled.find(result => result.status === 'fulfilled' && result.activeCategory)?.activeCategory ?? null,
     results: [...settled, ...unsupported.map(item => ({
       status: 'rejected',
       ...item,
+      categories: [],
+      activeCategory: null,
     }))],
   };
 }
