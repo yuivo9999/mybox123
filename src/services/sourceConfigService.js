@@ -1,4 +1,5 @@
 import { sourceRepository } from '../repositories/sourceRepository.js';
+import { createSourceAdapters } from '../adapters/sourceAdapterFactory.js';
 
 function validateImportedSources(value) {
   if (!Array.isArray(value)) throw new Error('SOURCE_IMPORT_ARRAY_REQUIRED');
@@ -390,6 +391,10 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
 export const sourceConfigService = {
   read() {
     return sourceRepository.getAll();
+  },
+
+  createAdapters(options = {}) {
+    return createSourceAdapters(this.read(), options);
   },
 
   normalize(sources) {
