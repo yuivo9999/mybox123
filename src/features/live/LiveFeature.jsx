@@ -317,45 +317,48 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
           )}
 
           {!!allChannels.length && (
-            <div className="channel-tree">
-          {grouped.map(([category, categoryChannels]) => (
-            <details key={category} open>
-              <summary style={{ cursor: 'pointer', padding: '9px 6px', fontWeight: 700 }}>
-                <Radio size={15} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-                {category}
-                <small style={{ marginLeft: 8, opacity: 0.65 }}>{categoryChannels.length}</small>
-              </summary>
-              <div className="channel-list" style={{ paddingLeft: 12 }}>
-                {categoryChannels.map(channel => {
-                  const isCurrent = channel.channelId === activeChannel?.channelId;
-                  const favorite = favorites.some(i => i.targetType === 'channel' && i.targetId === channel.channelId);
-                  const isLazy = Boolean(channel.deferredRef);
-                  const isResolving = streamLoading && selectedChannelId === channel.channelId && isLazy;
-                  const streamCount = resolvedStreams[channel.channelId]?.length ?? channel.streams?.length ?? 0;
-                  return (
-                    <div className={'channel ' + (isCurrent ? 'active-playing' : '')} key={channel.channelId} onClick={() => selectChannel(channel)}>
-                      <div className="channel-logo"><SmartImage src={channel.logo} alt={channel.name} fallback={<Radio />} /></div>
-                      <div className="channel-main">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <b>{channel.name}</b>
-                          {isCurrent && <span className="live-pill" style={{ fontSize: 10, padding: '1px 5px' }}>当前</span>}
-                        </div>
-                        <small>
-                          {isResolving ? '正在读取播放地址…' : isLazy ? 'TV1 · 地址按需读取' : 'Live'} · {streamCount ? streamCount + ' 条线路' : '未读取线路'}
-                        </small>
-                      </div>
-                      <button className={favorite ? 'channel-favorite active-fav' : 'channel-favorite'} onClick={event => { event.stopPropagation(); toggleFavorite('channel', channel.channelId); }}>
-                        <Heart size={17} fill={favorite ? 'currentColor' : 'none'} />
-                      </button>
-                      <button className="secondary" disabled={isResolving} onClick={event => { event.stopPropagation(); selectChannel(channel); if (channel.streams?.length) onPlay?.(channel); }}>
-                        <Play size={17} />
-                      </button>
+            <div className="live-channel-picker" aria-label="直播频道分组">
+              {grouped.map(([category, categoryChannels]) => (
+                <section className="live-channel-group" key={category}>
+                  <div className="live-channel-group-header">
+                    <div className="live-channel-group-title">
+                      <Radio size={14} />
+                      <b>{category}</b>
+                      <span>{categoryChannels.length}</span>
                     </div>
-                  );
-                })}
-              </div>
-            </details>
-            ))}
+                    <small>组内滑动</small>
+                  </div>
+                  <div className="live-channel-group-list" aria-label={category + '频道列表'}>
+                    {categoryChannels.map(channel => {
+                      const isCurrent = channel.channelId === activeChannel?.channelId;
+                      const favorite = favorites.some(i => i.targetType === 'channel' && i.targetId === channel.channelId);
+                      const isLazy = Boolean(channel.deferredRef);
+                      const isResolving = streamLoading && selectedChannelId === channel.channelId && isLazy;
+                      const streamCount = resolvedStreams[channel.channelId]?.length ?? channel.streams?.length ?? 0;
+                      return (
+                        <div className={'channel live-channel-row ' + (isCurrent ? 'active-playing' : '')} key={channel.channelId} onClick={() => selectChannel(channel)}>
+                          <div className="channel-logo live-channel-logo"><SmartImage src={channel.logo} alt={channel.name} fallback={<Radio />} /></div>
+                          <div className="channel-main">
+                            <div className="live-channel-name">
+                              <b>{channel.name}</b>
+                              {isCurrent && <span className="live-pill">当前</span>}
+                            </div>
+                            <small>
+                              {isResolving ? '正在读取播放地址…' : isLazy ? 'TV1 · 地址按需读取' : 'Live'} · {streamCount ? streamCount + ' 条线路' : '未读取线路'}
+                            </small>
+                          </div>
+                          <button aria-label={'收藏 ' + channel.name} className={favorite ? 'channel-favorite active-fav' : 'channel-favorite'} onClick={event => { event.stopPropagation(); toggleFavorite('channel', channel.channelId); }}>
+                            <Heart size={15} fill={favorite ? 'currentColor' : 'none'} />
+                          </button>
+                          <button aria-label={'播放 ' + channel.name} className="secondary live-channel-play" disabled={isResolving} onClick={event => { event.stopPropagation(); selectChannel(channel); if (channel.streams?.length) onPlay?.(channel); }}>
+                            <Play size={15} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
             </div>
           )}
 
