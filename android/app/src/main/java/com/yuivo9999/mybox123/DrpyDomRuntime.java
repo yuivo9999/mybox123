@@ -189,7 +189,7 @@ public final class DrpyDomRuntime {
         static DomValue from(String input) {
             if (input == null) return new DomValue("", "");
             String trimmed = input.trim();
-            if (trimmed.startsWith("{") && trimmed.contains(""__drpyDom"")) {
+            if (trimmed.startsWith("{") && trimmed.contains("\"__drpyDom\"")) {
                 try {
                     JSONObject object = new JSONObject(trimmed);
                     return new DomValue(object.optString("html", ""), object.optString("baseUrl", ""));
