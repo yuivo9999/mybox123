@@ -1,4 +1,5 @@
 import { ErrorCode, toAppError } from '../../models/errors.js';
+import { createTVBoxNativeRuntime } from './tvboxNativeRuntime.js';
 
 /**
  * TVBox 扩展执行器的统一边界。
@@ -18,6 +19,7 @@ export const TVBOX_EXTENSION_KIND = Object.freeze({
 export const TVBOX_EXTENSION_ERROR = 'TVBOX_EXTENSION_RUNTIME_UNAVAILABLE';
 
 export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
+  const effectiveRuntime = runtime ?? createTVBoxNativeRuntime();
   const sourceId = String(config.sourceId || '').trim();
   const kind = String(config.tvboxAdapterKind || 'unknown').trim() || 'unknown';
 
@@ -50,7 +52,7 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
   );
 
   const execute = async (operation, payload = {}, options = {}) => {
-    if (!runtime || typeof runtime.execute !== 'function') {
+    if (!effectiveRuntime || typeof effectiveRuntime.execute !== 'function') {
       throw unavailable(operation);
     }
 
@@ -76,7 +78,7 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
       return {
         ok: false,
         sourceId,
-        status: runtime ? 'error' : 'unsupported',
+        status: effectiveRuntime ? 'error' : 'unsupported',
         checkedAt: Date.now(),
         error: toAppError(error, { context: { sourceId, kind } }),
       };
@@ -86,7 +88,7 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
   return {
     sourceId,
     definition,
-    isRuntimeAvailable: () => Boolean(runtime && typeof runtime.execute === 'function'),
+    isRuntimeAvailable: () => Boolean(effectiveRuntime && typeof effectiveRuntime.execute === 'function'),
     healthCheck,
     execute,
     load: (payload, options) => execute('load', payload, options),
