@@ -1058,6 +1058,29 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
   margin-bottom: 6px;
 }
 
+/* Live channel picker: fixed viewport with independently scrollable groups. */
+.live-channel-picker{margin:0 14px 18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;max-height:min(440px,52vh);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:2px 2px 4px}
+.live-channel-group{min-width:0;display:flex;flex-direction:column;min-height:0;border:1px solid #2b313d;border-radius:12px;background:#11151c;overflow:hidden}
+.live-channel-group-header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;border-bottom:1px solid #252b35;background:#171b23}
+.live-channel-group-title{min-width:0;display:flex;align-items:center;gap:6px}
+.live-channel-group-title b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.live-channel-group-title span{flex:0 0 auto;min-width:20px;padding:1px 6px;border-radius:999px;background:#252b35;color:#9da6b6;font-size:10px;text-align:center}
+.live-channel-group-header small{flex:0 0 auto;color:#747e90;font-size:10px}
+.live-channel-group-list{min-height:0;height:214px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding:4px}
+.live-channel-row{min-height:48px;padding:6px 6px!important;gap:8px!important;border-radius:8px;cursor:pointer;transition:background .15s,border-color .15s}
+.live-channel-row:hover{background:rgba(255,255,255,.035)}
+.live-channel-logo{width:34px!important;height:34px!important;border-radius:9px!important;flex:0 0 34px}
+.live-channel-name{display:flex;align-items:center;gap:5px;min-width:0}
+.live-channel-name b{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.live-channel-name .live-pill{font-size:9px;padding:1px 4px;flex:0 0 auto}
+.live-channel-row .channel-main small{display:block;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#778194}
+.live-channel-row .channel-favorite{padding:5px;flex:0 0 26px}
+.live-channel-play{width:28px;height:28px;min-width:28px;padding:0!important;display:grid;place-items:center;border-radius:7px}
+@media(max-width:720px){
+  .live-channel-picker{grid-template-columns:1fr;max-height:50vh}
+  .live-channel-group-list{height:190px}
+}
+
 /* Live In-Page Player Bar Styles */
 .live-current-bar {
   margin: 0 14px 12px;
