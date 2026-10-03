@@ -47,10 +47,21 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
     return preparedPath;
   };
 
+  const inferClassName = () => {
+    const tvbox = definition.tvboxDefinition;
+    const explicit = String(tvbox?.className || tvbox?.class || '').trim();
+    if (explicit) return explicit;
+    const api = String(tvbox?.api || '').trim();
+    const key = String(tvbox?.key || '').trim();
+    if (/^csp_/i.test(api)) return api.replace(/^csp_/i, '');
+    if (/^csp_/i.test(key)) return key.replace(/^csp_/i, '');
+    return '';
+  };
+
   const invoke = async (operation, payload = {}) => execute(operation, {
     ...payload,
     path: payload.path || preparedPath || '',
-    className: payload.className || '',
+    className: payload.className || inferClassName(),
     ext: payload.ext ?? definition.tvboxDefinition?.ext ?? '',
   });
 
