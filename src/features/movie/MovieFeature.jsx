@@ -70,76 +70,75 @@ function MovieSourceSelector({sources=[],selectedSourceId,onChange}){
 
 function MovieCatalog({movies,state,setState,onMovie,onPlay,onSearch,recordSearch,sources=[]}){
  const home=useMemo(()=>movieService.getHome({movies}),[movies]); const categories=['全部','电影','电视剧','综艺'];
- const [queryInput,setQueryInput]=useState(state.query||'');
- useEffect(()=>{
-  const current=String(state.query||'');
-  if(current!==queryInput)setQueryInput(current);
- },[state.query]);
- useEffect(()=>{
-  const normalized=String(queryInput||'').trim();
-  const persisted=String(state.query||'').trim();
-  if(normalized===persisted)return;
-  const timer=setTimeout(()=>setState({query:queryInput,page:1}),300);
-  return()=>clearTimeout(timer);
- },[queryInput,state.query,setState]);
+ const [queryInput,setQueryInput]=useState('');
+ const submitSearch=()=>{
+  const keyword=String(queryInput||'').trim();
+  if(!keyword)return;
+  pageStateStore.patch('search',{query:keyword});
+  recordSearch?.(keyword);
+  onSearch?.(keyword);
+ };
  const selectedType=state.category==='电影'?'movie':state.category==='电视剧'?'tv':state.category==='综艺'?'variety':null;
  const subcategories=selectedType?(home.taxonomy?.[selectedType]??[]):[];
  const listMeta=movieService.list({movies,...state}); const apply=(patch)=>setState({...patch,page:1});
  const filters=home.filters??{}; const values=(key)=>['全部',...(filters[key]??[])];
- return <Page><Header title="影视"/><div className="searchbox"><Search size={18}/><input value={queryInput} onChange={e=>setQueryInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){setState({query:queryInput,page:1});recordSearch(queryInput)}}} placeholder="搜索影视内容"/>{queryInput&&<X size={16} onClick={()=>setQueryInput('')}/>}</div>
+ return <Page><Header title="影视"/><div className="searchbox"><Search size={18}/><input value={queryInput} onChange={e=>setQueryInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')submitSearch()}} placeholder="搜索影视内容"/><button className="secondary search-submit" type="button" onClick={submitSearch}>搜索</button>{queryInput&&<button className="icon-button" aria-label="清空搜索" type="button" onClick={()=>setQueryInput('')}><X size={16}/></button>}</div>
  <div className="chips">{categories.map(item=><button className={state.category===item?'active':''} onClick={()=>apply({category:item,filters:{...state.filters,categoryId:''}})} key={item}>{item}</button>)}</div>
  {selectedType&&<div className="chips">{subcategories.map(item=>{const selected=state.filters.categoryId===item.id;return <button className={selected?'active':''} onClick={()=>setState({filters:{...state.filters,categoryId:selected?'':item.id},page:1})} key={item.id}>{item.label}</button>})}</div>}
  <div className="filter-row"><select value={state.filters.type||'全部'} onChange={e=>setState({filters:{...state.filters,type:e.target.value==='全部'?'':e.target.value},page:1})}>{values('types').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.year||'全部'} onChange={e=>setState({filters:{...state.filters,year:e.target.value==='全部'?'':e.target.value},page:1})}>{values('years').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.region||'全部'} onChange={e=>setState({filters:{...state.filters,region:e.target.value==='全部'?'':e.target.value},page:1})}>{values('regions').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.status||'全部'} onChange={e=>setState({filters:{...state.filters,status:e.target.value==='全部'?'':e.target.value},page:1})}>{values('statuses').map(x=><option key={x}>{x}</option>)}</select><select value={state.sort} onChange={e=>setState({sort:e.target.value,page:1})}>{[['default','默认'],['latest','最新'],['popular','热门'],['time','时间'],['title','名称']].map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></div>
- {state.query.trim()
-   ? <GlobalMovieSearch query={state.query} sources={sources} onMovie={onMovie} onPlay={(movie)=>onPlay?.(movie,0,movie?.sourceId,'movies')}/>
-   : listMeta.items.length
-     ? <MovieGrid movies={listMeta.items} onMovie={onMovie}/>
-     : <EmptyState text={movies.length?'当前筛选暂无内容':'暂无影视内容'}/>}
+ {listMeta.items.length
+   ? <MovieGrid movies={listMeta.items} onMovie={onMovie}/>
+   : <EmptyState text={movies.length?'当前筛选暂无内容':'暂无影视内容'}/>}
  {!state.query.trim()&&listMeta.items.length>0&&<div className="pagination"><button disabled={state.page<=1} onClick={()=>setState({page:state.page-1})}>上一页</button><span>第 {state.page} 页 / 共 {Math.max(1,Math.ceil(listMeta.total/state.pageSize))} 页</span><button disabled={!listMeta.hasMore} onClick={()=>setState({page:state.page+1})}>下一页</button></div>}</Page>;
 }
 
 function MovieSearch({movies,initial,recordSearch,onMovie,onPlay,onBack,onQuery,sources=[]}){
  const [query,setQuery]=useState(initial||'');
- return <Page><button className="back" onClick={onBack}><ChevronLeft/>返回</button><Header title="搜索"/><div className="searchbox"><Search size={18}/><input autoFocus value={query} onChange={e=>{setQuery(e.target.value);onQuery(e.target.value)}} onKeyDown={e=>e.key==='Enter'&&recordSearch(query)} placeholder="搜索全部影视源"/>{query&&<X size={16} onClick={()=>{setQuery('');onQuery('')}}/>}</div>{!query?<EmptyState text="输入关键词搜索全部已导入影视源"/>:<GlobalMovieSearch query={query} sources={sources} onMovie={onMovie} onPlay={(movie)=>onPlay?.(movie,0,movie?.sourceId,'search')}/>}</Page>;
+ const [submitted,setSubmitted]=useState(String(initial||'').trim());
+ const submitSearch=()=>{
+  const keyword=String(query||'').trim();
+  if(!keyword)return;
+  setSubmitted(keyword);
+  onQuery?.(keyword);
+  recordSearch?.(keyword);
+ };
+ return <Page><button className="back" onClick={onBack}><ChevronLeft/>返回</button><Header title="搜索结果"/><div className="searchbox"><Search size={18}/><input autoFocus value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')submitSearch()}} placeholder="搜索全部影视源"/><button className="secondary search-submit" type="button" onClick={submitSearch}>搜索</button>{query&&<button className="icon-button" aria-label="清空搜索" type="button" onClick={()=>setQuery('')}><X size={16}/></button>}</div>{!submitted?<EmptyState text="输入关键词后点击“搜索”"/>:<GlobalMovieSearch query={submitted} sources={sources} onMovie={onMovie} onPlay={(movie)=>onPlay?.(movie,0,movie?.sourceId,'search')}/>}</Page>;
 }
 
 function GlobalMovieSearch({query,sources=[],onMovie,onPlay}){
- const [state,setState]=useState({loading:true,groups:[],failed:[],error:''});
+ const [state,setState]=useState({loading:true,groups:[],failed:[],error:'',completed:0,totalSources:0});
  const normalizedQuery=String(query||'').trim();
  useEffect(()=>{
-   if(normalizedQuery.length<2){
-     setState({loading:false,groups:[],failed:[],error:''});
+   if(!normalizedQuery){
+     setState({loading:false,groups:[],failed:[],error:'',completed:0,totalSources:0});
      return undefined;
    }
    const controller=new AbortController();
    let active=true;
-   setState({loading:true,groups:[],failed:[],error:''});
-   searchMovieSources(sources,normalizedQuery,{signal:controller.signal,concurrency:4,pageSize:20,timeoutMs:5000})
-     .then(result=>{
-       if(!active)return;
-       setState({loading:false,groups:result.results??[],failed:result.failed??[],error:''});
-     })
-     .catch(error=>{
-       if(!active||error?.name==='AbortError')return;
-       setState({loading:false,groups:[],failed:[],error:error?.message||'搜索失败'});
-     });
+   const totalSources=sources.filter(source=>source?.sourceType==='movie'&&source?.enabled!==false).length;
+   setState({loading:true,groups:[],failed:[],error:'',completed:0,totalSources});
+   searchMovieSources(sources,normalizedQuery,{signal:controller.signal,pageSize:20,timeoutMs:5000,onSourceResult:(entry,meta)=>{
+     if(!active)return;
+     setState(current=>({...current,
+       groups:entry.status==='fulfilled'?[...current.groups,entry]:current.groups,
+       failed:entry.status==='rejected'?[...current.failed,entry]:current.failed,
+       completed:meta?.completed??current.completed,
+     }));
+   }}).then(result=>{
+     if(!active)return;
+     setState(current=>({...current,loading:false,groups:result.results??current.groups,failed:result.failed??current.failed,completed:result.completed??current.completed}));
+   }).catch(error=>{
+     if(!active||error?.name==='AbortError')return;
+     setState(current=>({...current,loading:false,error:error?.message||'搜索失败'}));
+   });
    return()=>{active=false;controller.abort();};
  },[normalizedQuery,sources]);
  const total=state.groups.reduce((sum,group)=>sum+(group.items?.length??0),0);
- if(normalizedQuery.length<2)return <EmptyState text="至少输入 2 个字符后开始全源搜索"/>;
- if(state.loading)return <div className="empty state-view"><Search size={22}/><b>正在搜索全部影视源</b><span>正在并发搜索 {sources.filter(source=>source?.sourceType==='movie'&&source?.enabled!==false).length} 个已启用影视源…</span></div>;
+ if(!normalizedQuery)return <EmptyState text="输入关键词后点击“搜索”"/>;
+ if(state.loading)return <div><div className="empty state-view"><Search size={22}/><b>正在逐源搜索</b><span>已完成 {state.completed} / {state.totalSources} 个影视源，结果会持续显示。</span></div>{state.groups.filter(group=>(group.items?.length??0)>0).map(group=><section key={group.sourceId}><div className="section-title" style={{marginBottom:8}}><h3>{group.sourceName}</h3><span style={{fontSize:12,color:'#8f9aaa'}}>{group.items.length} 条</span></div><MovieGrid movies={group.items} onMovie={onPlay||onMovie}/></section>)}</div>;
  if(state.error)return <EmptyState text={state.error}/>;
- if(!total)return <EmptyState text={<>没有找到“{query}”的同名影视剧</>}/>;
- return <div>
-   <SectionTitle title="全源搜索结果" action={String(total)+' 条'}/>
-   <div style={{display:'grid',gap:18}}>
-     {state.groups.filter(group=>(group.items?.length??0)>0).map(group=><section key={group.sourceId}>
-       <div className="section-title" style={{marginBottom:8}}><h3>{group.sourceName}</h3><span style={{fontSize:12,color:'#8f9aaa'}}>{group.items.length} 条</span></div>
-       <MovieGrid movies={group.items} onMovie={onPlay || onMovie}/>
-     </section>)}
-   </div>
-   {state.failed.length>0&&<div style={{fontSize:11,color:'#8f9aaa',marginTop:12}}>另有 {state.failed.length} 个源未返回结果，已跳过，不影响其他源。</div>}
- </div>;
+ if(!total&&!state.failed.length)return <EmptyState text={<>没有找到“{query}”的同名影视剧</>}/>;
+ return <div><SectionTitle title="全源搜索结果" action={String(total)+' 条'}/><div style={{display:'grid',gap:18}}>{state.groups.filter(group=>(group.items?.length??0)>0).map(group=><section key={group.sourceId}><div className="section-title" style={{marginBottom:8}}><h3>{group.sourceName}</h3><span style={{fontSize:12,color:'#8f9aaa'}}>{group.items.length} 条</span></div><MovieGrid movies={group.items} onMovie={onPlay||onMovie}/></section>)}</div>{state.failed.length>0&&<div style={{fontSize:11,color:'#8f9aaa',marginTop:12}}>另有 {state.failed.length} 个源未返回结果，已跳过，不影响其他源。</div>}</div>;
 }
 
 function MovieDetail({movie,movies,sources=[],selectedSourceId,onMovie,onBack,onPlay,favorite,onFavorite}){
