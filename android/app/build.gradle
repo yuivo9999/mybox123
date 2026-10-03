@@ -3,6 +3,11 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.yuivo9999.mybox123"
     compileSdk = rootProject.ext.compileSdkVersion
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
     defaultConfig {
         applicationId "com.yuivo9999.mybox123"
         minSdkVersion rootProject.ext.minSdkVersion
