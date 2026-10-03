@@ -71,7 +71,6 @@ function MovieSourceSelector({sources=[],selectedSourceId,onChange}){
  const [draftSourceId,setDraftSourceId]=useState(selectedSourceId||'');
  useEffect(()=>{if(!open)setDraftSourceId(selectedSourceId||'');},[selectedSourceId,open]);
  const selected=sources.find(source=>source.sourceId===selectedSourceId);
- const draft=sources.find(source=>source.sourceId===draftSourceId);
  const close=()=>{setDraftSourceId(selectedSourceId||'');setOpen(false);};
  const apply=()=>{setOpen(false);if(draftSourceId&&draftSourceId!==selectedSourceId)onChange?.(draftSourceId);};
  return <section className="source-selector" style={{marginBottom:16}}>
