@@ -216,8 +216,10 @@ function classifyTVBoxSite(site = {}) {
   const key = String(site.key || '').trim();
   const api = String(site.api || '').trim();
   const text = `${name} ${key} ${api}`;
-  const liveLike = /(直播|体育赛事|赛事直播|竞技直播|网红直播|310直播)/i.test(text);
-  return liveLike ? 'live' : 'movie';
+  // TVBox 的 `sites` 始终是影视/内容站点定义；真正的直播源位于顶层 `lives`。
+  // 不能因为站点名称包含“直播/体育”等字样就把它注册到 Live Registry，
+  // 否则 csp/CSP、Drpy、ext 等内容提供器会污染直播源集合。
+  return 'movie';
 }
 
 function classifyTVBoxCapability(site = {}) {
@@ -311,18 +313,22 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
         sourceType,
         sourceRef: api,
         url: api,
-        enabled: isSupportedDirect,
+        // “导入”与“当前运行时是否支持”必须分离：
+        // 导入后所有合法 site 都保留并默认启用；真正请求时由 movieSourceService
+        // 再依据 sourceCapability/adapterType 判断是否存在可执行适配器。
+        enabled: true,
         status: isSupportedDirect ? '未测试' : '待适配',
-        sourceCapability: sourceType === 'live' ? 'tvbox-live-provider' : capability.sourceCapability,
-        adapterType: sourceType === 'live' ? 'tvbox-live-provider' : adapterType,
-        tvboxAdapterKind: sourceType === 'live' ? 'live-provider' : capability.kind,
+        runtimeSupported: isSupportedDirect,
+        sourceCapability: capability.sourceCapability,
+        adapterType,
+        tvboxAdapterKind: capability.kind,
         tvboxRequiresJar: capability.requiresJar === true,
         tvboxType: Number.isFinite(Number(site.type)) ? Number(site.type) : null,
         tvboxKey: String(site.key || '').trim(),
         tvboxApi: api,
         tvboxDefinition: { ...site },
         tvboxUnsupportedReason: isSupportedDirect ? null : (
-          !api ? '缺少 api' : sourceType === 'live' ? 'TVBox site 是直播提供器，当前没有 Live 专用适配器'
+          !api ? '缺少 api' :
             : capability.kind === 'drpy-js' ? 'Drpy JS 源当前未适配执行器'
             : capability.kind === 'csp' ? 'CSP 源当前未适配执行器'
             : capability.kind === 'jar' || capability.kind === 'http-vod-with-jar' ? '该源依赖 JAR 扩展，当前未适配 JAR 执行器'
