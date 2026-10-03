@@ -64,7 +64,7 @@ public final class TVBoxJarBridge {
             result.put("isolatedProcessMode", "in-memory-dex");
             result.put("networkAccess", "not-granted-to-isolated-process");
             result.put("isolatedProcessNetworkProxyRequired", true);
-            result.put("reason", "CATVOD_SPIDER_ABI_DEXCLASSLOADER_HOST_PROCESS");
+            result.put("reason", "CATVOD_SPIDER_ABI_ISOLATED_IN_MEMORY_DEX_NETWORK_PROXY_PENDING");
             return result.toString();
         } catch (Exception e) {
             return "{\"available\":false,\"reason\":\"TVBOX_JAR_CAPABILITY_ERROR\"}";
