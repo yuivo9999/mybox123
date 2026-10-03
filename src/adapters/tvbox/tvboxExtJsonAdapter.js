@@ -45,6 +45,7 @@ export function createTVBoxExtJsonAdapter(config = {}, transport = null) {
     sourceCapability: 'tvbox-ext-json',
     adapterType: 'tvbox-extension',
     kind: 'ext',
+    tvboxExtFormat: config.tvboxExtFormat ?? null,
     tvboxExt: ext ?? null,
   });
 
