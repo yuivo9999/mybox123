@@ -251,7 +251,7 @@ Native bridge 不可用时：
 
 - 阶段：阶段 3：React 请求层 Android 适配实施
 - 完成日期：2026-10-03
-- Commit：9dce6153d79903f43045c1c4865468a7e3e75815、ca6b3312704013493400b31801946835f91ee095、e9dfb5d1f89dfb96954cdd474a01cc234a193c07、fee58e6b5794f57a5fa049279704e5f87712a79d、9eb6593d6f7a8f0bc97485e0612aee69427a5a9e、c32df82ec67fbae2444460e8943021ec3e8c7f8e、2fefdea23bcfb9df23609e9612c7048a2828037f
+- Commit：本阶段提交链从 9dce6153d79903f43045c1c4865468a7e3e75815 开始；修正误写根目录路径后，最终修正提交为 63cae7ab6594bef1bc08e7dff4c6fdd9e5e6c2db。最终交接文档提交将在本次更新后生成。
 - request adapter：src/services/requestAdapter.js；内部拆分 browserRequest / nativeRequest
 - 修改 requestManager：未改写核心实现；保留 concurrency=4、deduplication、AbortController、cancel、cancelAll。Stage 3 通过 request adapter 消费其传递的 signal。
 - 修改的 service：src/services/requestAdapter.js、src/services/movieSourceService.js、src/services/sourceRegistryService.js
