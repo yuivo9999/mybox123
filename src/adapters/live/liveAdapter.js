@@ -22,7 +22,9 @@ export function createLiveAdapter(config, transport = null) {
   const load = async (options = {}) => {
     lastAttemptAt = Date.now();
     try {
-      const response = await requestAdapter.request(config.sourceRef, {
+      const response = config.localContent != null
+        ? { ok: true, status: 200, headers: new Headers({ 'content-type': config.localFormat === 'json' ? 'application/json' : 'text/plain' }), text: async () => String(config.localContent) }
+        : await requestAdapter.request(config.sourceRef, {
         headers: config.headers ?? {},
         signal: options.signal,
         timeoutMs: options.timeoutMs,
