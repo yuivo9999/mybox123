@@ -106,11 +106,28 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     }
   };
 
+  const loadDeferredStreams = async channel => {
+    if (!channel?.deferredRef || resolvedStreams[channel.channelId]) return;
+    setStreamLoading(true);
+    try {
+      const streams = await requestManager.run(
+        'live-deferred-streams:' + channel.channelId,
+        signal => liveService.getStreams(channel, { signal }),
+      );
+      setResolvedStreams(prev => ({ ...prev, [channel.channelId]: streams }));
+    } catch (error) {
+      if (error?.name !== 'AbortError') setTv1Error(error);
+    } finally {
+      setStreamLoading(false);
+    }
+  };
+
   const selectChannel = channel => {
     setSelectedChannelId(channel.channelId);
     setActiveStreamIndex(0);
     if (channel.deferredRef) {
-      void loadTv1Streams(channel);
+      const tv1Source = channel.sourceRefs?.some(ref => enabledTv1Sources.some(source => source.sourceId === ref.sourceId));
+      void (tv1Source ? loadTv1Streams(channel) : loadDeferredStreams(channel));
     }
   };
 
