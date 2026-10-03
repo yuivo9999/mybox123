@@ -1,5 +1,6 @@
 import { createMovieRegistry } from '../adapters/movie/movieRegistry.js';
 import { createMovieAdapter } from '../adapters/movie/movieAdapter.js';
+import { createSourceAdapter } from '../adapters/sourceAdapterFactory.js';
 import { contentService } from './contentService.js';
 import { cacheStorage, CacheNamespace, createCacheKey } from '../storage/cache.js';
 import { requestManager } from './requestManager.js';
@@ -11,8 +12,8 @@ export const movieRegistry = createMovieRegistry();
  * Movie adapter dispatch boundary.
  *
  * Only standard HTTP VOD sources are allowed into the generic HTTP adapter.
- * TVBox CSP/Drpy/ext/JAR-provider sources must stay out of this path unless
- * a dedicated executor is explicitly implemented later.
+ * TVBox extension sources stay out of the generic HTTP adapter path.
+ * Dedicated adapters are created through sourceAdapterFactory.
  *
  * Local/user-created movie sources do not carry sourceCapability, so they
  * continue to use the existing generic adapter path.
@@ -82,20 +83,36 @@ export async function syncMovieSources(sourceConfigs = [], selectedSourceId = nu
   movieRegistry.clear();
 
   // 影视源采用按需加载：没有明确选择时不请求任何影视源。
-  sourceConfigs
-    .filter(source =>
-      source.enabled !== false
-      && source.sourceType === 'movie'
-      && source.sourceId === selectedSourceId
-      && canUseHttpMovieAdapter(source)
-      && (source.sourceRef || source.url)
-    )
-    .forEach(source => {
-      movieRegistry.register(createMovieAdapter({
-        ...source,
-        sourceRef: source.sourceRef || source.url,
-      }));
-    });
+  const selected = sourceConfigs.filter(source =>
+    source.enabled !== false
+    && source.sourceType === 'movie'
+    && source.sourceId === selectedSourceId
+  );
+
+  const adapters = [];
+  const unsupported = [];
+  selected.forEach(source => {
+    try {
+      if (canUseHttpMovieAdapter(source)) {
+        adapters.push(createMovieAdapter({
+          ...source,
+          sourceRef: source.sourceRef || source.url,
+        }));
+      } else {
+        adapters.push(createSourceAdapter(source));
+      }
+    } catch (error) {
+      unsupported.push({
+        sourceId: source.sourceId,
+        name: source.name || '',
+        adapterType: source.adapterType || null,
+        sourceCapability: source.sourceCapability || null,
+        error,
+      });
+    }
+  });
+
+  adapters.forEach(adapter => movieRegistry.register(adapter));
 
   const settled = await Promise.all(movieRegistry.list().map(async adapter => {
     try {
@@ -128,6 +145,9 @@ export async function syncMovieSources(sourceConfigs = [], selectedSourceId = nu
     movies: contentService.getMovies(
       settled.flatMap(result => result.status === 'fulfilled' ? result.value : []),
     ),
-    results: settled,
+    results: [...settled, ...unsupported.map(item => ({
+      status: 'rejected',
+      ...item,
+    }))],
   };
 }
