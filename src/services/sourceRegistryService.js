@@ -41,7 +41,8 @@ export const sourceRegistryService = {
   async testLiveSource(source, options = {}) {
     const normalized = normalizeSource(source);
     const adapter = createLiveAdapter(normalized, options.transport);
-    return adapter.healthCheck(options);
+    const result = await adapter.healthCheck(options);
+    return { ...result, detectedFormat: adapter.getSnapshotState?.().detectedFormat ?? null };
   },
 
   async syncMovieSources(sources, selectedSourceId = null) {
