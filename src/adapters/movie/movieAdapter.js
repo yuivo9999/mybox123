@@ -27,6 +27,12 @@ export function createMovieAdapter(config, transport = null) {
     enabled: config.enabled !== false,
     priority: Number.isFinite(Number(config.priority)) ? Number(config.priority) : 0,
     capabilities: [...new Set(Array.isArray(config.capabilities) && config.capabilities.length ? config.capabilities : DEFAULT_CAPABILITIES)],
+    sourceCapability: String(config.sourceCapability || '').trim() || undefined,
+    adapterType: String(config.adapterType || '').trim() || undefined,
+    tvboxAdapterKind: config.tvboxAdapterKind ?? undefined,
+    tvboxRequiresJar: config.tvboxRequiresJar === true,
+    tvboxJar: config.tvboxJar ?? undefined,
+    tvboxType: config.tvboxType ?? undefined,
   });
 
   let lastError = null;
@@ -114,7 +120,20 @@ export function createMovieAdapter(config, transport = null) {
         try {
           if (!item || typeof item !== 'object') throw new Error('MOVIE_SOURCE_FIELD_MISSING');
           if (!(item.sourceItemId ?? item.id) || !(item.title ?? item.name)) throw new Error('MOVIE_SOURCE_FIELD_MISSING');
-          return normalizeMovie({ sourceId, item, index });
+          return normalizeMovie({
+            sourceId,
+            item,
+            index,
+            sourceMetadata: {
+              sourceCapability: config.sourceCapability,
+              adapterType: config.adapterType,
+              tvboxAdapterKind: config.tvboxAdapterKind,
+              tvboxRequiresJar: config.tvboxRequiresJar,
+              tvboxJar: config.tvboxJar,
+              tvboxType: config.tvboxType,
+              playerType: config.playerType,
+            },
+          });
         } catch (error) {
           throw toAppError(error, {
             code: ErrorCode.NORMALIZE,
