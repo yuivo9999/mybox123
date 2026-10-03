@@ -24,24 +24,34 @@ export function Tv1LiveFeature({ sources = [], favorites = [], onPlay, toggleFav
 
   const activeSource = useMemo(() => tv1Sources.find(source => source.sourceId === sourceId) || tv1Sources[0] || null, [tv1Sources, sourceId]);
 
-  const load = async () => {
+  const load = async (isCurrent = () => true) => {
     if (!activeSource) return;
     setStatus('loading');
     setError(null);
     try {
       const next = await requestManager.run(`tv1-live:${activeSource.sourceId}`, signal => tv1LiveService.load(activeSource, { signal }));
+      if (!isCurrent()) return;
       setChannels(next);
       setSelectedChannelId(current => next.some(item => item.channelId === current) ? current : (next[0]?.channelId || ''));
       setStreamIndex(0);
       setStatus('success');
     } catch (reason) {
+      if (!isCurrent() || reason?.name === 'AbortError' || reason?.message === 'REQUEST_ABORTED') return;
       setChannels([]);
       setStatus('error');
       setError(reason);
     }
   };
 
-  useEffect(() => { void load(); }, [activeSource?.sourceId]);
+  useEffect(() => {
+    let current = true;
+    const sourceKey = activeSource?.sourceId ? `tv1-live:${activeSource.sourceId}` : null;
+    if (sourceKey) void load(() => current);
+    return () => {
+      current = false;
+      if (sourceKey) requestManager.cancel(sourceKey);
+    };
+  }, [activeSource?.sourceId]);
 
   const activeChannel = useMemo(() => channels.find(channel => channel.channelId === selectedChannelId) || channels[0] || null, [channels, selectedChannelId]);
   const activeStream = activeChannel?.streams?.[streamIndex] || activeChannel?.streams?.[0] || null;
