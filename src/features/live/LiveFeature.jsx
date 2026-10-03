@@ -106,6 +106,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   const [playbackCandidate, setPlaybackCandidate] = useState(null);
   const [playbackStatus, setPlaybackStatus] = useState('idle');
   const [playbackError, setPlaybackError] = useState('');
+  const [resolvedPlaybackInput, setResolvedPlaybackInput] = useState(null);
   const playbackController = useMemo(() => livePlaybackRequest
     ? playbackService.createController(livePlaybackRequest, {
         onStateChange: setPlaybackStatus,
@@ -117,6 +118,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
             if (index >= 0) setActiveStreamIndex(index);
           }
         },
+        onResolvedInput: setResolvedPlaybackInput,
         onPlayerError: ({ error }) => setPlaybackError(error?.message || '播放器加载失败'),
         onParserError: ({ code }) => setPlaybackError('解析失败：' + code),
         onExhausted: () => setPlaybackStatus('error'),
@@ -165,6 +167,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     setSelectedChannelId(channel.channelId);
     setActiveStreamIndex(0);
     setPlaybackCandidate(null);
+    setResolvedPlaybackInput(null);
     setPlaybackError('');
     if (channel.deferredRef) {
       const tv1Source = channel.sourceRefs?.some(ref => enabledTv1Sources.some(source => source.sourceId === ref.sourceId));
@@ -175,6 +178,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   useEffect(() => {
     if (!playbackController) {
       setPlaybackCandidate(null);
+      setResolvedPlaybackInput(null);
       setPlaybackStatus('idle');
       setPlaybackError('');
       return undefined;
@@ -182,6 +186,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     const player = playbackController.attachPlayer(videoRef.current);
     const initial = playbackController.start();
     setPlaybackCandidate(initial);
+    setResolvedPlaybackInput(null);
     if (initial) {
       playbackController.resolveAndLoad(initial).catch(error => setPlaybackError(error?.message || '播放初始化失败'));
     } else {
@@ -228,6 +233,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
           sourceId: playbackCandidate?.sourceId || activeStream.sourceId,
         } : { label: '请选择频道', protocol: 'LIVE' }}
         error={playbackError}
+        resolvedInput={resolvedPlaybackInput}
         terminalTag={activeChannel ? 'LIVE · ' + activeChannel.name : 'LIVE · 等待频道'}
       >
         <video ref={videoRef} controls playsInline className="sangtian-video-element" />
