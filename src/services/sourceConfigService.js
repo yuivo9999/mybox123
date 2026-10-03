@@ -176,6 +176,23 @@ function createLocalSource({ name, sourceType, text, format }) {
   };
 }
 
+function resolveLiveSourceRef(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (/^proxy:\/\//i.test(raw)) {
+    const match = raw.match(/(?:[?&]|^)ext=(.+)$/i);
+    if (!match) return '';
+    try {
+      const decoded = decodeURIComponent(match[1]);
+      return /^https?:\/\//i.test(decoded) ? decoded : '';
+    } catch {
+      return '';
+    }
+  }
+  return '';
+}
+
 function parseTVBoxSources(parsed) {
   const imported = [];
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return imported;
@@ -200,17 +217,32 @@ function parseTVBoxSources(parsed) {
 
   if (Array.isArray(parsed.lives)) {
     parsed.lives.forEach((live, index) => {
-      const url = String(live?.url || '').trim();
-      if (!/^https?:\/\//i.test(url)) return;
-      imported.push({
-        sourceId: `tvbox_live_${live.name || `live-${index + 1}`}_${Date.now()}_${index}`,
-        name: String(live.name || `TVBox直播-${index + 1}`).trim(),
-        sourceType: 'live',
-        sourceRef: url,
-        url,
-        enabled: true,
-        status: '未测试',
-        createdAt: Date.now(),
+      const liveName = String(live?.name || `TVBox直播-${index + 1}`).trim();
+      const candidates = [];
+      const addLiveRef = (value) => {
+        const sourceRef = resolveLiveSourceRef(value);
+        if (sourceRef) candidates.push(sourceRef);
+      };
+      addLiveRef(live?.url);
+      if (Array.isArray(live?.urls)) live.urls.forEach(addLiveRef);
+      if (Array.isArray(live?.channels)) {
+        live.channels.forEach(channel => {
+          if (Array.isArray(channel?.urls)) channel.urls.forEach(addLiveRef);
+          addLiveRef(channel?.url);
+        });
+      }
+      [...new Set(candidates)].forEach((sourceRef, refIndex) => {
+        imported.push({
+          sourceId: `tvbox_live_${live.key || live.name || `live-${index + 1}`}_${Date.now()}_${index}_${refIndex}`,
+          name: candidates.length > 1 ? `${liveName} · 线路 ${refIndex + 1}` : liveName,
+          sourceType: 'live',
+          sourceRef,
+          url: sourceRef,
+          format: 'txt',
+          enabled: true,
+          status: '未测试',
+          createdAt: Date.now(),
+        });
       });
     });
   }
