@@ -130,6 +130,9 @@ export function createMovieAdapter(config, transport = null) {
       let raw;
       try {
         raw = parseJSONMovies(normalizedBody);
+      if (!raw || (Array.isArray(raw) && raw.length === 0) || (raw?.list && Array.isArray(raw.list) && raw.list.length === 0 && Number(raw.total ?? 0) === 0)) {
+        return [];
+      }
       } catch (error) {
         throw toAppError(error, {
           code: ErrorCode.PARSE,
