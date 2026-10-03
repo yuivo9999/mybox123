@@ -223,7 +223,7 @@ export function App(){
    sessionStateStore.patch({selected:request,route:'live-play',tab:'live'}); persistent.recordLivePlay(channel,streamId);
  };
  const movieActive=['detail','movie-play','search'].includes(route)||tab==='home'||tab==='movies';
- const isManagementTab = ['sources', 'settings', 'me', 'about', 'data-management', 'history', 'search-history'].includes(tab);
+ const isManagementTab = ['sources', 'settings', 'appearance', 'me', 'about', 'data-management', 'history', 'search-history'].includes(tab);
 
  useEffect(()=>{ void ensureFont(getFontById(persistent.settings?.fontFamily)); },[persistent.settings?.fontFamily]);
 
