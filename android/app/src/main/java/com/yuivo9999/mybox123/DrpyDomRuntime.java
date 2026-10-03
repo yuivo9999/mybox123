@@ -112,8 +112,9 @@ public final class DrpyDomRuntime {
             String part = parts[i].trim();
             if (i == parts.length - 1 && isOption(part)) continue;
             if (part.isEmpty()) continue;
-            if (selectors.size() > 0 && !looksLikeSelector(part)) {
-                selectors.add(part + ":eq(0)");
+            boolean intermediate = i < parts.length - 1;
+            if (intermediate && isSimpleSelector(part)) {
+                selectors.add(part + (arrayMode ? ":first" : ":eq(0)"));
             } else {
                 selectors.add(part);
             }
@@ -141,6 +142,10 @@ public final class DrpyDomRuntime {
                 || lower.equals("title") || lower.equals("alt") || lower.equals("class")
                 || lower.equals("id") || lower.equals("style") || lower.equals("data-src")
                 || lower.endsWith("-url") || lower.contains("poster");
+    }
+
+    private static boolean isSimpleSelector(String value) {
+        return value.matches("^[A-Za-z][A-Za-z0-9_-]*$");
     }
 
     private static boolean looksLikeSelector(String value) {
