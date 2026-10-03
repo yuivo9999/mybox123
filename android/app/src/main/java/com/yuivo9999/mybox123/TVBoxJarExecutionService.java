@@ -24,7 +24,10 @@ public final class TVBoxJarExecutionService extends Service {
     public static final int MSG_PING = 1;
     public static final int MSG_CAPABILITIES = 2;
     public static final int MSG_EXECUTE = 3;
+    public static final int MSG_NETWORK_REQUEST = 4;
+    public static final int MSG_FILE_READ = 5;
     public static final int MSG_RESULT = 100;
+    private static final int MAX_MESSAGE_CHARS = 256 * 1024;
     public static final String KEY_REQUEST_ID = "requestId";
     public static final String KEY_PAYLOAD = "payload";
 
@@ -48,16 +51,26 @@ public final class TVBoxJarExecutionService extends Service {
                 reply(message, error("TVBOX_JAR_ISOLATED_EXECUTION_REQUIRES_PROXY"));
                 return;
             }
+            if (message.what == MSG_NETWORK_REQUEST) {
+                reply(message, error("TVBOX_JAR_NETWORK_PROXY_NOT_IMPLEMENTED"));
+                return;
+            }
+            if (message.what == MSG_FILE_READ) {
+                reply(message, error("TVBOX_JAR_FILE_PROXY_NOT_IMPLEMENTED"));
+                return;
+            }
             super.handleMessage(message);
         }
     }
 
     private void reply(Message request, String payload) {
         if (request.replyTo == null) return;
+        String safePayload = payload == null ? "" : payload;
+        if (safePayload.length() > MAX_MESSAGE_CHARS) safePayload = error("TVBOX_JAR_PROTOCOL_PAYLOAD_TOO_LARGE");
         Message response = Message.obtain(null, MSG_RESULT);
         response.setData(new android.os.Bundle());
         response.getData().putString(KEY_REQUEST_ID, request.getData().getString(KEY_REQUEST_ID, ""));
-        response.getData().putString(KEY_PAYLOAD, payload);
+        response.getData().putString(KEY_PAYLOAD, safePayload);
         try { request.replyTo.send(response); } catch (Exception ignored) { }
     }
 
@@ -70,6 +83,9 @@ public final class TVBoxJarExecutionService extends Service {
                     .put("executionMode", "isolated-process-protocol-only")
                     .put("networkProxyRequired", true)
                     .put("hostFileProxyRequired", true)
+                    .put("maxMessageChars", MAX_MESSAGE_CHARS)
+                    .put("networkMessage", MSG_NETWORK_REQUEST)
+                    .put("fileMessage", MSG_FILE_READ)
                     .toString();
         } catch (Exception e) {
             return "{\"ok\":false,\"code\":\"TVBOX_JAR_ISOLATED_CAPABILITY_ERROR\"}";
