@@ -57,6 +57,17 @@ expectNo('src/runtime/nativeHttpBridge.js', [/window\.Android/, /eval\\(/, /Func
 
 
 // Settings completeness: every user-facing setting must be backed by persistent state and a real event path.
+// Stage 3 request-layer contract: environment selection stays in one adapter; source adapters never inspect Android or call the native bridge directly.
+expect('src/services/requestAdapter.js', [/browserRequest/, /nativeRequest/, /requestAdapter/, /webViewRuntime\.capabilities\.nativeHttp/, /resilientFetch/, /errorService\.classifyNetwork/]);
+expect('src/services/requestManager.js', [/concurrency/, /AbortController/, /const cancel/, /cancelAll/]);
+expect('src/adapters/movie/movieAdapter.js', [/requestAdapter\.request/, /transport = null/]);
+expect('src/adapters/live/liveAdapter.js', [/requestAdapter\.request/, /transport = null/]);
+expectNo('src/adapters/movie/movieAdapter.js', [/resilientFetch/, /nativeHttpRequest/, /webViewRuntime/]);
+expectNo('src/adapters/live/liveAdapter.js', [/resilientFetch/, /nativeHttpRequest/, /webViewRuntime/]);
+expect('src/services/movieSourceService.js', [/createMovieAdapter\\(\\{/, /options\.transport\\)/]);
+expect('src/services/sourceRegistryService.js', [/registerLiveSource\\(source, transport = null\\)/, /options\.transport\\)/]);
+expect('src/parsers/hlsParser.js', [/context\.fetchManifest/, /context\.fetch \\?\\? fetch/]);
+
 expect('src/models/userData.js', [/defaultSettings/, /normalizeSettings/, /autoplayResume/, /defaultMovieSource/, /defaultLiveSource/, /theme/, /fontSize/, /cardStyle/, /density/]);
 expect('src/services/userDataService.js', [/normalizeSettings/, /updateSettings/]);
 expect('src/state/persistentStateStore.js', [/updateSettings/]);
