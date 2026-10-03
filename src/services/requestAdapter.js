@@ -46,6 +46,7 @@ export async function nativeRequest(url, options = {}) {
     timeoutMs,
     disableRedirects,
     responseType = 'text',
+    doh,
   } = options;
 
   try {
@@ -59,6 +60,7 @@ export async function nativeRequest(url, options = {}) {
         timeoutMs,
         disableRedirects,
         responseType,
+        doh,
       },
       { signal },
     );
