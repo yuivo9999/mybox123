@@ -24,11 +24,19 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
   };
 
   let preparedPath = '';
-  const prepare = async (payload = {}) => execute('prepare', {
-    ...payload,
-    name: payload.name || definition.name,
-    url: payload.url || (typeof definition.tvboxJar === 'string' ? definition.tvboxJar : ''),
-  });
+  const prepare = async (payload = {}) => {
+    const jar = definition.tvboxJar;
+    const jarUrl = typeof jar === 'string'
+      ? jar
+      : (jar && typeof jar === 'object' ? (jar.url || jar.path || '') : '');
+    const jarMd5 = typeof jar === 'object' && jar ? (jar.md5 || '') : '';
+    return execute('prepare', {
+      ...payload,
+      name: payload.name || definition.name,
+      url: payload.url || jarUrl,
+      md5: payload.md5 || jarMd5,
+    });
+  };
 
   const inspect = async (payload = {}) => execute('inspect', payload);
 
@@ -81,6 +89,8 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
     definition,
     isRuntimeAvailable: () => Boolean(effectiveRuntime?.isAvailable?.()),
     getCapabilities: () => effectiveRuntime?.getCapabilities?.() || { available: false },
+    getDefinition: () => ({ ...definition, status: 'runtime' }),
+    getStatus: () => ({ status: 'runtime', error: null }),
     prepare,
     inspect,
     invoke,
