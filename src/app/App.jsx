@@ -30,7 +30,7 @@ export function App(){
    setContentState(state=>({status:selectedMovieFailed&&!movies.length?'error':'success',movies,channels:result.channels?.length?result.channels:state.channels,error:failed.length?failed:null,sourceLoading:false}));
    persistent.reload?.();
  };
- const reloadSources=async(movieSourceIdOverride=undefined,{background=false}={})=>{
+ const reloadSources=async(movieSourceIdOverride=undefined,{background=false,includeMovie=true,includeLive=!background,liveSourceIds=null}={})=>{
    const generation=++reloadGenerationRef.current;
    if(!background) setContentState(state=>({...state,status:'loading',error:null,sourceLoading:false}));
    else setContentState(state=>({...state,error:null,sourceLoading:true}));
@@ -38,7 +38,12 @@ export function App(){
      const selectedMovieSourceId = movieSourceIdOverride !== undefined
        ? movieSourceIdOverride
        : (persistent.selectedSources?.movie ?? persistent.settings?.defaultMovieSource ?? null);
-     const result=await sourceManagementService.reload({ movieSourceId: selectedMovieSourceId, includeMovie:true, includeLive:!background });
+     const result=await sourceManagementService.reload({
+       movieSourceId: selectedMovieSourceId,
+       includeMovie,
+       includeLive,
+       liveSourceIds,
+     });
      applySourceResult(result,generation);
    }catch(error){
      if(generation!==reloadGenerationRef.current)return;
@@ -116,7 +121,11 @@ export function App(){
    const source=persistent.sources.find(item=>item.sourceId===id);
    await sourceManagementService.setActive(id);
    persistent.reload?.();
-   void reloadSources(source?.sourceType==='movie' ? id : undefined,{background:true});
+   if(source?.sourceType==='movie'){
+     void reloadSources(id,{background:true,includeMovie:true,includeLive:false});
+   }else if(source?.sourceType==='live'){
+     void reloadSources(undefined,{background:true,includeMovie:false,includeLive:true,liveSourceIds:[id]});
+   }
  };
  const removeSource=async(id)=>{
    const source=persistent.sources.find(item=>item.sourceId===id);
