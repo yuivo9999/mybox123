@@ -162,10 +162,20 @@ function GlobalMovieSearch({query,sources=[],onMovie,onPlay}){
  },[normalizedQuery,sources]);
  const total=state.groups.reduce((sum,group)=>sum+(group.items?.length??0),0);
  if(!normalizedQuery)return <EmptyState text="输入关键词后点击“搜索”"/>;
- if(state.loading)return <div><div className="empty state-view"><Search size={22}/><b>正在逐源搜索</b><span>已完成 {state.completed} / {state.totalSources} 个影视源，结果会持续显示。</span></div>{state.groups.filter(group=>(group.items?.length??0)>0).map(group=><section key={group.sourceId}><div className="section-title" style={{marginBottom:8}}><h3>{group.sourceName}</h3><span style={{fontSize:12,color:'#8f9aaa'}}>{group.items.length} 条</span></div><MovieCarousel movies={group.items} onMovie={onPlay||onMovie}/></section>)}</div>;
+ if(state.loading)return <div><div className="empty state-view"><Search size={22}/><b>正在逐源搜索</b><span>已完成 {state.completed} / {state.totalSources} 个影视源，结果会持续显示。</span></div>{state.groups.filter(group=>(group.items?.length??0)>0).map(group=><section key={group.sourceId}><div className="section-title" style={{marginBottom:8}}><h3>{group.sourceName}</h3><span style={{fontSize:12,color:'#8f9aaa'}}>{group.items.length} 条</span></div><MovieSearchList movies={group.items} onMovie={onPlay||onMovie}/></section>)}</div>;
  if(state.error)return <EmptyState text={state.error}/>;
  if(!total&&!state.failed.length)return <EmptyState text={<>没有找到“{query}”的同名影视剧</>}/>;
- return <div><SectionTitle title="全源搜索结果" action={String(total)+' 条'}/><div style={{display:'grid',gap:18}}>{state.groups.filter(group=>(group.items?.length??0)>0).map(group=><section key={group.sourceId}><div className="section-title" style={{marginBottom:8}}><h3>{group.sourceName}</h3><span style={{fontSize:12,color:'#8f9aaa'}}>{group.items.length} 条</span></div><MovieCarousel movies={group.items} onMovie={onPlay||onMovie}/></section>)}</div>{state.failed.length>0&&<div style={{fontSize:11,color:'#8f9aaa',marginTop:12}}>另有 {state.failed.length} 个源未返回结果，已跳过，不影响其他源。</div>}</div>;
+ return <div><SectionTitle title="全源搜索结果" action={String(total)+' 条'}/><div style={{display:'grid',gap:18}}>{state.groups.filter(group=>(group.items?.length??0)>0).map(group=><section key={group.sourceId}><div className="section-title" style={{marginBottom:8}}><h3>{group.sourceName}</h3><span style={{fontSize:12,color:'#8f9aaa'}}>{group.items.length} 条</span></div><MovieSearchList movies={group.items} onMovie={onPlay||onMovie}/></section>)}</div>{state.failed.length>0&&<div style={{fontSize:11,color:'#8f9aaa',marginTop:12}}>另有 {state.failed.length} 个源未返回结果，已跳过，不影响其他源。</div>}</div>;
+}
+
+function MovieSearchList({movies=[],onMovie}){ 
+ return <div className="movie-search-list">
+   {movies.map((movie,index)=><button className="movie-search-list-item" key={movie.contentId||movie.episodeId||movie.sourceId+':'+index} type="button" onClick={()=>onMovie?.(movie)}>
+     <span className="movie-search-list-poster"><SmartImage src={movie.poster} alt="" fallback={<div className="image-placeholder"><Film size={18}/></div>}/></span>
+     <span className="movie-search-list-copy"><b>{movie.title||'未命名'}</b><small>{movie.year||'—'} · {movie.category||'—'}{movie.episodeCount?' · '+movie.episodeCount+'集':''}</small></span>
+     <ChevronRight size={17}/>
+   </button>)}
+ </div>;
 }
 
 function MovieDetail({movie,movies,sources=[],selectedSourceId,onMovie,onBack,onPlay,favorite,onFavorite}){
