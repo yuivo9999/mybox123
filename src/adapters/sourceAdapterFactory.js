@@ -12,7 +12,7 @@ export const SOURCE_ADAPTER_TYPE = Object.freeze({
 
 function isSafeExtJsonSource(source) {
   if (source?.tvboxAdapterKind !== 'ext') return false;
-  if (source?.tvboxExtFormat && !['json-vod', 'remote-json', 'inline-json'].includes(source.tvboxExtFormat)) return false;
+  if (source?.tvboxExtFormat && !['json-vod', 'remote-json', 'remote-resource', 'inline-json'].includes(source.tvboxExtFormat)) return false;
   const ext = source?.tvboxExt;
   if (ext && typeof ext === 'object' && !Array.isArray(ext)) {
     const serialized = JSON.stringify(ext);
