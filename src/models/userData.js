@@ -47,7 +47,7 @@ export const normalizePlaybackSettings = (value = {}) => {
     fallbackEnabled: input.fallbackEnabled !== false,
     fallbackOrder,
     decoder: {
-      exo: 'auto',
+      exo: ['auto', 'hardware', 'software'].includes(decoder.exo) ? decoder.exo : 'auto',
       ijk: ['auto', 'hardware', 'software'].includes(decoder.ijk) ? decoder.ijk : 'auto',
       native: 'system',
     },
