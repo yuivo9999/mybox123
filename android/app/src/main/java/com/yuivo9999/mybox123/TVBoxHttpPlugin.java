@@ -11,6 +11,7 @@ import java.net.InetAddress;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -50,7 +51,9 @@ public class TVBoxHttpPlugin extends Plugin {
             Request.Builder builder = new Request.Builder().url(url);
             JSObject headers = call.getObject("headers");
             if (headers != null) {
-                for (String key : headers.keySet()) {
+                Iterator<String> headerKeys = headers.keys();
+                while (headerKeys.hasNext()) {
+                    String key = headerKeys.next();
                     builder.header(key, String.valueOf(headers.get(key)));
                 }
             }
@@ -146,7 +149,7 @@ public class TVBoxHttpPlugin extends Plugin {
         if (values == null) return result;
         for (int i = 0; i < values.length(); i++) {
             try {
-                String value = values.getString(i, "").trim();
+                String value = values.getString(i).trim();
                 if (!value.isEmpty()) result.add(InetAddress.getByName(value));
             } catch (Exception ignored) {
                 // Ignore malformed bootstrap entries; system DNS remains available.
