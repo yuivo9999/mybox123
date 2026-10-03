@@ -66,6 +66,7 @@ public final class NativePlaybackBridge {
     private Map<String, String> headers = Collections.emptyMap();
     private String cookies = "";
     private String decoderMode = "auto";
+    private Map<String, String> decoderModes = Collections.emptyMap();
     private boolean fallbackEnabled = true;
     private List<String> configuredFallbackOrder = Collections.emptyList();
     private String selectedEngine = ENGINE_EXO;
@@ -137,12 +138,14 @@ public final class NativePlaybackBridge {
             JSONObject hint = input.optJSONObject("playerHint");
             String requested = hint == null ? "" : hint.optString("engine", "");
             decoderMode = hint == null ? "auto" : hint.optString("decoder", "auto");
+            decoderModes = readStringMap(hint == null ? null : hint.optJSONObject("decoderModes"));
             fallbackEnabled = hint == null || hint.optBoolean("fallbackEnabled", true);
             configuredFallbackOrder = readStringList(hint == null ? null : hint.optJSONArray("fallbackOrder"));
             engineOrder = buildEngineOrder(requested, url, input.optString("protocol", ""));
 
             engineIndex = 0;
             selectedEngine = engineOrder.get(engineIndex);
+            decoderMode = decoderModes.getOrDefault(selectedEngine, decoderMode);
             prepared = false;
             wantPlay = false;
             releaseCurrentEngine();
@@ -498,6 +501,7 @@ public final class NativePlaybackBridge {
             releaseCurrentEngine();
             engineIndex++;
             selectedEngine = engineOrder.get(engineIndex);
+            decoderMode = decoderModes.getOrDefault(selectedEngine, decoderMode);
             prepared = false;
             try {
                 createCurrentEngine();
@@ -556,6 +560,20 @@ public final class NativePlaybackBridge {
             if (nativePlayer != null && prepared) return Math.max(0L, nativePlayer.getDuration());
         } catch (Throwable ignored) {}
         return 0L;
+    }
+
+    private Map<String, String> readStringMap(@Nullable JSONObject object) {
+        if (object == null) return Collections.emptyMap();
+        Map<String, String> result = new LinkedHashMap<>();
+        Iterator<String> keys = object.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            String value = object.optString(key, "").trim().toLowerCase();
+            if (ENGINE_EXO.equals(key) || ENGINE_IJK.equals(key) || ENGINE_NATIVE.equals(key)) {
+                result.put(key, value);
+            }
+        }
+        return result;
     }
 
     private List<String> readStringList(@Nullable JSONArray array) {
