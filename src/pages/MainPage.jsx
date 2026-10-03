@@ -36,7 +36,7 @@ function Main({tab,movies,channels,favorites,history,sources,searches,progress,s
     },
   });
   const playerLabel=value=>value==='ijk'?'IJKPlayer':value==='native'?'系统播放器':'ExoPlayer';
-  const ijkDecoder=decoder.ijk==='hardware'?'硬件解码':decoder.ijk==='software'?'软件解码':'自动（硬件优先）';
+  const decoderLabel=(value,auto='自动')=>value==='hardware'?'硬件解码':value==='software'?'软件解码':auto;
   const order=(playback.fallbackOrder??['exo','ijk','native']).join(' → ');
   return <Page><Header title="设置"/>
    <SectionTitle title="播放设置"/>
@@ -46,10 +46,10 @@ function Main({tab,movies,channels,favorites,history,sources,searches,progress,s
    <SettingMenu icon={Radio} title="失败自动切换" value={playback.fallbackEnabled===false?'关闭':'开启'} onClick={()=>updatePlayback({fallbackEnabled:playback.fallbackEnabled===false})}/>
    <SettingMenu icon={Radio} title="切换顺序" value={order} onClick={()=>updatePlayback({fallbackOrder:rotateOrder(playback.fallbackOrder)})}/>
    <SectionTitle title="解码设置"/>
-   <SettingMenu icon={Radio} title="ExoPlayer 解码" value="自动（MediaCodec）" onClick={()=>{}}/>
+   <SettingMenu icon={Radio} title="ExoPlayer 解码" value={decoderLabel(decoder.exo,'自动（MediaCodec）')} onClick={()=>updatePlayback({decoder:{exo:cycle(decoder.exo??'auto',['auto','hardware','software'])}})}/>
    <SettingMenu icon={Radio} title="IJKPlayer 解码" value={ijkDecoder} onClick={()=>updatePlayback({decoder:{ijk:cycle(decoder.ijk??'auto',['auto','hardware','software'])}})}/>
    <SettingMenu icon={Radio} title="系统播放器解码" value="系统自动选择" onClick={()=>{}}/>
-   <InfoCard title="解码说明" text="ExoPlayer/Media3 当前使用 Android MediaCodec 视频解码链路，不提供伪造的软件视频解码开关；IJKPlayer 支持硬件 MediaCodec 与 FFmpeg 软件解码；系统播放器由 Android 自动选择。"/>
+   <InfoCard title="解码说明" text="ExoPlayer/Media3 可选择自动、硬件或平台软件 MediaCodec；若设备没有匹配的软件/硬件 MediaCodec，ExoPlayer 会失败并按播放器回退策略切换。IJKPlayer 支持硬件 MediaCodec 与 FFmpeg 软件解码；系统播放器由 Android 自动选择，应用不强制指定其硬/软解。"/>
    <SectionTitle title="线路设置"/>
    <SettingMenu icon={Radio} title="默认影视线路" value={settings?.defaultMovieSource||'自动选择'} onClick={()=>onUpdateSettings?.({defaultMovieSource:nextSource(sources,'movie',settings?.defaultMovieSource)})}/>
    <SettingMenu icon={Radio} title="默认直播线路" value={settings?.defaultLiveSource||'自动选择'} onClick={()=>onUpdateSettings?.({defaultLiveSource:nextSource(sources,'live',settings?.defaultLiveSource)})}/>
