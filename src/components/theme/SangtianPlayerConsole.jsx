@@ -169,7 +169,7 @@ export function SangtianPlayerWindow({
                   <div className="sangtian-fullscreen-actions">
                     <button onClick={handleToggleLandscape}><RotateCw size={15}/>{isLandscape ? '竖屏' : '横屏'}</button>
                     <button onClick={handleCycleAspect}><Ratio size={15}/>{currentAspect.label}</button>
-                    <button onClick={()=>{const v=videoRef?.current;if(v) v.playbackRate=v.playbackRate>=2?1:v.playbackRate+0.25;}}><Clock3 size={15}/>{videoRef?.current?.playbackRate?.toFixed?.(2) || '1.00'}x</button>
+                    <button onClick={()=>{const next=playbackRate>=2?0.75:playbackRate+0.25;onChangePlaybackRate?.(Number(next.toFixed(2)));}}><Clock3 size={15}/>{playbackRate.toFixed(2)}x</button>
                     <button onClick={()=>setShowFullscreenBar(false)}><Minimize2 size={15}/>收起</button>
                   </div>
                 </div>
