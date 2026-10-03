@@ -479,6 +479,22 @@ public final class NativePlaybackBridge {
         }
 
         ijkPlayer.setOnPreparedListener(mp -> {
+            // IJK can silently fall back to FFmpeg when MediaCodec selection fails.
+            // Treat that as a hardware-decoder failure when hardware was requested,
+            // so Live goes directly to Exo and VOD gets the explicit IJK software step.
+            if ("hardware".equals(decoderMode)) {
+                try {
+                    int actual = mp.getVideoDecoder();
+                    if (actual != 2) {
+                        fallbackOrError("IJK_HARDWARE_NOT_ACTIVE:" + actual);
+                        return;
+                    }
+                } catch (Throwable e) {
+                    fallbackOrError("IJK_HARDWARE_PROBE:" + safeMessage(e));
+                    return;
+                }
+            }
+
             prepared = true;
             emit("decoderChanged", decoderObject());
             emit("prepared", null);
