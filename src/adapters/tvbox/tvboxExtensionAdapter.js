@@ -56,7 +56,7 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
       throw unavailable(operation);
     }
 
-    return runtime.execute({
+    return effectiveRuntime.execute({
       definition,
       operation,
       payload,
@@ -78,7 +78,7 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
       return {
         ok: false,
         sourceId,
-        status: effectiveRuntime ? 'error' : 'unsupported',
+        status: effectiveRuntime && (typeof effectiveRuntime.isAvailable !== 'function' || effectiveRuntime.isAvailable()) ? 'error' : 'unsupported',
         checkedAt: Date.now(),
         error: toAppError(error, { context: { sourceId, kind } }),
       };
