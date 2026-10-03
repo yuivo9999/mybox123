@@ -27,7 +27,7 @@ export function getGestureDirection(dx, dy, { threshold = 72, ratio = 1.25 } = {
 
 export function isSwipeExcludedTarget(target) {
   return target instanceof Element && Boolean(target.closest(
-    'input,textarea,select,button,[contenteditable="true"],[data-swipe-ignore="true"],[data-horizontal-scroll="true"]'
+    'input,textarea,select,button,[contenteditable="true"],[data-swipe-ignore="true"],[data-horizontal-scroll="true"],.movie-carousel,.movie-carousel-card'
   ));
 }
 
