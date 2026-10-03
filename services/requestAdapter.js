@@ -24,9 +24,10 @@ function normalizeRequestError(error, context) {
 }
 
 export async function browserRequest(url, options = {}) {
-  const { transport = fetch, ...requestOptions } = options;
+  const { transport, ...requestOptions } = options;
+  const browserTransport = typeof transport === 'function' ? transport : fetch;
   try {
-    return await resilientFetch(url, requestOptions, transport);
+    return await resilientFetch(url, requestOptions, browserTransport);
   } catch (error) {
     throw normalizeRequestError(error, {
       transport: 'browser',
