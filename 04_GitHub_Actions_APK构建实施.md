@@ -231,3 +231,29 @@ Android workflow 与 Pages workflow 应独立。
 - 下一 AI 第一件事：
 - 下一 AI 必须先检查：
 - 不要重复做：
+
+
+---
+
+## 13. 阶段 4 完成记录（2026-10-03）
+
+- 阶段：阶段 4：GitHub Actions APK 构建实施
+- 完成日期：2026-10-03
+- Commit：f8062814e4f178bebe057382981514ef8c121c60（Android workflow toolchain hardening）
+- Workflow：.github/workflows/build-apk.yml
+- Node：22
+- Java：Temurin 21
+- Android SDK：compile/target SDK 36；CI 显式安装 platform android-36、build-tools 36.0.0、platform-tools
+- Gradle：8.14.3（仓库 Gradle Wrapper）
+- Capacitor：8.5.2
+- APK 类型：Debug APK
+- APK 输出路径：android/app/build/outputs/apk/debug/app-debug.apk
+- Artifact 名称：mybox-android-debug-apk
+- 最近一次成功 Run：前一版 workflow Run #1 已验证完整构建链路成功；本次安全加固后的 workflow 尚未重新执行远程构建
+- Artifact：前一版 Artifact tvbox-react-debug-apk 已成功上传；安全加固后的新 Artifact 尚未产生
+- 未完成：安全加固后的 workflow 需要一次 GitHub Actions 远程 Run 验证
+- 风险：Release 签名未配置；本阶段按文档先完成 Debug APK
+- 下一阶段：05_最终验收与AI交接实施.md
+- 下一 AI 第一件事：先检查本文件第 13 节与 GitHub Actions 最近一次 Run，再继续阶段 5
+- 下一 AI 必须先检查：Android workflow、Pages workflow、Artifact、Release 签名状态
+- 不要重复做：不要重复创建 Android workflow；不要把 Debug APK 描述为正式发布 APK
