@@ -33,6 +33,7 @@ export function createMovieAdapter(config, transport = null) {
     tvboxRequiresJar: config.tvboxRequiresJar === true,
     tvboxJar: config.tvboxJar ?? undefined,
     tvboxType: config.tvboxType ?? undefined,
+    timeoutMs: Number.isFinite(Number(config.timeoutMs)) ? Number(config.timeoutMs) : undefined,
   });
 
   let lastError = null;
@@ -65,14 +66,19 @@ export function createMovieAdapter(config, transport = null) {
       }
     }
 
+    const requestHeaders = { ...(config.headers ?? {}) };
+    if (config.userAgent && !requestHeaders['User-Agent'] && !requestHeaders['user-agent']) requestHeaders['User-Agent'] = config.userAgent;
+    if (config.referer && !requestHeaders.Referer && !requestHeaders.referer) requestHeaders.Referer = config.referer;
+    if (config.cookies && !requestHeaders.Cookie && !requestHeaders.cookie) requestHeaders.Cookie = config.cookies;
+
     let response;
     try {
       response = config.localContent != null
         ? { ok: true, status: 200, headers: new Headers({ 'content-type': 'application/json' }), text: async () => String(config.localContent) }
         : await requestAdapter.request(finalUrl, {
-        headers: config.headers ?? {},
+        headers: requestHeaders,
         signal: options.signal,
-        timeoutMs: options.timeoutMs,
+        timeoutMs: options.timeoutMs ?? config.timeoutMs,
         transport,
       });
     } catch (error) {
