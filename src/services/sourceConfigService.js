@@ -378,6 +378,7 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
         tvboxUnsupportedReason: isSupportedDirect || safeExtJson ? null : (
           isTVBoxLiveProvider ? 'TVBox Live Provider 当前未适配执行器' :
           !api ? '缺少 api' :
+            capability.requiresJar ? '该源依赖 JAR 扩展，已进入 CatVod Spider 执行阶段；首次请求时自动准备并校验 JAR' :
             capability.kind === 'drpy-js' ? 'Drpy JS 源当前未适配执行器'
             : capability.kind === 'csp' ? 'CSP 源当前未适配执行器'
             : capability.kind === 'jar' || capability.kind === 'http-vod-with-jar' ? '该源依赖 JAR 扩展，已进入 CatVod Spider 执行阶段；首次请求时自动准备并校验 JAR'
