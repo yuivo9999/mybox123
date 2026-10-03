@@ -40,6 +40,9 @@ export function createSourceAdapter(source, options = {}) {
     if (isSafeExtJsonSource(source)) {
       return createTVBoxExtJsonAdapter(source, options.transport ?? null);
     }
+    if (source.tvboxAdapterKind === 'ext' && source.tvboxExtFormat) {
+      throw new Error(`TVBOX_EXT_FORMAT_UNSUPPORTED:${source.tvboxExtFormat}`);
+    }
     return createTVBoxExtensionAdapter(source, options.runtime);
   }
 
