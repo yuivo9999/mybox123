@@ -84,7 +84,7 @@ public final class TVBoxJarBridge {
         File dir = new File(context.getCacheDir(), "tvbox/jar");
         if (!dir.exists() && !dir.mkdirs()) throw new IOException("TVBOX_JAR_CACHE_CREATE_FAILED");
 
-        String fileName = safeFileName(data.optString("name", "spider")) + ".jar";
+        String fileName = safeFileName(data.optString("name", "spider")) + "_" + shortSha256(url) + ".jar";
         File target = new File(dir, fileName);
         boolean reused = false;
         if (target.isFile() && target.length() > 0 && !expectedMd5.isEmpty()) {
@@ -129,7 +129,11 @@ public final class TVBoxJarBridge {
         String path = data.optString("path", "");
         if (path.isEmpty()) throw new IllegalArgumentException("TVBOX_JAR_PATH_REQUIRED");
         String className = data.optString("className", "");
-        String result = executor.invoke(new File(path), className, operation, data);
+        File jarFile = new File(path).getCanonicalFile();
+        File cache = new File(context.getCacheDir(), "tvbox/jar").getCanonicalFile();
+        if (!jarFile.getPath().startsWith(cache.getPath() + File.separator)) throw new SecurityException("TVBOX_JAR_PATH_OUTSIDE_CACHE");
+        if (!jarFile.isFile() || jarFile.length() > MAX_JAR_BYTES) throw new SecurityException("TVBOX_JAR_NOT_READY");
+        String result = executor.invoke(jarFile, className, operation, data);
         if (result != null && result.length() > MAX_RESULT_CHARS) throw new SecurityException("TVBOX_JAR_RESULT_TOO_LARGE");
         return result;
     }
@@ -206,6 +210,14 @@ public final class TVBoxJarBridge {
         byte[] bytes = digest.digest();
         StringBuilder result = new StringBuilder();
         for (byte b : bytes) result.append(String.format(Locale.US, "%02x", b));
+        return result.toString();
+    }
+
+    private static String shortSha256(String value) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] bytes = digest.digest(String.valueOf(value).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < 6; i++) result.append(String.format(Locale.US, "%02x", bytes[i]));
         return result.toString();
     }
 
