@@ -104,12 +104,16 @@ export function createLiveAdapter(config, transport = null) {
       if (detectedFormat === 'txt' && channel.deferredRef?.lineIndex != null) {
         const body = config.localContent != null
           ? String(config.localContent)
-          : await (await requestAdapter.request(config.sourceRef, {
-              headers: config.headers ?? {},
-              signal: options.signal,
-              timeoutMs: options.timeoutMs,
-              transport,
-            })).text();
+          : await (async () => {
+              const response = await requestAdapter.request(config.sourceRef, {
+                headers: config.headers ?? {},
+                signal: options.signal,
+                timeoutMs: options.timeoutMs,
+                transport,
+              });
+              if (!response.ok) throw new Error(`HTTP_${response.status}`);
+              return response.text();
+            })();
         return parseTXTLiveLineStreams(String(body).replace(/^\uFEFF/, '').split(/\r?\n/)[channel.deferredRef.lineIndex]).map((stream, index) => ({
           ...stream,
           streamId: 'stream:' + sourceId + ':' + channel.sourceItemId + ':' + (index + 1),
