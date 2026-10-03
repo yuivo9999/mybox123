@@ -170,8 +170,8 @@ function stableHash(value) {
   return (hash >>> 0).toString(36);
 }
 
-function createBundleId(name, text) {
-  return `bundle_local_${stableHash(`${String(name || '').trim()}\\n${String(text || '')}`)}`;
+function createBundleId(name) {
+  return `bundle_local_${stableHash(String(name || '').trim().toLowerCase())}`;
 }
 
 function createLocalSource({ name, sourceType, text, format, liveMode, bundleId }) {
