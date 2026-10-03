@@ -49,7 +49,7 @@ public final class TVBoxJarBridge {
             result.put("reason", "JAR_ACQUIRE_VERIFY_INSPECT_ONLY");
             return result.toString();
         } catch (Exception e) {
-            return "{"available":false,"reason":"TVBOX_JAR_CAPABILITY_ERROR"}";
+            return "{\"available\":false,\"reason\":\"TVBOX_JAR_CAPABILITY_ERROR\"}";
         }
     }
 
