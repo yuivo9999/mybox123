@@ -9,11 +9,19 @@ export function normalizeMovie({ sourceId, item, index = 0, sourceMetadata = {} 
       tvboxRequiresJar: sourceMetadata.tvboxRequiresJar,
       tvboxJar: sourceMetadata.tvboxJar,
       playerType: sourceMetadata.tvboxType ?? sourceMetadata.playerType,
+      headers: sourceMetadata.headers,
+      userAgent: sourceMetadata.userAgent,
+      referer: sourceMetadata.referer,
+      cookies: sourceMetadata.cookies,
     }).filter(([, value]) => value !== undefined && value !== null && value !== '')
   );
   const normalizeCandidate = (candidate = {}) => ({
     ...candidate,
     metadata: { ...playbackMetadata, ...(candidate.metadata ?? {}) },
+    headers: { ...(sourceMetadata.headers ?? {}), ...(candidate.headers ?? {}) },
+    userAgent: candidate.userAgent ?? sourceMetadata.userAgent,
+    referer: candidate.referer ?? sourceMetadata.referer,
+    cookies: candidate.cookies ?? sourceMetadata.cookies ?? '',
   });
   const episodes = (item.episodes ?? []).map((episode, episodeIndex) => {
     if (typeof episode === 'string') return { title: episode };
