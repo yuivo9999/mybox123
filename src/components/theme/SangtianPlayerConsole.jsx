@@ -293,6 +293,7 @@ export function SangtianConsoleCard({
   onReplay,
   onTogglePip,
   playerStatus = 'idle',
+  isLive = false,
 }) {
   const [activeTab, setActiveTab] = useState('episodes'); // 'episodes' | 'info' | 'sources'
   const [smartDecode, setSmartDecode] = useState(true);
