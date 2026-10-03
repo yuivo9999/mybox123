@@ -61,6 +61,9 @@ public final class NativePlaybackBridge {
     private String url;
     private Map<String, String> headers = Collections.emptyMap();
     private String cookies = "";
+    private String decoderMode = "auto";
+    private boolean fallbackEnabled = true;
+    private List<String> configuredFallbackOrder = Collections.emptyList();
     private String selectedEngine = ENGINE_EXO;
     private List<String> engineOrder = Collections.emptyList();
     private int engineIndex = 0;
@@ -128,6 +131,9 @@ public final class NativePlaybackBridge {
 
             JSONObject hint = input.optJSONObject("playerHint");
             String requested = hint == null ? "" : hint.optString("engine", "");
+            decoderMode = hint == null ? "auto" : hint.optString("decoder", "auto");
+            fallbackEnabled = hint == null || hint.optBoolean("fallbackEnabled", true);
+            configuredFallbackOrder = readStringList(hint == null ? null : hint.optJSONArray("fallbackOrder"));
             engineOrder = buildEngineOrder(requested, url, input.optString("protocol", ""));
 
             engineIndex = 0;
@@ -272,6 +278,9 @@ public final class NativePlaybackBridge {
         JSONObject state = new JSONObject();
         try {
             state.put("engine", selectedEngine);
+            state.put("decoder", actualDecoder());
+            state.put("decoderMode", decoderMode);
+            state.put("fallbackEnabled", fallbackEnabled);
             state.put("url", url == null ? "" : url);
             state.put("prepared", prepared);
             state.put("wantPlay", wantPlay);
@@ -301,20 +310,25 @@ public final class NativePlaybackBridge {
     private List<String> buildEngineOrder(String requested, String mediaUrl, String protocol) {
         ArrayList<String> result = new ArrayList<>();
         String normalized = requested == null ? "" : requested.trim().toLowerCase();
-        if (ENGINE_IJK.equals(normalized)) {
-            result.add(ENGINE_IJK);
-            result.add(ENGINE_EXO);
-            result.add(ENGINE_NATIVE);
+        if (!configuredFallbackOrder.isEmpty()) {
+            result.addAll(configuredFallbackOrder);
+            if (normalized.length() > 0) {
+                result.remove(normalized);
+                result.add(0, normalized);
+            }
+        } else if (ENGINE_IJK.equals(normalized)) {
+            result.add(ENGINE_IJK); result.add(ENGINE_EXO); result.add(ENGINE_NATIVE);
         } else if (ENGINE_NATIVE.equals(normalized)) {
-            result.add(ENGINE_NATIVE);
-            result.add(ENGINE_EXO);
-            result.add(ENGINE_IJK);
+            result.add(ENGINE_NATIVE); result.add(ENGINE_EXO); result.add(ENGINE_IJK);
         } else {
-            result.add(ENGINE_EXO);
-            result.add(ENGINE_IJK);
-            result.add(ENGINE_NATIVE);
+            result.add(ENGINE_EXO); result.add(ENGINE_IJK); result.add(ENGINE_NATIVE);
         }
-        return result;
+        if (!fallbackEnabled && !result.isEmpty()) return Collections.singletonList(result.get(0));
+        ArrayList<String> unique = new ArrayList<>();
+        for (String item : result) {
+            if ((ENGINE_EXO.equals(item) || ENGINE_IJK.equals(item) || ENGINE_NATIVE.equals(item)) && !unique.contains(item)) unique.add(item);
+        }
+        return unique;
     }
 
     private void createCurrentEngine() throws Exception {
@@ -365,6 +379,9 @@ public final class NativePlaybackBridge {
 
     private void createIjk() throws IOException {
         ijkPlayer = new IjkMediaPlayer();
+        ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", "software".equals(decoderMode) ? 0 : 1);
+        ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 1);
+        ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1);
         if (!headers.isEmpty()) ijkPlayer.setDataSource(url, headers);
         else ijkPlayer.setDataSource(url);
         if (cookies.length() > 0) {
@@ -499,6 +516,35 @@ public final class NativePlaybackBridge {
             if (nativePlayer != null && prepared) return Math.max(0L, nativePlayer.getDuration());
         } catch (Throwable ignored) {}
         return 0L;
+    }
+
+    private List<String> readStringList(@Nullable JSONArray array) {
+        if (array == null) return Collections.emptyList();
+        ArrayList<String> result = new ArrayList<>();
+        for (int i = 0; i < array.length(); i++) {
+            String value = array.optString(i, "").trim().toLowerCase();
+            if ((ENGINE_EXO.equals(value) || ENGINE_IJK.equals(value) || ENGINE_NATIVE.equals(value)) && !result.contains(value)) result.add(value);
+        }
+        return result;
+    }
+
+    private String actualDecoder() {
+        if (ENGINE_IJK.equals(selectedEngine) && ijkPlayer != null) {
+            try {
+                int decoder = ijkPlayer.getVideoDecoder();
+                if (decoder == 2) return "MediaCodec";
+                if (decoder == 1) return "FFmpeg";
+            } catch (Throwable ignored) {}
+            return "Unknown";
+        }
+        if (ENGINE_EXO.equals(selectedEngine)) return "MediaCodec";
+        if (ENGINE_NATIVE.equals(selectedEngine)) return "System";
+        return "Unknown";
+    }
+
+    private JSONObject decoderObject() {
+        try { return new JSONObject().put("engine", selectedEngine).put("decoder", actualDecoder()).put("mode", decoderMode); }
+        catch (Exception e) { return new JSONObject(); }
     }
 
     private Map<String, String> readMap(@Nullable JSONObject object) {
