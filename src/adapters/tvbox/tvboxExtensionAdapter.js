@@ -115,9 +115,25 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
     execute,
     load,
     request,
-    search: (payload, options) => execute('search', payload, options),
-    detail: (payload, options) => execute('detail', payload, options),
-    episodes: (payload, options) => execute('episodes', payload, options),
-    playUrl: (payload, options) => execute('playUrl', payload, options),
+    search: async (payload = {}, options = {}) => execute(
+      'search',
+      { ...payload, script: await resolveScript(payload, options) },
+      options,
+    ),
+    detail: async (payload = {}, options = {}) => execute(
+      'detail',
+      { ...payload, script: await resolveScript(payload, options) },
+      options,
+    ),
+    episodes: async (payload = {}, options = {}) => execute(
+      'episodes',
+      { ...payload, script: await resolveScript(payload, options) },
+      options,
+    ),
+    playUrl: async (payload = {}, options = {}) => execute(
+      'playUrl',
+      { ...payload, script: await resolveScript(payload, options) },
+      options,
+    ),
   };
 }
