@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, Clock3, Database, Film, Info, Radio, Search, Server, Settings, Trash2, Check, Download, Upload, X, ArrowLeft, CheckSquare, Square, Power, PowerOff, RefreshCw } from 'lucide-react';
+import { ChevronLeft, Clock3, Database, Film, Info, Radio, Search, Server, Settings, Trash2, Check, Download, Upload, X, CheckSquare, Square, Power, PowerOff, RefreshCw } from 'lucide-react';
 import { LiveFeature } from '../features/live/LiveFeature.jsx';
 import { SmartImage, EmptyState } from '../components/StateViews.jsx';
 import { sourceConfigService } from '../services/sourceConfigService.js';
