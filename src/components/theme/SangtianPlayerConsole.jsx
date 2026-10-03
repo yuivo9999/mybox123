@@ -95,7 +95,7 @@ export function SangtianPlayerWindow({
   };
 
   return (
-    <div className={`sangtian-window ${isLandscape ? 'is-landscape' : ''} ${isWebFullscreen ? 'is-web-fullscreen' : ''} aspect-${aspectMode.replace(':', '-')}`}>
+    <div className={`sangtian-window ${isLive ? 'is-live-direct' : ''} ${isLandscape ? 'is-landscape' : ''} ${isWebFullscreen ? 'is-web-fullscreen' : ''} aspect-${aspectMode.replace(':', '-')}`}>
       {/* Top Header Bar of the Window - Exactly matching screenshot */}
       <div className="sangtian-window-bar">
         <div className="sangtian-window-tag">
@@ -412,13 +412,13 @@ export function SangtianConsoleCard({
         {activeTab === 'sources' && (
           <div className="console-sources-section">
             <div className="console-section-header">
-              <span className="section-eyebrow">SOURCES · 换源与线路</span>
+              <span className="section-eyebrow">{isLive ? 'LIVE · 直播线路' : 'SOURCES · 换源与线路'}</span>
               <h4>{isLive ? '直播线路' : '视频源解析矩阵'}</h4>
             </div>
 
             {sources.length > 0 && (
               <div className="console-source-group">
-                <span className="group-label">可用内容源：</span>
+                <span className="group-label">{isLive ? '当前直播源：' : '可用内容源：'}</span>
                 <div className="chips">
                   {sources.map(s => (
                     <button
