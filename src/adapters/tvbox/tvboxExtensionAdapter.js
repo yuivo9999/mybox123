@@ -70,11 +70,13 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
       throw unavailable(operation);
     }
 
+    const controller = options.signal ? null : new AbortController();
+    const signal = options.signal || controller.signal;
     return effectiveRuntime.execute({
       definition,
       operation,
       payload,
-      signal: options.signal,
+      signal,
     });
   };
 
