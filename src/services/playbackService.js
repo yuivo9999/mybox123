@@ -13,10 +13,17 @@ function sortCandidates(candidates) {
   return [...candidates].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 }
 
+function isSupportedVODCandidate(candidate) {
+  const capability = String(candidate?.metadata?.sourceCapability || '').trim();
+  const adapterType = String(candidate?.metadata?.adapterType || '').trim();
+  if (!capability && !adapterType) return true;
+  return capability === 'direct-http-vod' && adapterType === 'http-vod';
+}
+
 export const playbackService = {
   getVODCandidates({ content, episode, episodeIndex = 0, preferredSource = null } = {}) {
     if (!content || !episode) return [];
-    return sortCandidates((episode.playbackCandidates ?? []).map((candidate, index) => normalizePlaybackCandidate({
+    return sortCandidates((episode.playbackCandidates ?? []).filter(isSupportedVODCandidate).map((candidate, index) => normalizePlaybackCandidate({
       ...candidate,
       kind: PlaybackKind.VOD,
       contentId: candidate.contentId ?? content.contentId,
