@@ -387,6 +387,16 @@ public final class NativePlaybackBridge {
         for (String item : result) {
             if ((ENGINE_EXO.equals(item) || ENGINE_IJK.equals(item) || ENGINE_NATIVE.equals(item)) && !unique.contains(item)) unique.add(item);
         }
+
+        // Live playback has a stricter fallback contract: when IJK hardware fails,
+        // ExoPlayer must be the immediate next engine. Do not let a user-configured
+        // fallback order insert native/IJK-software between IJK and Exo.
+        if (livePlayback && ENGINE_IJK.equals(normalized) && fallbackEnabled) {
+            unique.remove(ENGINE_IJK);
+            unique.remove(ENGINE_EXO);
+            unique.add(0, ENGINE_EXO);
+            unique.add(0, ENGINE_IJK);
+        }
         return unique;
     }
 
