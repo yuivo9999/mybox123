@@ -26,6 +26,8 @@ public final class TVBoxExtensionBridge {
     private static final Set<String> KINDS = new HashSet<>(Arrays.asList(
             "csp", "drpy-js", "jar", "ext", "unknown"
     ));
+    private static final int MAX_PAYLOAD_CHARS = 512 * 1024;
+    private static final int MAX_SCRIPT_CHARS = 1_000_000;
 
     @JavascriptInterface
     public String getCapabilities() {
@@ -48,6 +50,7 @@ public final class TVBoxExtensionBridge {
         String operation = "";
         String kind = "";
         try {
+            if (payload != null && payload.length() > MAX_PAYLOAD_CHARS) return error("TVBOX_EXTENSION_PAYLOAD_TOO_LARGE", operation, kind);
             JSONObject input = new JSONObject(payload == null ? "{}" : payload);
             operation = input.optString("operation", "");
             JSONObject definition = input.optJSONObject("definition");
@@ -72,6 +75,7 @@ public final class TVBoxExtensionBridge {
             }
             if ("load".equals(operation)) {
                 String script = payloadObject == null ? "" : payloadObject.optString("script", "");
+                if (script.length() > MAX_SCRIPT_CHARS) return error("DRPY_SCRIPT_TOO_LARGE", operation, kind);
                 String ruleJson = DrpySandboxRuntime.evaluate(script, DrpyHttpRuntime::request);
                 JSONObject result = new JSONObject();
                 result.put("ok", true);
@@ -124,6 +128,7 @@ public final class TVBoxExtensionBridge {
             }
 
             String script = payloadObject == null ? "" : payloadObject.optString("script", "");
+            if (script.length() > MAX_SCRIPT_CHARS) return error("DRPY_SCRIPT_TOO_LARGE", operation, kind);
             String operationPayload = payloadObject == null ? "{}" : payloadObject.optJSONObject("params") != null
                     ? payloadObject.optJSONObject("params").toString()
                     : payloadObject.toString();
