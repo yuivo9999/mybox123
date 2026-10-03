@@ -67,6 +67,8 @@ public final class NativePlaybackBridge {
     private String cookies = "";
     private String decoderMode = "auto";
     private Map<String, String> decoderModes = Collections.emptyMap();
+    private Map<String, List<IjkOption>> ijkProfiles = Collections.emptyMap();
+    private String ijkProfile = "";
     private boolean fallbackEnabled = true;
     private List<String> configuredFallbackOrder = Collections.emptyList();
     private String selectedEngine = ENGINE_EXO;
@@ -139,6 +141,8 @@ public final class NativePlaybackBridge {
             String requested = hint == null ? "" : hint.optString("engine", "");
             decoderMode = hint == null ? "auto" : hint.optString("decoder", "auto");
             decoderModes = readStringMap(hint == null ? null : hint.optJSONObject("decoderModes"));
+            ijkProfiles = readIjkProfiles(hint == null ? null : hint.optJSONObject("ijkProfiles"));
+            ijkProfile = hint == null ? "" : hint.optString("ijkProfile", "").trim();
             fallbackEnabled = hint == null || hint.optBoolean("fallbackEnabled", true);
             configuredFallbackOrder = readStringList(hint == null ? null : hint.optJSONArray("fallbackOrder"));
             engineOrder = buildEngineOrder(requested, url, input.optString("protocol", ""));
@@ -465,9 +469,7 @@ public final class NativePlaybackBridge {
 
     private void createIjk() throws IOException {
         ijkPlayer = new IjkMediaPlayer();
-        ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", "software".equals(decoderMode) ? 0 : 1);
-        ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 1);
-        ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1);
+        applyIjkProfile();
         if (!headers.isEmpty()) ijkPlayer.setDataSource(url, headers);
         else ijkPlayer.setDataSource(url);
         if (cookies.length() > 0) {
@@ -492,6 +494,79 @@ public final class NativePlaybackBridge {
         });
 
         attachSurface();
+    }
+
+    private static final class IjkOption {
+        final int category;
+        final String name;
+        final String value;
+        IjkOption(int category, String name, String value) {
+            this.category = category;
+            this.name = name;
+            this.value = value;
+        }
+    }
+
+    private static final java.util.Set<String> ALLOWED_IJK_OPTIONS =
+            new java.util.HashSet<>(java.util.Arrays.asList(
+                    "opensles", "overlay-format", "framedrop", "soundtouch",
+                    "start-on-prepared", "http-detect-range-support", "fflags",
+                    "skip_loop_filter", "reconnect", "max-buffer-size",
+                    "enable-accurate-seek", "mediacodec", "mediacodec-auto-rotate",
+                    "mediacodec-handle-resolution-change", "mediacodec-hevc",
+                    "dns_cache_timeout"
+            ));
+
+    private Map<String, List<IjkOption>> readIjkProfiles(@Nullable JSONObject object) {
+        if (object == null) return Collections.emptyMap();
+        Map<String, List<IjkOption>> profiles = new LinkedHashMap<>();
+        Iterator<String> groups = object.keys();
+        while (groups.hasNext()) {
+            String group = groups.next();
+            JSONArray options = object.optJSONArray(group);
+            if (options == null) continue;
+            ArrayList<IjkOption> parsed = new ArrayList<>();
+            for (int i = 0; i < options.length(); i++) {
+                JSONObject option = options.optJSONObject(i);
+                if (option == null) continue;
+                int category = option.optInt("category", 0);
+                String name = option.optString("name", "").trim();
+                String value = option.optString("value", "");
+                if (category < 1 || category > 4 || name.isEmpty()
+                        || value.isEmpty() || !ALLOWED_IJK_OPTIONS.contains(name)) continue;
+                parsed.add(new IjkOption(category, name, value));
+            }
+            if (!parsed.isEmpty()) profiles.put(group, parsed);
+        }
+        return profiles;
+    }
+
+    private void applyIjkProfile() {
+        List<IjkOption> options = ijkProfiles.get(ijkProfile);
+        if (options == null || options.isEmpty()) {
+            // Preserve the existing project defaults when no TVBox profile is available.
+            ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec",
+                    "software".equals(decoderMode) ? 0 : 1);
+            ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 1);
+            ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1);
+            return;
+        }
+        for (IjkOption option : options) {
+            try {
+                if (option.category == IjkMediaPlayer.OPT_CATEGORY_PLAYER
+                        || option.category == IjkMediaPlayer.OPT_CATEGORY_FORMAT
+                        || option.category == IjkMediaPlayer.OPT_CATEGORY_CODEC
+                        || option.category == IjkMediaPlayer.OPT_CATEGORY_SWS) {
+                    long numeric;
+                    try {
+                        numeric = Long.parseLong(option.value);
+                        ijkPlayer.setOption(option.category, option.name, numeric);
+                    } catch (NumberFormatException ignored) {
+                        ijkPlayer.setOption(option.category, option.name, option.value);
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
     }
 
     private void createNative() throws IOException {
