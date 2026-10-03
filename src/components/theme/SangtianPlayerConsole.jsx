@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Copy, Maximize2, Minimize2, RotateCw, Sparkles, Terminal, Paperclip,
-  Play, ArrowUp, ChevronDown,
+  Play, ArrowUp, ChevronDown, ListVideo, X, Heart, Radio, CheckCircle2, ChevronRight, ChevronLeft, Search,
   FileText, LayoutGrid, SlidersHorizontal, Check, RefreshCw, Ratio
 } from 'lucide-react';
 
@@ -9,6 +9,7 @@ export function SangtianPlayerWindow({
   videoRef, status, error, resolvedInput, candidate, request, onRetry, onSwitchCandidate,
   onFullscreen, terminalTag = 'BASH', children, videoContainerRef, isLive = false,
   playbackRate = 1.0, onChangePlaybackRate,
+  channelGroups = [], activeChannelId = '', onSelectChannel,
 }) {
   const [showTerminal, setShowTerminal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -22,6 +23,8 @@ export function SangtianPlayerWindow({
   const [networkDownlink, setNetworkDownlink] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showFullscreenBar, setShowFullscreenBar] = useState(true);
+  const [showLiveChannelList, setShowLiveChannelList] = useState(false);
+  const [liveChannelQuery, setLiveChannelQuery] = useState('');
   const lastBufferRef = React.useRef({time: 0, buffered: 0});
 
   const streamUrl = resolvedInput?.url || candidate?.mediaUrl || candidate?.url || candidate?.metadata?.url || '';
@@ -159,7 +162,13 @@ export function SangtianPlayerWindow({
             {fullscreen && (
               <div className={`sangtian-fullscreen-controls ${isLandscape ? 'landscape' : 'portrait'} ${showFullscreenBar ? 'visible' : ''}`}
                    onClick={()=>setShowFullscreenBar(true)}>
-                <div className="sangtian-fullscreen-topbar"><span>{request?.metadata?.title || candidate?.label || '正在播放'}</span><button onClick={handleToggleFullscreen}><Minimize2 size={18}/></button></div>
+                <div className="sangtian-fullscreen-topbar">
+                   <div className="sangtian-fullscreen-title"><span>{request?.metadata?.title || candidate?.label || '正在播放'}</span>{isLive && <small>{candidate?.label || '直播频道'}</small>}</div>
+                   <div className="sangtian-fullscreen-top-actions">
+                     {isLive && <button onClick={() => setShowLiveChannelList(value => !value)} aria-label="频道列表"><ListVideo size={18}/></button>}
+                     <button onClick={handleToggleFullscreen} aria-label="退出全屏"><Minimize2 size={18}/></button>
+                   </div>
+                 </div>
                 <div className="sangtian-fullscreen-center"><button onClick={handlePlayPause} className="fullscreen-play-btn">{isPlaying ? '暂停' : '播放'}</button></div>
                 <div className="sangtian-fullscreen-bottombar">
                   {!isLive && (
