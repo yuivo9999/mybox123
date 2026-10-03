@@ -50,7 +50,9 @@ export function createMovieAdapter(config, transport = null) {
 
     let response;
     try {
-      response = await requestAdapter.request(finalUrl, {
+      response = config.localContent != null
+        ? { ok: true, status: 200, headers: new Headers({ 'content-type': 'application/json' }), text: async () => String(config.localContent) }
+        : await requestAdapter.request(finalUrl, {
         headers: config.headers ?? {},
         signal: options.signal,
         timeoutMs: options.timeoutMs,
