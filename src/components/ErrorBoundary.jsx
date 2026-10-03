@@ -5,7 +5,7 @@ export class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false, error: null };
-    this.recoveryAttempted = false;
+    this.lastRecoverySignature = null;
   }
 
   static getDerivedStateFromError(error) {
@@ -20,9 +20,15 @@ export class ErrorBoundary extends React.Component {
     });
 
     // 页面级渲染异常不再弹出阻塞式错误窗口。
-    // 先让上层导航回到安全页面，再自动重试一次当前应用树。
-    if (!this.recoveryAttempted) {
-      this.recoveryAttempted = true;
+    // 同一种异常只自动恢复一次，避免持续异常形成重试死循环。
+    const signature = [
+      error?.name ?? 'Error',
+      error?.message ?? String(error),
+      this.props.route ?? '',
+    ].join('|');
+
+    if (signature !== this.lastRecoverySignature) {
+      this.lastRecoverySignature = signature;
       this.props.onReset?.();
       setTimeout(() => {
         this.setState({ hasError: false, error: null });
@@ -31,7 +37,7 @@ export class ErrorBoundary extends React.Component {
   }
 
   reset = () => {
-    this.recoveryAttempted = false;
+    this.lastRecoverySignature = null;
     this.setState({ hasError: false, error: null });
     this.props.onReset?.();
   };
