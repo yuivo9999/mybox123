@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Copy, Maximize2, Minimize2, RotateCw, Tv, Sparkles, Terminal, Paperclip,
+  Copy, Maximize2, Minimize2, RotateCw, Sparkles, Terminal, Paperclip,
   Play, ArrowUp, ChevronDown,
   FileText, LayoutGrid, SlidersHorizontal, Check, RefreshCw, Ratio
 } from 'lucide-react';
@@ -125,13 +125,12 @@ export function SangtianPlayerWindow({
   const loadSpeed = bufferRate > 0 ? `${bufferRate.toFixed(1)} 秒/秒` : '—';
 
   return (
-    <div className={`sangtian-window ${isLive ? 'is-live-direct' : ''} ${isLandscape ? 'is-landscape' : ''} ${isWebFullscreen ? 'is-web-fullscreen' : ''} ${isSystemFullscreen ? 'is-system-fullscreen' : ''} aspect-${aspectMode.replace(':','-')}`}>
+    <div className={`sangtian-window ${isLive ? 'is-live-direct' : ''} ${isLandscape ? 'is-landscape' : ''} ${isSystemFullscreen ? 'is-system-fullscreen' : ''} aspect-${aspectMode.replace(':','-')}`}>
       {!fullscreen && <div className="sangtian-window-bar">
         <div className="sangtian-window-tag"><span>{terminalTag}</span></div>
         <div className="sangtian-window-actions">
           <button className="sangtian-window-btn" onClick={handleCopyLink} title="复制播放链接">{copied ? <Check size={13}/> : <Copy size={13}/>}<span>{copied ? '已复制' : '复制'}</span></button>
           <button className={`sangtian-window-btn ${isLandscape ? 'active' : ''}`} onClick={handleToggleLandscape} title="方向"><RotateCw size={13}/><span>{isLandscape ? '竖屏' : '横屏'}</span></button>
-          <button className={`sangtian-window-btn ${isWebFullscreen ? 'active' : ''}`} onClick={()=>setIsWebFullscreen(v=>!v)} title="窗口全屏"><Tv size={13}/><span>{isWebFullscreen ? '还原' : '全屏'}</span></button>
           <button className={`sangtian-window-btn ${aspectMode !== 'original' ? 'active' : ''}`} onClick={handleCycleAspect} title={currentAspect.title}><Ratio size={13}/><span>{currentAspect.label}</span></button>
           <button className="sangtian-window-btn icon-only" onClick={handleToggleFullscreen} title="系统全屏"><Maximize2 size={13}/></button>
         </div>
