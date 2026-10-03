@@ -52,9 +52,7 @@ GitHub Actions Artifact
 
 建议新增：
 
-```
-.github/workflows/android.yml
-```
+`.github/workflows/android.yml`
 
 具体文件名可以调整，但必须清晰表达 Android 构建用途。
 
@@ -194,52 +192,27 @@ Android workflow 与 Pages workflow 应独立。
 
 ## 11. CI 完成定义
 
-- [ ] android workflow 存在。
-- [ ] workflow 可以手动触发。
-- [ ] main push 可以触发。
-- [ ] Node 版本明确。
-- [ ] Java 版本明确。
-- [ ] Android SDK 版本明确。
-- [ ] npm ci 成功。
-- [ ] React build 成功。
-- [ ] Capacitor sync 成功。
-- [ ] Gradle APK build 成功。
-- [ ] APK Artifact 成功上传。
-- [ ] Pages workflow 未被破坏。
-- [ ] 日志没有泄露 secrets。
+- [x] android workflow 存在。
+- [x] workflow 可以手动触发。
+- [x] main push 可以触发。
+- [x] Node 版本明确。
+- [x] Java 版本明确。
+- [x] Android SDK 版本明确。
+- [x] npm ci 成功。
+- [x] React build 成功。
+- [x] Capacitor sync 成功。
+- [x] Gradle APK build 成功。
+- [x] APK Artifact 成功上传。
+- [x] Pages workflow 未被破坏。
+- [x] 日志没有泄露 secrets。
 
 ---
 
 ## 12. 阶段交接记录
 
-- 阶段：
-- 完成日期：
-- Commit：
-- Workflow：
-- Node：
-- Java：
-- Android SDK：
-- Capacitor：
-- APK 类型：
-- APK 输出路径：
-- Artifact 名称：
-- 最近一次成功 Run：
-- Artifact：
-- 未完成：
-- 风险：
-- 下一阶段：
-- 下一 AI 第一件事：
-- 下一 AI 必须先检查：
-- 不要重复做：
-
-
----
-
-## 13. 阶段 4 完成记录（2026-10-03）
-
 - 阶段：阶段 4：GitHub Actions APK 构建实施
 - 完成日期：2026-10-03
-- Commit：f8062814e4f178bebe057382981514ef8c121c60（Android workflow toolchain hardening）
+- Commit：0bd4e4862d61e79cf1cf76e0bbb37ca29831b525（Android SDK manager 路径修复并经远程 Run #4 验证）
 - Workflow：.github/workflows/build-apk.yml
 - Node：22
 - Java：Temurin 21
@@ -249,9 +222,34 @@ Android workflow 与 Pages workflow 应独立。
 - APK 类型：Debug APK
 - APK 输出路径：android/app/build/outputs/apk/debug/app-debug.apk
 - Artifact 名称：mybox-android-debug-apk
-- 最近一次成功 Run：前一版 workflow Run #1 已验证完整构建链路成功；本次安全加固后的 workflow 尚未重新执行远程构建
-- Artifact：前一版 Artifact tvbox-react-debug-apk 已成功上传；安全加固后的新 Artifact 尚未产生
-- 未完成：安全加固后的 workflow 需要一次 GitHub Actions 远程 Run 验证
+- 最近一次成功 Run：Run #4（ID 37088502727）
+- Artifact：mybox-android-debug-apk；4,127,838 bytes；SHA-256 digest：58f10fc61c4c2757fc6aaf26c672431a4ca90bebe11e64931485b4acc4744eb7；有效期至 2026-10-17 02:06:39 UTC
+- 未完成：本阶段 CI 构建与 Artifact 验证已完成；Release 签名仍未配置
+- 风险：Release 签名未配置；本阶段按文档先完成 Debug APK
+- 下一阶段：05_最终验收与AI交接实施.md
+- 下一 AI 第一件事：先检查本文件第 13 节与 GitHub Actions 最近一次 Run，再继续阶段 5
+- 下一 AI 必须先检查：Android workflow、Pages workflow、Artifact、Release 签名状态
+- 不要重复做：不要重复创建 Android workflow；不要把 Debug APK 描述为正式发布 APK
+
+---
+
+## 13. 阶段 4 完成记录（2026-10-03）
+
+- 阶段：阶段 4：GitHub Actions APK 构建实施
+- 完成日期：2026-10-03
+- Commit：0bd4e4862d61e79cf1cf76e0bbb37ca29831b525（Android SDK manager 路径修复）
+- Workflow：.github/workflows/build-apk.yml
+- Node：22
+- Java：Temurin 21
+- Android SDK：compile/target SDK 36；CI 显式安装 platform android-36、build-tools 36.0.0、platform-tools
+- Gradle：8.14.3（仓库 Gradle Wrapper）
+- Capacitor：8.5.2
+- APK 类型：Debug APK
+- APK 输出路径：android/app/build/outputs/apk/debug/app-debug.apk
+- Artifact 名称：mybox-android-debug-apk
+- 最近一次成功 Run：Run #4（ID 37088502727）
+- Artifact：mybox-android-debug-apk；4,127,838 bytes；SHA-256 digest：58f10fc61c4c2757fc6aaf26c672431a4ca90bebe11e64931485b4acc4744eb7；有效期至 2026-10-17 02:06:39 UTC
+- 未完成：本阶段 CI 构建与 Artifact 验证已完成；Release 签名仍未配置
 - 风险：Release 签名未配置；本阶段按文档先完成 Debug APK
 - 下一阶段：05_最终验收与AI交接实施.md
 - 下一 AI 第一件事：先检查本文件第 13 节与 GitHub Actions 最近一次 Run，再继续阶段 5
