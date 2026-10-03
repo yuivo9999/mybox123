@@ -29,6 +29,7 @@ export const defaultSettings = () => ({
   defaultLiveSource: null,
   theme: 'sangtian',
   fontSize: 'medium',
+  fontFamily: DEFAULT_FONT_ID,
   cardStyle: 'poster',
   density: 'comfortable',
   playback: defaultPlaybackSettings(),
@@ -56,7 +57,7 @@ export const normalizePlaybackSettings = (value = {}) => {
 
 export const normalizeSettings = (value = {}) => {
   const input = value && typeof value === 'object' ? value : {};
-  return { ...defaultSettings(), ...input, playback: normalizePlaybackSettings(input.playback) };
+  return { ...defaultSettings(), ...input, fontFamily: typeof input.fontFamily === 'string' && input.fontFamily ? input.fontFamily : DEFAULT_FONT_ID, playback: normalizePlaybackSettings(input.playback) };
 };
 
 export const emptyUserData = () => ({
