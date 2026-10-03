@@ -9,8 +9,10 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
 import android.os.Messenger;
+import android.os.ParcelFileDescriptor;
 
 import java.util.UUID;
+import java.io.File;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.json.JSONObject;
@@ -89,6 +91,36 @@ public final class TVBoxJarIsolatedClient implements AutoCloseable {
             throw new IllegalStateException("TVBOX_JAR_ISOLATED_BIND_FAILED");
         }
         if (!latch.await(DEFAULT_TIMEOUT_MS, TimeUnit.MILLISECONDS)) throw new IllegalStateException("TVBOX_JAR_ISOLATED_CONNECT_TIMEOUT");
+    }
+
+    public String execute(File jarFile, String className, String operation, String payload) throws Exception {
+        if (jarFile == null || !jarFile.isFile()) throw new IllegalArgumentException("TVBOX_JAR_FILE_REQUIRED");
+        connect();
+        ParcelFileDescriptor descriptor = ParcelFileDescriptor.open(jarFile, ParcelFileDescriptor.MODE_READ_ONLY);
+        try {
+            String requestId = UUID.randomUUID().toString();
+            Message message = Message.obtain(null, TVBoxJarExecutionService.MSG_EXECUTE);
+            Bundle data = new Bundle();
+            data.putString(TVBoxJarExecutionService.KEY_REQUEST_ID, requestId);
+            data.putString(TVBoxJarExecutionService.KEY_OPERATION, operation == null ? "" : operation);
+            data.putString(TVBoxJarExecutionService.KEY_CLASS_NAME, className == null ? "" : className);
+            data.putString(TVBoxJarExecutionService.KEY_PAYLOAD, payload == null ? "{}" : payload);
+            data.putParcelable(TVBoxJarExecutionService.KEY_JAR_FD, descriptor);
+            message.setData(data);
+            message.replyTo = incoming;
+            remote.send(message);
+            long deadline = System.currentTimeMillis() + DEFAULT_TIMEOUT_MS;
+            synchronized (responses) {
+                while (!responses.containsKey(requestId)) {
+                    long remaining = deadline - System.currentTimeMillis();
+                    if (remaining <= 0) throw new IllegalStateException("TVBOX_JAR_ISOLATED_REQUEST_TIMEOUT");
+                    responses.wait(remaining);
+                }
+                return responses.remove(requestId);
+            }
+        } finally {
+            try { descriptor.close(); } catch (Exception ignored) { }
+        }
     }
 
     public String capabilities() throws Exception {
