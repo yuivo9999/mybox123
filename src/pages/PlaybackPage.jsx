@@ -27,6 +27,7 @@ function PlaybackView({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sourceModalOpen, setSourceModalOpen] = useState(false);
   const videoRef = useRef(null);
+  const playerWindowBodyRef = useRef(null);
 
   const controller = useMemo(() => playbackService.createController(request, {
     onEvent: e => {
@@ -62,6 +63,40 @@ function PlaybackView({
       document.removeEventListener('visibilitychange', onVisibility);
       controller.leave();
       void player;
+    };
+  }, [controller]);
+
+  useEffect(() => {
+    const body = playerWindowBodyRef.current;
+    if (!body || !controller?.setVideoViewBounds) return undefined;
+
+    const syncNativeVideoSurface = () => {
+      if (typeof window === 'undefined' || typeof body.getBoundingClientRect !== 'function') return;
+      const rect = body.getBoundingClientRect();
+      controller.setVideoViewBounds({
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
+      });
+    };
+
+    syncNativeVideoSurface();
+    const observer = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(syncNativeVideoSurface)
+      : null;
+    observer?.observe(body);
+    window.addEventListener('resize', syncNativeVideoSurface);
+    window.addEventListener('orientationchange', syncNativeVideoSurface);
+    const timer = window.setTimeout(syncNativeVideoSurface, 150);
+
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', syncNativeVideoSurface);
+      window.removeEventListener('orientationchange', syncNativeVideoSurface);
+      window.clearTimeout(timer);
     };
   }, [controller]);
 
@@ -139,6 +174,7 @@ function PlaybackView({
       {/* 2. Video Playback Window matching the top window in image */}
       <SangtianPlayerWindow
         videoRef={videoRef}
+        videoContainerRef={playerWindowBodyRef}
         status={status}
         error={error}
         resolvedInput={resolvedInput}
