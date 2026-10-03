@@ -4,9 +4,9 @@ import { parseXMLLive, parseXMLEPG } from './xmlParser.js';
 import { parseTXTLive, isTXTGenreFormat } from './txtParser.js';
 import { normalizeLiveChannel } from './normalizeLive.js';
 import { defaultLiveCapabilities, normalizeLiveCapabilities } from './liveCapabilities.js';
-import { resilientFetch } from '../../utils/resilientFetch.js';
+import { requestAdapter } from '../../services/requestAdapter.js';
 
-export function createLiveAdapter(config, transport = fetch) {
+export function createLiveAdapter(config, transport = null) {
   const sourceId = config.sourceId;
   let snapshot = [];
   let lastSuccessfulSnapshot = [];
@@ -22,7 +22,12 @@ export function createLiveAdapter(config, transport = fetch) {
   const load = async (options = {}) => {
     lastAttemptAt = Date.now();
     try {
-      const response = await resilientFetch(config.sourceRef, { headers: config.headers ?? {}, signal: options.signal }, transport);
+      const response = await requestAdapter.request(config.sourceRef, {
+        headers: config.headers ?? {},
+        signal: options.signal,
+        timeoutMs: options.timeoutMs,
+        transport,
+      });
       if (!response.ok) throw new Error(`HTTP_${response.status}`);
       const body = await response.text();
       const format = detectFormat(config.format, response.headers?.get?.('content-type') || '', body);
