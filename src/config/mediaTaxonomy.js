@@ -41,6 +41,17 @@ function text(...values) {
   return values.filter(value => value != null).map(value => String(value).trim().toLowerCase()).join(' ');
 }
 
+const TYPE_ALIASES = {
+  movie: ['movie', 'movies', 'film', 'films', 'vod', '电影', '影片', '电影片'],
+  tv: ['tv', 'series', 'serial', '电视剧', '连续剧', '剧集', '电视'],
+  variety: ['variety', 'show', 'shows', '综艺', '真人秀', '脱口秀', '娱乐节目'],
+};
+
+function includesAlias(value, aliases) {
+  const normalized = text(value);
+  return aliases.some(alias => normalized === alias || normalized.includes(alias));
+}
+
 function hasAny(value, keywords) {
   return keywords.some(keyword => value.includes(keyword));
 }
@@ -50,12 +61,14 @@ export function classifyMedia({ type = '', category = '', region = '', title = '
   const typeText = text(type);
   let mediaType;
 
-  if (hasAny(typeText, ['variety', '综艺', '真人秀', '脱口秀'])) mediaType = MEDIA_TYPE.VARIETY;
-  else if (hasAny(typeText, ['series', 'tv', '电视剧', '连续剧', '剧集', 'drama-series'])) mediaType = MEDIA_TYPE.TV;
-  else if (hasAny(typeText, ['movie', '电影', 'film'])) mediaType = MEDIA_TYPE.MOVIE;
-  else if (episodes.length > 1) mediaType = MEDIA_TYPE.TV;
-  else if (hasAny(raw, ['综艺', '真人秀', '脱口秀', 'variety'])) mediaType = MEDIA_TYPE.VARIETY;
+  if (includesAlias(typeText, TYPE_ALIASES.variety)) mediaType = MEDIA_TYPE.VARIETY;
+  else if (includesAlias(typeText, TYPE_ALIASES.tv)) mediaType = MEDIA_TYPE.TV;
+  else if (includesAlias(typeText, TYPE_ALIASES.movie)) mediaType = MEDIA_TYPE.MOVIE;
+  else if (episodes.length > 1 && !hasAny(raw, ['综艺', '真人秀', '脱口秀', 'variety'])) mediaType = MEDIA_TYPE.TV;
+  else if (hasAny(raw, ['综艺', '真人秀', '脱口秀', 'variety', '日综', '韩综', '美综', '国产综艺'])) mediaType = MEDIA_TYPE.VARIETY;
   else if (hasAny(raw, ['电视剧', '连续剧', '剧集', 'tv剧', '日剧', '韩剧', '美剧', '英剧', '泰剧', '国产剧'])) mediaType = MEDIA_TYPE.TV;
+  else if (hasAny(raw, ['电视剧', '连续剧', '剧集', 'tv剧', '日剧', '韩剧', '美剧', '英剧', '泰剧', '国产剧'])) mediaType = MEDIA_TYPE.TV;
+  else if (hasAny(raw, ['电影', '影片', '电影片', '科幻', '动作片', '爱情片', '战争片', '动画电影', '喜剧片', '惊悚片'])) mediaType = MEDIA_TYPE.MOVIE;
   else mediaType = MEDIA_TYPE.MOVIE;
 
   const ids = [];
