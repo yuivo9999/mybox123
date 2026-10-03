@@ -15,11 +15,11 @@ import { webViewRuntime } from '../runtime/webViewRuntime.js';
 import { MainPage } from '../pages/MainPage.jsx';
 import { PlaybackPage } from '../pages/PlaybackPage.jsx';
 import { LoadingState, ErrorState } from '../components/StateViews.jsx';
-import { ErrorCode } from '../models/errors.js';
 
 export function App(){
  const session=useSessionState(); const persistent=usePersistentState(); const {tab,route,selected}=session;
  const [contentState,setContentState]=useState({status:'idle',movies:[],channels:[],error:null,sourceLoading:false});
+ const [sourceErrorDismissed,setSourceErrorDismissed]=useState(false);
  const reloadGenerationRef=useRef(0);
  const applySourceResult=(result,generation=reloadGenerationRef.current)=>{
    if(generation!==reloadGenerationRef.current)return;
@@ -32,6 +32,7 @@ export function App(){
  };
  const reloadSources=async(movieSourceIdOverride=undefined,{background=false,includeMovie=true,includeLive=!background,liveSourceIds=null}={})=>{
    const generation=++reloadGenerationRef.current;
+   setSourceErrorDismissed(false);
    if(!background) setContentState(state=>({...state,status:'loading',error:null,sourceLoading:false}));
    else setContentState(state=>({...state,error:null,sourceLoading:true}));
    try{
@@ -230,20 +231,17 @@ export function App(){
         }
 
         if (contentState.status === 'error') {
-          const errorCode = contentState.error?.[0]?.reason?.code ?? contentState.error?.code;
-          const errorText = errorCode === ErrorCode.NETWORK ? '网络连接失败' : errorCode === ErrorCode.SOURCE_EMPTY ? '内容源返回空结果' : '当前内容源无法正常使用';
           return (
-            <main className="page">
-              <ErrorState 
-                text={errorText} 
-                retry={reloadSources} 
-                secondaryAction={() => nav('sources')} 
-                secondaryActionText="切换源"
-              />
-              <div style={{marginTop: 20, textAlign: 'center'}}>
-                <button className="secondary" onClick={() => nav('me')}>返回我的</button>
-              </div>
-            </main>
+            <>
+              {movieActive
+                ? <MovieFeature route={route} tab={tab} selected={selected} movies={contentState.movies} channels={contentState.channels} history={persistent.history} progress={persistent.progress} selectedSources={persistent.selectedSources} sources={persistent.sources} onSelectMovieSource={setSourceActive} favorites={persistent.favorites} onMovie={openMovie} onPlay={playMovie} onTab={nav} onBack={()=>sessionStateStore.patch({route:route==='movie-play'?(selected?.metadata?.returnRoute||'detail'):null,selected:route==='movie-play'&&selected?.metadata?.returnRoute==='detail'?selected:null})} onLive={playLive} recordSearch={persistent.recordSearch} toggleFavorite={persistent.toggleFavorite}/>
+                : route === 'live-channel'
+                  ? <LiveChannelPanel channel={selected} channels={contentState.channels} favorites={persistent.favorites} onBack={()=>sessionStateStore.patch({route:null,selected:null,tab:'live'})} onPlay={playLive} onChannel={openLiveChannel} toggleFavorite={persistent.toggleFavorite}/>
+                  : route === 'live-play'
+                    ? <PlaybackPage request={selected} kind="live" channels={contentState.channels} favorites={persistent.favorites} onChannel={openLiveChannel} onPlay={playLive} toggleFavorite={persistent.toggleFavorite} onTab={nav} onBack={()=>sessionStateStore.patch({route:'live-channel',selected:contentState.channels.find(c=>c.channelId===selected?.channelId)??null})}/>
+                    : <MainPage tab={tab} movies={contentState.movies} channels={contentState.channels} favorites={persistent.favorites} history={persistent.history} progress={persistent.progress} settings={persistent.settings} sources={persistent.sources} searches={persistent.searches} onTab={nav} onMovie={openMovie} onLive={playLive} onLiveChannel={openLiveChannel} onSearchHistory={openSearchHistory} toggleFavorite={persistent.toggleFavorite} onClearData={persistent.clearUserData} onClearHistory={persistent.clearHistory} onClearSearches={persistent.clearSearches} onRemoveSearch={persistent.removeSearch} onClearCache={persistent.clearCache} onSourceEnabled={setSourceEnabled} onSourceActive={setSourceActive} onUpdateSettings={persistent.updateSettings} onTestSource={testSource} onSaveSources={saveSources} onRemoveSource={removeSource}/>}
+              {!sourceErrorDismissed && <ErrorState text="无法加载源" onClose={()=>setSourceErrorDismissed(true)}/>}
+            </>
           );
         }
 
