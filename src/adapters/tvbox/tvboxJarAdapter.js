@@ -23,6 +23,7 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
     return effectiveRuntime.execute({ operation, payload });
   };
 
+  let preparedPath = '';
   const prepare = async (payload = {}) => execute('prepare', {
     ...payload,
     name: payload.name || definition.name,
@@ -31,18 +32,27 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
 
   const inspect = async (payload = {}) => execute('inspect', payload);
 
+  const ensurePrepared = async (payload = {}) => {
+    if (payload.path) return payload.path;
+    if (preparedPath) return preparedPath;
+    const result = await prepare(payload);
+    preparedPath = String(result?.path || '');
+    if (!preparedPath) throw new Error('TVBOX_JAR_PREPARE_PATH_MISSING');
+    return preparedPath;
+  };
+
   const invoke = async (operation, payload = {}) => execute(operation, {
     ...payload,
-    path: payload.path || '',
+    path: payload.path || preparedPath || '',
     className: payload.className || '',
     ext: payload.ext ?? definition.tvboxDefinition?.ext ?? '',
   });
 
-  const home = (payload = {}) => invoke('home', payload);
-  const category = (payload = {}) => invoke('category', payload);
-  const detail = (payload = {}) => invoke('detail', payload);
-  const search = (payload = {}) => invoke('search', payload);
-  const play = (payload = {}) => invoke('play', payload);
+  const home = async (payload = {}) => invoke('home', { ...payload, path: await ensurePrepared(payload) });
+  const category = async (payload = {}) => invoke('category', { ...payload, path: await ensurePrepared(payload) });
+  const detail = async (payload = {}) => invoke('detail', { ...payload, path: await ensurePrepared(payload) });
+  const search = async (payload = {}) => invoke('search', { ...payload, path: await ensurePrepared(payload) });
+  const play = async (payload = {}) => invoke('play', { ...payload, path: await ensurePrepared(payload) });
 
   const normalizeResult = (result) => {
     const raw = result?.result ?? result;
