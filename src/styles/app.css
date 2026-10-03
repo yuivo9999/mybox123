@@ -1413,3 +1413,22 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
 .theme-sangtian .movie-carousel-card,.theme-light .movie-carousel-card{color:#151515;background:#fff}
 .theme-sangtian .movie-carousel-caption,.theme-light .movie-carousel-caption{background:#fff}
 @media (prefers-reduced-motion:reduce){.movie-carousel-card{transition:none}}
+/* Movie playback context and VOD-only fullscreen seek controls. */
+.movie-playback-context{margin:0 14px 10px;padding:10px 12px;border:1px solid #3b3027;border-radius:13px;background:#241d17;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.movie-playback-context-main{min-width:0;display:flex;align-items:center;gap:9px;flex:1}
+.movie-playback-back,.movie-playback-fav{width:34px;height:34px;display:grid;place-items:center;border:1px solid #4b3b2e;background:#30251d;color:#ded5ca;border-radius:9px;flex:0 0 34px}
+.movie-playback-title{min-width:0;display:flex;flex-direction:column;gap:3px}
+.movie-playback-title b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.movie-playback-title span{font-size:10px;color:#a99b8b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.movie-playback-context-actions{display:flex;gap:6px;flex:0 0 auto}
+.movie-playback-context-actions button{display:inline-flex;align-items:center;gap:4px;min-height:32px;padding:0 9px;border:1px solid #4b3b2e;background:#30251d;color:#ded5ca;border-radius:8px;font-size:11px}
+.movie-playback-context-actions button:disabled{opacity:.38;cursor:not-allowed}
+.fullscreen-skip-row{display:flex;align-items:center;gap:16px}
+.fullscreen-skip-row>button:not(.fullscreen-play-btn){width:54px;height:54px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(0,0,0,.46);color:#fff;display:grid;place-items:center;font-size:9px}
+.fullscreen-skip-row>button span{font-size:9px}
+@media(max-width:720px){.movie-playback-context{align-items:stretch;flex-direction:column}.movie-playback-context-actions{width:100%}.movie-playback-context-actions button{flex:1;justify-content:center}}
+.theme-light .movie-playback-context{background:#fff;border-color:#d9dee7}
+.theme-light .movie-playback-back,.theme-light .movie-playback-fav,.theme-light .movie-playback-context-actions button{background:#f7f8fa;border-color:#d9dee7;color:#151820}
+.theme-sangtian .movie-playback-context{background:#fcf9f2;border-color:#d4c5a9;color:#261f18}
+.theme-sangtian .movie-playback-back,.theme-sangtian .movie-playback-fav,.theme-sangtian .movie-playback-context-actions button{background:#fbf6ec;border-color:#d4c5a9;color:#554535}
+.theme-sangtian .movie-playback-title span{color:#7b6a57}
