@@ -21,10 +21,14 @@ public final class DrpyHttpRuntime {
     private DrpyHttpRuntime() {}
 
     public static Response request(String method, String urlString, String body, String contentType) throws IOException {
-        return request(method, urlString, body, contentType, 0);
+        return request(method, urlString, body, contentType, java.util.Collections.emptyMap(), 0);
     }
 
-    private static Response request(String method, String urlString, String body, String contentType, int redirects) throws IOException {
+    public static Response request(String method, String urlString, String body, String contentType, Map<String, String> headers) throws IOException {
+        return request(method, urlString, body, contentType, headers == null ? java.util.Collections.emptyMap() : headers, 0);
+    }
+
+    private static Response request(String method, String urlString, String body, String contentType, Map<String, String> headers, int redirects) throws IOException {
         if (urlString == null || urlString.trim().isEmpty()) throw new IllegalArgumentException("DRPY_HTTP_URL_REQUIRED");
         if (redirects > MAX_REDIRECTS) throw new IOException("DRPY_HTTP_REDIRECT_LIMIT");
 
@@ -48,6 +52,9 @@ public final class DrpyHttpRuntime {
         connection.setRequestMethod(normalizeMethod(method));
         connection.setRequestProperty("Accept", "*/*");
         connection.setRequestProperty("User-Agent", "MyBox-TVBox-Drpy/1");
+        for (Map.Entry<String, String> header : headers.entrySet()) {
+            if (header.getKey() != null && !header.getKey().trim().isEmpty() && header.getValue() != null) connection.setRequestProperty(header.getKey(), header.getValue());
+        }
         if (contentType != null && !contentType.trim().isEmpty()) {
             connection.setRequestProperty("Content-Type", contentType.trim());
         }
@@ -64,7 +71,7 @@ public final class DrpyHttpRuntime {
             String location = connection.getHeaderField("Location");
             connection.disconnect();
             if (location == null || location.trim().isEmpty()) throw new IOException("DRPY_HTTP_REDIRECT_LOCATION_MISSING");
-            return request(method, uri.resolve(location).toString(), body, contentType, redirects + 1);
+            return request(method, uri.resolve(location).toString(), body, contentType, headers, redirects + 1);
         }
 
         InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
