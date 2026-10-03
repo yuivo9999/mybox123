@@ -45,7 +45,7 @@ import tv.danmaku.ijk.media.player.IMediaPlayer;
  * The Web layer never talks to any engine directly.
  */
 public final class NativePlaybackBridge {
-    public static final String JS_NAME = "TVboxAndroidBridge";
+    public static final String JS_NAME = "TVBoxAndroidBridge";
 
     private static final String ENGINE_EXO = "exo";
     private static final String ENGINE_IJK = "ijk";
