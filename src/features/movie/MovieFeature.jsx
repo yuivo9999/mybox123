@@ -19,10 +19,10 @@ export function MovieFeature(props){
   return()=>window.removeEventListener('scroll',save);
  },[route,tab]);
  const feature=useMemo(()=>createMovieFeature({movies,history,progress}),[movies,history]);
- if(route==='search') return <MovieSearch movies={movies} sources={sources} initial={page.search.query} recordSearch={recordSearch} onMovie={onMovie} onBack={onBack} onQuery={query=>pageStateStore.patch('search',{query})}/>;
+ if(route==='search') return <MovieSearch movies={movies} sources={sources} initial={page.search.query} recordSearch={recordSearch} onMovie={onMovie} onPlay={onPlay} onBack={onBack} onQuery={query=>pageStateStore.patch('search',{query})}/>;
  if(route==='detail'){const movie=feature.getDetail(selected?.contentId??selected) || (selected?.contentId ? selected : null);if(!movie)return <MovieEmpty text="影视内容不存在" onBack={onBack}/>;return <MovieDetail movie={movie} movies={movies} sources={sources} selectedSourceId={selectedSources?.movie} onMovie={onMovie} favorite={favorites.some(i=>i.targetType==='content'&&i.targetId===movie.contentId)} onBack={onBack} onPlay={onPlay} onFavorite={()=>toggleFavorite('content',movie.contentId)}/>;}
  if(route==='movie-play') return <MoviePlaybackPage request={selected} movies={movies} favorites={favorites} toggleFavorite={toggleFavorite} onBack={onBack} onEpisode={onPlay} onMovie={onMovie} onTab={onTab}/>
- if(tab==='movies') return <MovieCatalog movies={movies} sources={sources} state={movieState} setState={patch=>pageStateStore.patch('movies',patch)} onMovie={onMovie} onSearch={()=>onMovie(null,'search')} recordSearch={recordSearch}/>;
+ if(tab==='movies') return <MovieCatalog movies={movies} sources={sources} state={movieState} setState={patch=>pageStateStore.patch('movies',patch)} onMovie={onMovie} onPlay={onPlay} onSearch={()=>onMovie(null,'search')} recordSearch={recordSearch}/>;
  return <MovieHome feature={feature} channels={channels} sources={sources} selectedSourceId={selectedSources?.movie} onSelectMovieSource={onSelectMovieSource} onTab={onTab} onMovie={onMovie} onPlay={onPlay} onLive={onLive} onSearch={()=>onMovie(null,'search')}/>;
 }
 
@@ -68,7 +68,7 @@ function MovieSourceSelector({sources=[],selectedSourceId,onChange}){
  </section>;
 }
 
-function MovieCatalog({movies,state,setState,onMovie,onSearch,recordSearch,sources=[]}){
+function MovieCatalog({movies,state,setState,onMovie,onPlay,onSearch,recordSearch,sources=[]}){
  const home=useMemo(()=>movieService.getHome({movies}),[movies]); const categories=['全部','电影','电视剧','综艺'];
  const selectedType=state.category==='电影'?'movie':state.category==='电视剧'?'tv':state.category==='综艺'?'variety':null;
  const subcategories=selectedType?(home.taxonomy?.[selectedType]??[]):[];
@@ -79,19 +79,19 @@ function MovieCatalog({movies,state,setState,onMovie,onSearch,recordSearch,sourc
  {selectedType&&<div className="chips">{subcategories.map(item=>{const selected=state.filters.categoryId===item.id;return <button className={selected?'active':''} onClick={()=>setState({filters:{...state.filters,categoryId:selected?'':item.id},page:1})} key={item.id}>{item.label}</button>})}</div>}
  <div className="filter-row"><select value={state.filters.type||'全部'} onChange={e=>setState({filters:{...state.filters,type:e.target.value==='全部'?'':e.target.value},page:1})}>{values('types').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.year||'全部'} onChange={e=>setState({filters:{...state.filters,year:e.target.value==='全部'?'':e.target.value},page:1})}>{values('years').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.region||'全部'} onChange={e=>setState({filters:{...state.filters,region:e.target.value==='全部'?'':e.target.value},page:1})}>{values('regions').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.status||'全部'} onChange={e=>setState({filters:{...state.filters,status:e.target.value==='全部'?'':e.target.value},page:1})}>{values('statuses').map(x=><option key={x}>{x}</option>)}</select><select value={state.sort} onChange={e=>setState({sort:e.target.value,page:1})}>{[['default','默认'],['latest','最新'],['popular','热门'],['time','时间'],['title','名称']].map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></div>
  {state.query.trim()
-   ? <GlobalMovieSearch query={state.query} sources={sources} onMovie={onMovie}/>
+   ? <GlobalMovieSearch query={state.query} sources={sources} onMovie={onMovie} onPlay={(movie)=>onPlay?.(movie,0,movie?.sourceId,'movies')}/>
    : listMeta.items.length
      ? <MovieGrid movies={listMeta.items} onMovie={onMovie}/>
      : <EmptyState text={movies.length?'当前筛选暂无内容':'暂无影视内容'}/>}
  {!state.query.trim()&&listMeta.items.length>0&&<div className="pagination"><button disabled={state.page<=1} onClick={()=>setState({page:state.page-1})}>上一页</button><span>第 {state.page} 页 / 共 {Math.max(1,Math.ceil(listMeta.total/state.pageSize))} 页</span><button disabled={!listMeta.hasMore} onClick={()=>setState({page:state.page+1})}>下一页</button></div>}</Page>;
 }
 
-function MovieSearch({movies,initial,recordSearch,onMovie,onBack,onQuery,sources=[]}){
+function MovieSearch({movies,initial,recordSearch,onMovie,onPlay,onBack,onQuery,sources=[]}){
  const [query,setQuery]=useState(initial||'');
- return <Page><button className="back" onClick={onBack}><ChevronLeft/>返回</button><Header title="搜索"/><div className="searchbox"><Search size={18}/><input autoFocus value={query} onChange={e=>{setQuery(e.target.value);onQuery(e.target.value)}} onKeyDown={e=>e.key==='Enter'&&recordSearch(query)} placeholder="搜索全部影视源"/>{query&&<X size={16} onClick={()=>{setQuery('');onQuery('')}}/>}</div>{!query?<EmptyState text="输入关键词搜索全部已导入影视源"/>:<GlobalMovieSearch query={query} sources={sources} onMovie={onMovie}/>}</Page>;
+ return <Page><button className="back" onClick={onBack}><ChevronLeft/>返回</button><Header title="搜索"/><div className="searchbox"><Search size={18}/><input autoFocus value={query} onChange={e=>{setQuery(e.target.value);onQuery(e.target.value)}} onKeyDown={e=>e.key==='Enter'&&recordSearch(query)} placeholder="搜索全部影视源"/>{query&&<X size={16} onClick={()=>{setQuery('');onQuery('')}}/>}</div>{!query?<EmptyState text="输入关键词搜索全部已导入影视源"/>:<GlobalMovieSearch query={query} sources={sources} onMovie={onMovie} onPlay={(movie)=>onPlay?.(movie,0,movie?.sourceId,'search')}/>}</Page>;
 }
 
-function GlobalMovieSearch({query,sources=[],onMovie}){
+function GlobalMovieSearch({query,sources=[],onMovie,onPlay}){
  const [state,setState]=useState({loading:true,groups:[],failed:[],error:''});
  useEffect(()=>{
    const controller=new AbortController();
@@ -117,7 +117,7 @@ function GlobalMovieSearch({query,sources=[],onMovie}){
    <div style={{display:'grid',gap:18}}>
      {state.groups.filter(group=>(group.items?.length??0)>0).map(group=><section key={group.sourceId}>
        <div className="section-title" style={{marginBottom:8}}><h3>{group.sourceName}</h3><span style={{fontSize:12,color:'#8f9aaa'}}>{group.items.length} 条</span></div>
-       <MovieGrid movies={group.items} onMovie={onMovie}/>
+       <MovieGrid movies={group.items} onMovie={onPlay || onMovie}/>
      </section>)}
    </div>
    {state.failed.length>0&&<div style={{fontSize:11,color:'#8f9aaa',marginTop:12}}>另有 {state.failed.length} 个源未返回结果，已跳过，不影响其他源。</div>}
@@ -131,11 +131,11 @@ function MovieDetail({movie,movies,sources=[],selectedSourceId,onMovie,onBack,on
  <SectionTitle title="剧集"/>{groups.length>1&&<div className="chips episode-groups">{groups.map((_,i)=><button key={i} className={episodePage===i?'active':''} onClick={()=>setEpisodePage(i)}>{i*50+1}–{Math.min((i+1)*50,movie.episodes.length)}</button>)}</div>}<div className="episode-grid">{currentEpisodes.map((episode,index)=><button key={episode.episodeId} onClick={()=>onPlay(movie,episodePage*50+index,sourceId)}>{episode.title}</button>)}</div>
  <SectionTitle title="其他源搜索" action="搜索同名" onAction={()=>setOtherSourceSearchOpen(true)}/><div className="info-card" style={{marginTop:-2,marginBottom:16}}><Search size={16}/><div><b>在其他影视源中查找《{movie.title}》</b><span>不会切换当前源，只搜索其他已启用影视源；找到后可直接进入对应来源的详情。</span></div></div>
  <SectionTitle title="来源选择"/><div className="chips">{sourceIds.length?sourceIds.map(id=><button className={sourceId===id?'active':''} key={id} onClick={()=>setSourceId(id)}>{sourceMap.get(id)||id}</button>):<span>暂无来源</span>}</div>
- {otherSourceSearchOpen&&<OtherSourceSearchDialog title={movie.title} currentSourceId={sourceId} sources={sources} onClose={()=>setOtherSourceSearchOpen(false)} onMovie={(item)=>{setOtherSourceSearchOpen(false);onMovie(item)}}/>}
+ {otherSourceSearchOpen&&<OtherSourceSearchDialog title={movie.title} currentSourceId={sourceId} sources={sources} onClose={()=>setOtherSourceSearchOpen(false)} onMovie={onMovie} onPlay={onPlay}/>}
  <SectionTitle title="相关推荐"/>{related.length?<MovieGrid movies={related} onMovie={onMovie}/>:<MovieEmpty compact text="暂无相关推荐"/>}</Page>;
 }
 
-function OtherSourceSearchDialog({title,currentSourceId,sources=[],onClose,onMovie}){
+function OtherSourceSearchDialog({title,currentSourceId,sources=[],onClose,onMovie,onPlay}){
  const [results,setResults]=useState([]);
  const [failed,setFailed]=useState([]);
  const [loading,setLoading]=useState(true);
@@ -182,7 +182,7 @@ function OtherSourceSearchDialog({title,currentSourceId,sources=[],onClose,onMov
        <section key={group.sourceId} style={{marginBottom:14}}>
          <div className="section-title" style={{marginBottom:7}}><h3>{group.sourceName}</h3><span style={{fontSize:12,color:'#8f9aaa'}}>{group.items.length} 条</span></div>
          <div style={{display:'grid',gap:8}}>
-           {group.items.map(item=><button className="menu" key={item.contentId} onClick={()=>onMovie(item)} style={{width:'100%',textAlign:'left'}}>
+           {group.items.map(item=><button className="menu" key={item.contentId} onClick={()=>{if(onPlay) onPlay(item,0,item?.sourceId,'detail'); else onMovie(item)}} style={{width:'100%',textAlign:'left'}}>
              <SmartImage src={item.poster} alt={item.title}/>
              <span style={{minWidth:0,flex:1}}><b>{item.title}</b><small>{item.year||'—'} · {item.category||'—'}{item.episodeCount?' · '+item.episodeCount+'集':''}</small></span>
              <ChevronRight size={17}/>
