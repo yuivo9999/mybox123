@@ -2,6 +2,19 @@ import { requestAdapter } from '../services/requestAdapter.js';
 import { createResolvedMediaInput } from '../models/parser.js';
 import { applyTVBoxNetworkPolicy } from '../services/tvboxNetworkPolicy.js';
 
+function selectDoH(config) {
+  const entries = Array.isArray(config?.doh) ? config.doh : [];
+  const endpoint = entries.find(item => /^https?:\/\//i.test(String(item?.url || '').trim()));
+  if (!endpoint) return null;
+  const bootstrapIps = Array.isArray(endpoint.ips)
+    ? endpoint.ips.map(value => String(value).trim()).filter(Boolean)
+    : [];
+  return {
+    url: String(endpoint.url).trim(),
+    bootstrapIps,
+  };
+}
+
 function normalizeFlag(value) {
   return String(value ?? '').replace(/\r?\n/g, '').trim().toLowerCase();
 }
