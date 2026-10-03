@@ -1161,6 +1161,30 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
 }
 
 
+.batch-source-backdrop{z-index:70;padding:16px;align-items:center;justify-items:center;background:rgba(0,0,0,.48);backdrop-filter:blur(3px)}
+.batch-source-modal{width:min(720px,calc(100vw - 24px));max-height:min(88vh,760px);display:flex;flex-direction:column;gap:0;min-height:0;background:var(--card-bg,#11141b);border:1px solid var(--border,#303744);border-radius:18px;box-shadow:0 22px 70px rgba(0,0,0,.42);overflow:hidden;color:inherit}
+.batch-source-modal .batch-source-header{flex:0 0 auto;padding:15px 16px 12px;border-bottom:1px solid var(--border,#303744);background:inherit}
+.batch-source-modal .batch-source-header .icon-button{width:36px;height:36px;flex:0 0 36px}
+.batch-source-modal .batch-source-toolbar{margin:12px 14px 0;flex:0 0 auto}
+.batch-source-modal .batch-source-actions{padding:10px 14px 0;flex:0 0 auto}
+.batch-source-modal .batch-source-notice{margin:10px 14px 0;flex:0 0 auto}
+.batch-source-modal .batch-source-list{padding:10px 14px 4px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;min-height:120px;max-height:42vh}
+.batch-source-modal .batch-source-tip{flex:0 0 auto;margin:0 14px 8px;padding:8px 0}
+.batch-source-modal .batch-source-actions .danger-button{margin-left:auto}
+.theme-light .batch-source-modal{background:#fff;border-color:#d9dee7;box-shadow:0 22px 70px rgba(31,41,55,.24)}
+.theme-light .batch-source-modal .batch-source-header{border-color:#d9dee7}
+.theme-sangtian .batch-source-modal{background:#fcf9f2;border-color:#d4c5a9;color:#261f18;box-shadow:0 22px 70px rgba(73,55,34,.24)}
+.theme-sangtian .batch-source-modal .batch-source-header{border-color:#d4c5a9}
+@media(max-width:560px){
+  .batch-source-backdrop{padding:8px}
+  .batch-source-modal{width:100%;max-height:92vh;border-radius:16px}
+  .batch-source-modal .batch-source-toolbar{margin:10px 10px 0}
+  .batch-source-modal .batch-source-actions{padding:9px 10px 0}
+  .batch-source-modal .batch-source-notice{margin:8px 10px 0}
+  .batch-source-modal .batch-source-list{padding:8px 10px 2px;max-height:48vh}
+  .batch-source-modal .batch-source-tip{margin:0 10px 7px}
+}
+
 .batch-source-page{display:flex;flex-direction:column;gap:14px;min-width:0}
 .batch-source-header{display:flex;align-items:center;gap:14px}
 .icon-text-button{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
