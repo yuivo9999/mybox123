@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Film, Heart, Play, Search, X } from 'lucide-react';
 import { movieService } from '../../services/movieService.js';
+import { getCategoryIdByLabel } from '../../config/mediaTaxonomy.js';
 import { usePageState, pageStateStore } from '../../state/pageStateStore.js';
 import { SmartImage, EmptyState } from '../../components/StateViews.jsx';
 import { MoviePlaybackPage } from './MoviePlaybackPage.jsx';
@@ -47,9 +48,9 @@ function MovieHome({feature,channels,sources=[],selectedSourceId,onSelectMovieSo
  <SectionTitle title="电影榜单"/><MovieGrid movies={home.movieRanking} onMovie={onMovie}/>
  <SectionTitle title="电视榜单"/><MovieGrid movies={home.tvRanking} onMovie={onMovie}/>
  <SectionTitle title="综艺榜单"/><MovieGrid movies={home.varietyRanking} onMovie={onMovie}/>
- <SectionTitle title="电影筛选" action="进入" onAction={()=>{pageStateStore.patch('movies',{category:'电影',page:1});onTab('movies')}}/><div className="chips">{home.taxonomy.movie.map(item=><button key={item} onClick={()=>{pageStateStore.patch('movies',{category:item,filters:{},page:1});onTab('movies')}}>{item}</button>)}</div>
- <SectionTitle title="电视筛选" action="进入" onAction={()=>{pageStateStore.patch('movies',{category:'电视剧',page:1});onTab('movies')}}/><div className="chips">{home.taxonomy.tv.map(item=><button key={item} onClick={()=>{pageStateStore.patch('movies',{category:item,page:1});onTab('movies')}}>{item}</button>)}</div>
- <SectionTitle title="综艺筛选" action="进入" onAction={()=>{pageStateStore.patch('movies',{category:'综艺',page:1});onTab('movies')}}/><div className="chips">{home.taxonomy.variety.map(item=><button key={item} onClick={()=>{pageStateStore.patch('movies',{category:item,page:1});onTab('movies')}}>{item}</button>)}</div>
+ <SectionTitle title="电影筛选" action="进入" onAction={()=>{pageStateStore.patch('movies',{category:'电影',page:1});onTab('movies')}}/><div className="chips">{home.taxonomy.movie.map(item=><button key={item} onClick={()=>{pageStateStore.patch('movies',{category:'电影',filters:{categoryId:getCategoryIdByLabel('movie',item)},page:1});onTab('movies')}}>{item}</button>)}</div>
+ <SectionTitle title="电视筛选" action="进入" onAction={()=>{pageStateStore.patch('movies',{category:'电视剧',page:1});onTab('movies')}}/><div className="chips">{home.taxonomy.tv.map(item=><button key={item} onClick={()=>{pageStateStore.patch('movies',{category:'电视剧',filters:{categoryId:getCategoryIdByLabel('tv',item)},page:1});onTab('movies')}}>{item}</button>)}</div>
+ <SectionTitle title="综艺筛选" action="进入" onAction={()=>{pageStateStore.patch('movies',{category:'综艺',page:1});onTab('movies')}}/><div className="chips">{home.taxonomy.variety.map(item=><button key={item} onClick={()=>{pageStateStore.patch('movies',{category:'综艺',filters:{categoryId:getCategoryIdByLabel('variety',item)},page:1});onTab('movies')}}>{item}</button>)}</div>
  <SectionTitle title="继续观看"/><div className="continue-row">{home.continueWatching.length?home.continueWatching.map(({movie,episodeIndex,history:item})=><div className="continue" key={item.historyId} onClick={()=>onPlay(movie,episodeIndex)}><SmartImage src={movie.poster} fallback={<div className="image-placeholder"><Film size={18}/></div>}/><div><b>{movie.title}</b><small>{movie.episodes?.[episodeIndex]?.title??'继续观看'} · {Math.floor((item.positionSeconds??0)/60)} 分钟</small></div></div>):<MovieEmpty compact text="暂无观看记录"/>}</div>
  <SectionTitle title="最新内容"/><MovieGrid movies={home.latest} onMovie={onMovie}/>
  <SectionTitle title="Live 快捷入口"/><div className="live-banner" onClick={()=>onTab('live')}><span><b>Live 直播中心</b><small>{channels.length} 个频道</small></span><ChevronLeft className="flip"/></div>{channels[0]&&<button className="movie-live-entry" onClick={()=>onLive(channels[0])}><Play size={15}/>直接播放示例频道</button>}</Page>;
