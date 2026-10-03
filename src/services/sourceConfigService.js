@@ -339,7 +339,14 @@ export const sourceConfigService = {
         createdAt: previous.createdAt || source.createdAt,
       };
     });
-    const retainedSources = currentSources.filter(source => !importedBundleIds.has(source.bundleId));
+    const importedIdentities = new Set(
+      normalizedImportedSources.map(source => `${source.sourceType}|${source.sourceRef || source.url || ''}`),
+    );
+    const retainedSources = currentSources.filter(source => {
+      if (importedBundleIds.has(source.bundleId)) return false;
+      const identity = `${source.sourceType}|${source.sourceRef || source.url || ''}`;
+      return !importedIdentities.has(identity);
+    });
     const nextSources = [...retainedSources, ...normalizedImportedSources];
     sourceRepository.saveAll(nextSources);
     return nextSources;
