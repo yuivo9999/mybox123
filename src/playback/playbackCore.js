@@ -13,6 +13,7 @@ import { playbackSessionManager } from './playbackSessionManager.js';
 import { ErrorCode } from '../models/errors.js';
 import { errorService } from '../services/errorService.js';
 import { normalizePlaybackEvent } from './playbackEventProtocol.js';
+import { userDataService } from '../services/userDataService.js';
 
 function nativeAvailable() {
   if (typeof window === 'undefined') return false;
@@ -83,7 +84,16 @@ export function createPlaybackCore(task,hooks={}) {
 
  const playResolved=async(input)=>{
   if(!player)throw new Error('PLAYER_ADAPTER_NOT_ATTACHED');
-  await Promise.resolve(player.load(input));
+  const playbackSettings = userDataService.getSettings().playback;
+  const defaultEngine = task.request.kind === PlaybackKind.LIVE ? playbackSettings.livePlayer : playbackSettings.moviePlayer;
+  const playerHint = {
+   ...(input.playerHint ?? {}),
+   engine: input.playerHint?.engine ?? defaultEngine,
+   decoder: input.playerHint?.decoder ?? playbackSettings.decoder?.[defaultEngine] ?? 'auto',
+   fallbackEnabled: input.playerHint?.fallbackEnabled ?? playbackSettings.fallbackEnabled,
+   fallbackOrder: input.playerHint?.fallbackOrder ?? playbackSettings.fallbackOrder,
+  };
+  await Promise.resolve(player.load({ ...input, playerHint }));
   await Promise.resolve(player.prepare());
   const startPosition=Number(task.request.metadata?.startPositionSeconds??0);
   if(task.request.kind===PlaybackKind.VOD&&startPosition>0)player.seek(startPosition);
