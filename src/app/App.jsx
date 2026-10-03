@@ -161,15 +161,15 @@ export function App(){
  const nav=(key)=>sessionStateStore.patch({tab:key,route:null,selected:null});
 
  // 全局 Android 风格横向导航：顶层五页使用左右切页；下一级页面右滑返回父级。
- const swipeRef = useRef({active:false,startX:0,startY:0,pointerId:null});
+ const swipeRef = useRef({active:false,startX:0,startY:0,pointerId:null,blocked:false});
  const handleSwipePointerDown = (event) => {
-   if (event.pointerType === 'mouse' || event.isPrimary === false || isSwipeExcludedTarget(event.target)) return;
-   swipeRef.current = {active:true,startX:event.clientX,startY:event.clientY,pointerId:event.pointerId};
+   if (event.pointerType === 'mouse' || event.isPrimary === false) return;
+   swipeRef.current = {active:true,startX:event.clientX,startY:event.clientY,pointerId:event.pointerId,blocked:isSwipeExcludedTarget(event.target)};
  };
  const handleSwipePointerUp = (event) => {
    const gesture = swipeRef.current;
-   swipeRef.current = {active:false,startX:0,startY:0,pointerId:null};
-   if (!gesture.active || event.pointerId !== gesture.pointerId || isSwipeExcludedTarget(event.target)) return;
+   swipeRef.current = {active:false,startX:0,startY:0,pointerId:null,blocked:false};
+   if (!gesture.active || event.pointerId !== gesture.pointerId || gesture.blocked || isSwipeExcludedTarget(event.target)) return;
    const direction = getGestureDirection(event.clientX - gesture.startX, event.clientY - gesture.startY);
    if (!direction) return;
 
