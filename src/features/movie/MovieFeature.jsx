@@ -22,8 +22,8 @@ export function MovieFeature(props){
  },[route,tab]);
  const feature=useMemo(()=>createMovieFeature({movies,history,progress}),[movies,history]);
  if(route==='search') return <MovieSearch movies={movies} sources={sources} initial={page.search.query} recordSearch={recordSearch} onMovie={onMovie} onPlay={onPlay} onBack={onBack} onQuery={query=>pageStateStore.patch('search',{query})}/>;
- if(route==='detail'){const movie=feature.getDetail(selected?.contentId??selected) || (selected?.contentId ? selected : null);if(!movie)return <MovieEmpty text="影视内容不存在" onBack={onBack}/>;return <MovieDetail movie={movie} movies={movies} sources={sources} selectedSourceId={selectedSources?.movie} onMovie={onMovie} favorite={favorites.some(i=>i.targetType==='content'&&i.targetId===movie.contentId)} onBack={onBack} onPlay={onPlay} onFavorite={()=>toggleFavorite('content',movie.contentId)}/>;}
- if(route==='movie-play') return <MoviePlaybackPage request={selected} movies={movies} favorites={favorites} toggleFavorite={toggleFavorite} onBack={onBack} onEpisode={onPlay} onMovie={onMovie} onTab={onTab}/>
+ if(route==='detail'){const movie=feature.getDetail(selected?.contentId??selected) || (selected?.contentId ? selected : null);if(!movie)return <MovieEmpty text="影视内容不存在" onBack={onBack}/>;return <MovieDetail movie={movie} movies={movies} sources={sources} selectedSourceId={selectedSources?.movie} onMovie={onMovie} favorite={favorites.some(i=>i.targetType==='content'&&i.targetId===movie.contentId)} progress={progress} history={history} onBack={onBack} onPlay={onPlay} onFavorite={()=>toggleFavorite('content',movie.contentId)}/>;}
+ if(route==='movie-play') return <MoviePlaybackPage request={selected} movies={movies} favorites={favorites} toggleFavorite={toggleFavorite} onBack={onBack} onEpisode={onPlay} onMovie={onMovie} onTab={onTab}/>;
  if(tab==='movies') return <MovieCatalog movies={movies} sources={sources} selectedSourceId={selectedSources?.movie} onSelectMovieSource={onSelectMovieSource} state={movieState} setState={patch=>pageStateStore.patch('movies',patch)} movieCategories={movieCategories} movieActiveCategory={movieActiveCategory} movieCategoryLoading={movieCategoryLoading} onLoadMovieCategory={onLoadMovieCategory} onMovie={onMovie} onPlay={onPlay} onSearch={()=>onMovie(null,'search')} recordSearch={recordSearch}/>;
  return <MovieHome feature={feature} movies={movies} channels={channels} sources={sources} selectedSourceId={selectedSources?.movie} movieCategories={movieCategories} movieActiveCategory={movieActiveCategory} movieCategoryLoading={movieCategoryLoading} onLoadMovieCategory={onLoadMovieCategory} onSelectMovieSource={onSelectMovieSource} onTab={onTab} onMovie={onMovie} onPlay={onPlay} onLive={onLive} onSearch={()=>onMovie(null,'search')}/>;
 }
@@ -673,15 +673,181 @@ function MovieSearchList({movies=[],onMovie}){
  </div>;
 }
 
-function MovieDetail({movie,movies,sources=[],selectedSourceId,onMovie,onBack,onPlay,favorite,onFavorite}){
- const [otherSourceSearchOpen,setOtherSourceSearchOpen]=useState(false);
- const sourceIds=[...new Set((movie.sourceRefs??[]).map(ref=>ref.sourceId).filter(Boolean))]; const sourceMap=new Map(sources.map(source=>[source.sourceId,source.name])); const [sourceId,setSourceId]=useState(sourceIds.includes(selectedSourceId)?selectedSourceId:(sourceIds[0]??'')); const [episodePage,setEpisodePage]=useState(0); const related=movieService.getRelated({movies,movie}); const groups=[];for(let i=0;i<(movie.episodes?.length??0);i+=50)groups.push(movie.episodes.slice(i,i+50)); const currentEpisodes=groups[episodePage]??[];
- return <Page><button className="back" onClick={onBack}><ChevronLeft/>返回</button><div className="detail-hero"><SmartImage src={movie.poster} alt={movie.title} fallback={<div className="image-placeholder"><Film/></div>}/><div><span className="eyebrow">{movie.category} · {movie.year}</span><h1>{movie.title}</h1><div className="detail-meta"><span>年份：{movie.year||'—'}</span>{movie.region&&<span>地区：{movie.region}</span>}<span>类型：{movie.category||'—'}</span>{movie.director&&<span>导演：{movie.director}</span>}{movie.actors?.length>0&&<span>演员：{movie.actors.join('、')}</span>}</div><p>{movie.description||'暂无简介'}</p><div className="actions"><button className="primary" onClick={()=>onPlay(movie,0,sourceId)}><Play size={16}/>播放</button><button className={favorite?'secondary active-fav':'secondary'} onClick={onFavorite}><Heart size={16} fill={favorite?'currentColor':'none'}/>{favorite?'已收藏':'收藏'}</button></div></div></div>
- <SectionTitle title="剧集"/>{groups.length>1&&<div className="chips episode-groups">{groups.map((_,i)=><button key={i} className={episodePage===i?'active':''} onClick={()=>setEpisodePage(i)}>{i*50+1}–{Math.min((i+1)*50,movie.episodes.length)}</button>)}</div>}<div className="episode-grid">{currentEpisodes.map((episode,index)=><button key={episode.episodeId} onClick={()=>onPlay(movie,episodePage*50+index,sourceId)}>{episode.title}</button>)}</div>
- <SectionTitle title="其他源搜索" action="搜索同名" onAction={()=>setOtherSourceSearchOpen(true)}/><div className="info-card" style={{marginTop:-2,marginBottom:16}}><Search size={16}/><div><b>在其他影视源中查找《{movie.title}》</b><span>不会切换当前源，只搜索其他已启用影视源；找到后可直接进入对应来源的详情。</span></div></div>
- <SectionTitle title="来源选择"/><div className="chips">{sourceIds.length?sourceIds.map(id=><button className={sourceId===id?'active':''} key={id} onClick={()=>setSourceId(id)}>{sourceMap.get(id)||id}</button>):<span>暂无来源</span>}</div>
- {otherSourceSearchOpen&&<OtherSourceSearchDialog title={movie.title} currentSourceId={sourceId} sources={sources} onClose={()=>setOtherSourceSearchOpen(false)} onMovie={onMovie} onPlay={onPlay}/>}
- <SectionTitle title="相关推荐"/>{related.length?<MovieCarousel movies={related} onMovie={onMovie}/>:<MovieEmpty compact text="暂无相关推荐"/>}</Page>;
+function MovieDetail({movie,movies,sources=[],selectedSourceId,onMovie,onBack,onPlay,favorite,onFavorite,progress=[],history=[]}){
+  const [otherSourceSearchOpen,setOtherSourceSearchOpen]=useState(false);
+  const [descExpanded,setDescExpanded]=useState(false);
+  const sourceIds=[...new Set([
+    ...(movie.sourceRefs??[]).map(ref=>ref.sourceId),
+    movie.sourceId,
+    selectedSourceId,
+  ].filter(Boolean))];
+  const sourceMap=new Map(sources.map(source=>[source.sourceId,source.name]));
+  const [sourceId,setSourceId]=useState(()=>{
+    if(selectedSourceId&&sourceIds.includes(selectedSourceId))return selectedSourceId;
+    if(movie.sourceId&&sourceIds.includes(movie.sourceId))return movie.sourceId;
+    return sourceIds[0]||selectedSourceId||'';
+  });
+  const [episodePage,setEpisodePage]=useState(0);
+  const related=movieService.getRelated({movies,movie});
+
+  const episodes = useMemo(() => {
+    if (Array.isArray(movie.episodes) && movie.episodes.length > 0) return movie.episodes;
+    return [{
+      episodeId: `${movie.contentId || 'movie'}:ep:1`,
+      title: '正片',
+      episodeNumber: 1,
+      playbackCandidates: movie.playbackCandidates || (movie.playUrl ? [{ mediaUrl: movie.playUrl, label: '默认线路' }] : []),
+    }];
+  }, [movie]);
+
+  const movieProgress = useMemo(() => {
+    if (!movie?.contentId || !Array.isArray(progress)) return null;
+    return progress.find(item => item.contentId === movie.contentId) || null;
+  }, [movie?.contentId, progress]);
+
+  const lastWatchedEpisodeIndex = useMemo(() => {
+    if (!movieProgress?.episodeId || !episodes.length) return 0;
+    const idx = episodes.findIndex(e => e.episodeId === movieProgress.episodeId);
+    return idx >= 0 ? idx : 0;
+  }, [movieProgress, episodes]);
+
+  const hasWatchProgress = movieProgress && movieProgress.positionSeconds > 5 && !movieProgress.completed;
+  const watchedPercent = movieProgress?.duration ? Math.min(100, Math.round((movieProgress.positionSeconds / movieProgress.duration) * 100)) : 0;
+
+  const groups=[];for(let i=0;i<episodes.length;i+=50)groups.push(episodes.slice(i,i+50));
+  const currentEpisodes=groups[episodePage]??episodes;
+  const updateInfo=movie.updateInfo||movie.remarks||movie.vod_remarks||'';
+  const is4K=/4k|2160p|超清|蓝光/i.test(`${movie.title} ${updateInfo}`);
+  const descText=movie.description||'暂无视频简介。';
+  const hasLongDesc=descText.length>80;
+
+  return <Page>
+    <button className="back" onClick={onBack} aria-label="返回上一页"><ChevronLeft size={18}/>返回</button>
+    
+    <div className="detail-hero">
+      <div className="detail-hero-poster-wrap" style={{ position: 'relative', width: 130, flexShrink: 0 }}>
+        <SmartImage
+          src={movie.poster}
+          alt={movie.title}
+          fallback={<div className="image-placeholder"><Film size={28}/></div>}
+          priority
+        />
+        {is4K && <span className="movie-card-quality-tag" aria-hidden="true">4K</span>}
+        {movie.rating && Number(movie.rating) > 0 && (
+          <span className="movie-card-rating" aria-label={`评分 ${movie.rating}`}>★ {movie.rating}</span>
+        )}
+        {updateInfo && <span className="movie-card-badge" title={updateInfo}>{updateInfo}</span>}
+      </div>
+      <div className="detail-hero-info">
+        <span className="eyebrow">{movie.category || '4K影音'}{movie.year ? ` · ${movie.year}` : ''}{movie.region ? ` · ${movie.region}` : ''}</span>
+        <h1 style={{ fontSize: 22, fontWeight: 700, margin: '4px 0 8px', lineHeight: 1.25 }}>{movie.title}</h1>
+        <div className="detail-meta">
+          <span>年份：{movie.year || '未知'}</span>
+          {movie.region && <span>地区：{movie.region}</span>}
+          <span>类型：{movie.category || '综合'}</span>
+          {movie.director && <span>导演：{movie.director}</span>}
+          {movie.actors?.length > 0 && <span>主演：{movie.actors.slice(0, 4).join('、')}</span>}
+        </div>
+        <div className="detail-desc-wrap" style={{ marginTop: 6, fontSize: 13, color: '#9ba5b5', lineHeight: 1.45 }}>
+          <p style={{ margin: 0, display: descExpanded ? 'block' : '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            {descText}
+          </p>
+          {hasLongDesc && (
+            <button type="button" onClick={() => setDescExpanded(!descExpanded)} style={{ background: 'none', border: 'none', color: '#f59e0b', fontSize: 12, padding: '2px 0', cursor: 'pointer' }}>
+              {descExpanded ? '收起简介 ▲' : '展开全文 ▼'}
+            </button>
+          )}
+        </div>
+        <div className="actions" style={{ marginTop: 12, flexWrap: 'wrap', gap: 8 }}>
+          <button
+            className="primary"
+            onClick={() => onPlay(movie, lastWatchedEpisodeIndex, sourceId)}
+            style={{ padding: '9px 18px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <Play size={16} fill="currentColor"/>
+            {hasWatchProgress ? `继续播放 ${episodes[lastWatchedEpisodeIndex]?.title || `第${lastWatchedEpisodeIndex+1}集`}${watchedPercent ? ` (${watchedPercent}%)` : ''}` : '立即播放'}
+          </button>
+          {hasWatchProgress && (
+            <button
+              className="secondary"
+              onClick={() => onPlay(movie, 0, sourceId)}
+              title="从第一集重新播放"
+            >
+              从头播放
+            </button>
+          )}
+          <button className={favorite ? 'secondary active-fav' : 'secondary'} onClick={onFavorite}>
+            <Heart size={16} fill={favorite ? 'currentColor' : 'none'}/> {favorite ? '已收藏' : '收藏'}
+          </button>
+          <button className="secondary" onClick={() => setOtherSourceSearchOpen(true)} title="全网同名搜索">
+            <Search size={15}/> 搜同名
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {/* 剧集选集专区 */}
+    <div className="section-title" style={{ marginTop: 16 }}>
+      <h3>剧集列表 {episodes.length > 0 && <small style={{ fontWeight: 400, color: '#8f9aaa', fontSize: 12 }}>({episodes.length} 集{updateInfo ? ` · ${updateInfo}` : ''})</small>}</h3>
+      {episodes.length > 1 && <span style={{ fontSize: 12, color: '#f59e0b' }}>点击直接播放</span>}
+    </div>
+    {groups.length > 1 && (
+      <div className="chips episode-groups" style={{ marginBottom: 8 }}>
+        {groups.map((_, i) => (
+          <button key={i} className={episodePage === i ? 'active' : ''} onClick={() => setEpisodePage(i)}>
+            {i * 50 + 1}–{Math.min((i + 1) * 50, episodes.length)}
+          </button>
+        ))}
+      </div>
+    )}
+    <div className="episode-grid">
+      {currentEpisodes.map((episode, index) => {
+        const realIndex = episodePage * 50 + index;
+        const isWatched = movieProgress && movieProgress.episodeId === episode.episodeId;
+        return (
+          <button
+            key={episode.episodeId || index}
+            className={isWatched ? 'active' : ''}
+            onClick={() => onPlay(movie, realIndex, sourceId)}
+            title={episode.title}
+            style={{ position: 'relative' }}
+          >
+            <span>{episode.title}</span>
+            {isWatched && (
+              <span style={{ display: 'block', fontSize: 10, color: '#f59e0b', marginTop: 2 }}>
+                {watchedPercent > 0 ? `已看${watchedPercent}%` : '在看'}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+
+   {/* 来源切换与其它源搜索 */}
+   <SectionTitle title="播放来源" action="全网搜同名 >" onAction={() => setOtherSourceSearchOpen(true)} />
+   <div className="chips" style={{ marginBottom: 12 }}>
+     {sourceIds.length ? sourceIds.map(id => (
+       <button className={sourceId === id ? 'active' : ''} key={id} onClick={() => setSourceId(id)}>
+         {sourceMap.get(id) || id}
+       </button>
+     )) : <span>默认影视源</span>}
+   </div>
+
+   {otherSourceSearchOpen && (
+     <OtherSourceSearchDialog
+       title={movie.title}
+       currentSourceId={sourceId}
+       sources={sources}
+       onClose={() => setOtherSourceSearchOpen(false)}
+       onMovie={onMovie}
+       onPlay={onPlay}
+     />
+   )}
+
+   {/* 相关推荐 */}
+   <SectionTitle title="同类精彩推荐" />
+   {related.length ? <MovieCarousel movies={related} onMovie={onMovie} /> : <MovieEmpty compact text="暂无相关推荐" />}
+ </Page>;
 }
 
 function OtherSourceSearchDialog({title,currentSourceId,sources=[],onClose,onMovie,onPlay}){

@@ -1863,6 +1863,88 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
 .live-realtime-clock { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
 .clock-digits { font-family: monospace; color: #e2e8f0; }
 
+/* Fullscreen Movie / VOD title header & episode box */
+.movie-fullscreen-title-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(65vw, 600px);
+  overflow: hidden;
+}
+.movie-fullscreen-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.movie-fullscreen-episode {
+  font-size: 11px;
+  font-weight: 600;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 5px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+.movie-fullscreen-source {
+  font-size: 10px;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.fullscreen-clock-badge {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2e8f0;
+  padding: 0 4px;
+}
+
+/* Fullscreen Lock Pill */
+.sangtian-fullscreen-lock-pill {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 9600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 20, 30, 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  padding: 10px 16px;
+  color: #fbbf24;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s ease;
+}
+.sangtian-fullscreen-lock-pill:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+/* Episode button watched/active badge */
+.episode-grid button.active {
+  border-color: #f59e0b !important;
+  background: rgba(245, 158, 11, 0.12) !important;
+  color: #fff !important;
+}
+.watched-badge {
+  display: inline-block;
+  font-size: 10px;
+  color: #f59e0b;
+  margin-top: 2px;
+  font-weight: 600;
+}
+
 /* Category Tabs & Channel Picker Refactoring */
 .live-category-tabs-container { margin: 12px 0 16px; padding: 0 2px; }
 .live-category-tabs-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }

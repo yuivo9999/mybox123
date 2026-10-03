@@ -58,12 +58,18 @@ export const MovieCarousel = React.memo(function MovieCarousel({ movies = [], on
                 />
                 <div className="movie-card-gradient" aria-hidden="true" />
                 {is4K && <span className="movie-card-quality-tag" aria-hidden="true">4K</span>}
+                {movie?.rating && Number(movie.rating) > 0 && (
+                  <span className="movie-card-rating" aria-label={`评分 ${movie.rating}`}>
+                    ★ {movie.rating}
+                  </span>
+                )}
                 {updateInfo && <span className="movie-card-badge" title={updateInfo}>{updateInfo}</span>}
               </div>
               <div className="movie-carousel-caption">
                 <b title={title}>{title}</b>
                 <span>
                   {movie?.year ? `${movie.year} · ` : ''}{movie?.category || '影视'}
+                  {movie?.region ? ` · ${movie.region}` : ''}
                 </span>
               </div>
             </article>

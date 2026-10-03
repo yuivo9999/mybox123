@@ -97,7 +97,15 @@ export function App(){
  };
  const playMovie=(movie,episodeIndex=0,sourceId=null,returnRoute='detail')=>{
    if(!movie)return;
-   const episode=movie.episodes?.[episodeIndex]??movie.episodes?.[0]; if(!episode)return;
+   const episodes=(Array.isArray(movie.episodes)&&movie.episodes.length>0)
+     ? movie.episodes
+     : [{
+         episodeId: `${movie.contentId || 'movie'}:ep:1`,
+         title: '正片',
+         episodeNumber: 1,
+         playbackCandidates: movie.playbackCandidates || (movie.playUrl ? [{ mediaUrl: movie.playUrl, label: '默认线路' }] : []),
+       }];
+   const episode=episodes[episodeIndex]??episodes[0]; if(!episode)return;
    const progress=persistent.progress.find((item)=>item.contentId===movie.contentId&&item.episodeId===episode.episodeId);
    const preferredSource=sourceId||persistent.selectedSources?.movie||persistent.settings?.defaultMovieSource||null;
    const request=playbackService.createVODRequest({content:movie,episode,episodeIndex,preferredSource,metadata:{title:movie.title,poster:movie.poster,episodeTitle:episode.title??'',sourceId:preferredSource,returnRoute,startPositionSeconds:persistent.settings?.autoplayResume?(progress?.completed?0:(progress?.positionSeconds??0)):0}});

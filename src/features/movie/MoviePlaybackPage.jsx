@@ -118,6 +118,12 @@ export function MoviePlaybackPage({
     }
   };
 
+  const handleVideoEnded = () => {
+    if (episodeIndex < episodes.length - 1) {
+      onEpisode?.(movie, episodeIndex + 1, source, request?.metadata?.returnRoute || 'detail');
+    }
+  };
+
   const candidates = request?.candidates ?? [];
   const relatedMovies = movie ? movieService.getRelated({ movies, movie }) : [];
   const activeStreamUrl = resolvedInput?.url || candidate?.url || candidate?.metadata?.url || '';
@@ -203,9 +209,14 @@ export function MoviePlaybackPage({
         title={movie?.title || request?.metadata?.title || '正在播放'}
         episodeLabel={currentEpisode?.title || `第 ${episodeIndex + 1} 集`}
         sourceLabel={candidateLabel}
-        onOpenSourceModal={() => setSourceModalOpen(true)}
+        episodes={episodes}
+        currentEpisodeIndex={episodeIndex}
+        onSelectEpisode={idx => onEpisode?.(movie, idx, source, request?.metadata?.returnRoute || 'detail')}
         onPreviousEpisode={episodeIndex > 0 ? () => onEpisode?.(movie, episodeIndex - 1, source, request?.metadata?.returnRoute || 'detail') : undefined}
         onNextEpisode={episodeIndex < episodes.length - 1 ? () => onEpisode?.(movie, episodeIndex + 1, source, request?.metadata?.returnRoute || 'detail') : undefined}
+        candidates={candidates}
+        onSelectCandidate={switchCandidate}
+        onOpenSourceModal={() => setSourceModalOpen(true)}
         videoContainerRef={videoContainerRef}
         terminalTag="VOD DECODE"
         isLive={false}
@@ -217,11 +228,11 @@ export function MoviePlaybackPage({
       >
         <video
           ref={videoRef}
-          controls
           playsInline
           preload="metadata"
           poster={request?.metadata?.poster || movie?.poster}
           className="sangtian-video-element"
+          onEnded={handleVideoEnded}
         />
         {status === 'error' && (
           <div className="video-error" style={{ display: 'none' }}>
