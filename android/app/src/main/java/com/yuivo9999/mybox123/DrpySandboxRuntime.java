@@ -61,6 +61,7 @@ public final class DrpySandboxRuntime {
                 ScriptableObject.putProperty(scope, "fetch", request);
             }
             ScriptableObject.putProperty(scope, "console", Context.javaToJS(new SafeConsole(), scope));
+            installDomFunctions(cx, scope);
 
             Object result = cx.evaluateString(scope, source, "tvbox-drpy-extension", 1, null);
             Object rule = ScriptableObject.getProperty(scope, "rule");
@@ -123,6 +124,7 @@ public final class DrpySandboxRuntime {
                 ScriptableObject.putProperty(scope, "fetch", request);
             }
             ScriptableObject.putProperty(scope, "console", Context.javaToJS(new SafeConsole(), scope));
+            installDomFunctions(cx, scope);
 
             String safePayload = payloadJson == null || payloadJson.trim().isEmpty() ? "{}" : payloadJson;
             Object parsedPayload = cx.evaluateString(
@@ -176,6 +178,57 @@ public final class DrpySandboxRuntime {
         if ("episodes".equals(operation)) return "episodes";
         if ("playUrl".equals(operation)) return "playUrl";
         throw new IllegalArgumentException("DRPY_OPERATION_UNSUPPORTED:" + operation);
+    }
+
+    private static void installDomFunctions(Context cx, Scriptable scope) {
+        BaseFunction pdfh = new DomFunction("pdfh");
+        BaseFunction pdfa = new DomFunction("pdfa");
+        BaseFunction pd = new DomFunction("pd");
+        ScriptableObject.putProperty(scope, "pdfh", pdfh);
+        ScriptableObject.putProperty(scope, "pdfa", pdfa);
+        ScriptableObject.putProperty(scope, "pd", pd);
+        Scriptable jq = cx.newObject(scope);
+        jq.put("pdfh", jq, pdfh);
+        jq.put("pdfa", jq, pdfa);
+        jq.put("pd", jq, pd);
+        ScriptableObject.putProperty(scope, "jq", jq);
+        ScriptableObject.putProperty(scope, "jsp", jq);
+    }
+
+    private static final class DomFunction extends BaseFunction {
+        private final String operation;
+        DomFunction(String operation) { this.operation = operation; }
+
+        @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+            String html = "";
+            String parse = args.length > 1 ? Context.toString(args[1]) : "";
+            String uri = args.length > 2 ? Context.toString(args[2]) : "";
+            String baseUrl = uri;
+            if (args.length > 0 && args[0] instanceof Scriptable) {
+                Scriptable value = (Scriptable) args[0];
+                Object htmlValue = ScriptableObject.getProperty(value, "html");
+                Object baseValue = ScriptableObject.getProperty(value, "baseUrl");
+                if (htmlValue != Scriptable.NOT_FOUND) html = Context.toString(htmlValue);
+                if (baseValue != Scriptable.NOT_FOUND) baseUrl = Context.toString(baseValue);
+            } else if (args.length > 0) {
+                html = Context.toString(args[0]);
+            }
+
+            try {
+                if ("pdfh".equals(operation)) {
+                    return DrpyDomRuntime.pdfh(html, parse, baseUrl);
+                }
+                if ("pd".equals(operation)) {
+                    return DrpyDomRuntime.pd(html, parse, uri, baseUrl);
+                }
+                String json = DrpyDomRuntime.pdfa(html, parse, baseUrl);
+                return cx.evaluateString(scope,
+                        "JSON.parse(" + JSONObject.quote(json) + ")",
+                        "drpy-dom-pdfa-result", 1, null);
+            } catch (Exception e) {
+                throw new IllegalArgumentException(e.getMessage() == null ? "DRPY_DOM_ERROR" : e.getMessage());
+            }
+        }
     }
 
     public interface HttpRequestHandler {
