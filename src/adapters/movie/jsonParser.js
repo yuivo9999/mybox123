@@ -26,7 +26,7 @@ function parseRouteEpisodes(route, routeIndex = 0, routeLabel = '') {
       return {
         title,
         episodeNumber: index + 1,
-        playbackCandidates: url ? [{ mediaUrl: url, label: routeLabel || `线路${routeIndex + 1}` }] : [],
+        playbackCandidates: url ? [{ mediaUrl: url, label: routeLabel || `线路${routeIndex + 1}`, metadata: { tvboxPlayFlag: routeLabel || `线路${routeIndex + 1}`, tvboxRouteIndex: routeIndex } }] : [],
       };
     })
     .filter(Boolean);
