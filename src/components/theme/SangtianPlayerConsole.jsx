@@ -13,7 +13,6 @@ export function SangtianPlayerWindow({
   const [showTerminal, setShowTerminal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
-  const [isWebFullscreen, setIsWebFullscreen] = useState(false);
   const [isSystemFullscreen, setIsSystemFullscreen] = useState(false);
   const [aspectMode, setAspectMode] = useState('original');
   const [currentTime, setCurrentTime] = useState(0);
@@ -118,7 +117,7 @@ export function SangtianPlayerWindow({
     if (!video) return;
     if (video.paused) video.play().catch(() => {}); else video.pause();
   };
-  const fullscreen = isSystemFullscreen || isWebFullscreen;
+  const fullscreen = isSystemFullscreen;
   const renderedChildren = isLive
     ? React.Children.map(children, child => React.isValidElement(child) ? React.cloneElement(child, { controls: !fullscreen }) : child)
     : children;
