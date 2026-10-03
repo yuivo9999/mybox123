@@ -160,10 +160,27 @@ function parseRelaxedJSON(text) {
   return JSON.parse(cleaned);
 }
 
-function createLocalSource({ name, sourceType, text, format, liveMode }) {
-  const sourceId = `source_${sourceType}_local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+function stableHash(value) {
+  let hash = 2166136261;
+  const input = String(value || '');
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function createBundleId(name, text) {
+  return `bundle_local_${stableHash(`${String(name || '').trim()}\\n${String(text || '')}`)}`;
+}
+
+function createLocalSource({ name, sourceType, text, format, liveMode, bundleId }) {
+  const resolvedBundleId = bundleId || createBundleId(name, text);
+  const sourceId = `source_${stableHash(`${resolvedBundleId}|${sourceType}|${name}`)}`;
   return {
     sourceId,
+    bundleId: resolvedBundleId,
+    sourceKey: `local|${sourceType}|${stableHash(name)}`,
     name,
     sourceType,
     sourceRef: `local://${encodeURIComponent(name)}`,
@@ -194,8 +211,9 @@ function resolveLiveSourceRef(value) {
   return '';
 }
 
-function parseTVBoxSources(parsed) {
+function parseTVBoxSources(parsed, { bundleId = null } = {}) {
   const imported = [];
+  const resolvedBundleId = bundleId || `bundle_tvbox_${stableHash(JSON.stringify(parsed))}`;
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return imported;
 
   if (Array.isArray(parsed.sites)) {
@@ -204,7 +222,9 @@ function parseTVBoxSources(parsed) {
       const api = String(site.api).trim();
       if (!/^https?:\/\//i.test(api)) return;
       imported.push({
-        sourceId: `tvbox_movie_${site.key || `site-${index + 1}`}_${Date.now()}_${index}`,
+        sourceId: `tvbox_movie_${stableHash(`${resolvedBundleId}|movie|${site.key || site.api || index}`)}`,
+        bundleId: resolvedBundleId,
+        sourceKey: `movie|${site.key || site.api || index}`,
         name: String(site.name || site.key || `TVBox影视-${index + 1}`).trim(),
         sourceType: 'movie',
         sourceRef: api,
@@ -234,7 +254,9 @@ function parseTVBoxSources(parsed) {
       }
       [...new Set(candidates)].forEach((sourceRef, refIndex) => {
         imported.push({
-          sourceId: `tvbox_live_${live.key || live.name || `live-${index + 1}`}_${Date.now()}_${index}_${refIndex}`,
+          sourceId: `tvbox_live_${stableHash(`${resolvedBundleId}|live|${live.key || live.name || index}|${sourceRef}`)}`,
+          bundleId: resolvedBundleId,
+          sourceKey: `live|${live.key || live.name || index}|${sourceRef}`,
           name: candidates.length > 1 ? `${liveName} · 线路 ${refIndex + 1}` : liveName,
           sourceType: 'live',
           sourceRef,
@@ -265,6 +287,7 @@ export const sourceConfigService = {
     const trimmed = text.replace(/^\uFEFF/, '').trim();
     const fileName = String(file.name || 'source').trim();
     const lowerName = fileName.toLowerCase();
+    const bundleId = createBundleId(fileName, text);
 
     if (lowerName.endsWith('.txt') || lowerName.endsWith('.m3u') || /#genre#/i.test(trimmed) || /^#EXTM3U/i.test(trimmed)) {
       return [createLocalSource({
@@ -273,6 +296,7 @@ export const sourceConfigService = {
         text,
         format: lowerName.endsWith('.m3u') || /^#EXTM3U/i.test(trimmed) ? 'm3u' : 'txt',
         liveMode: /#genre#/i.test(trimmed) ? 'tv1' : 'generic',
+        bundleId,
       })];
     }
 
@@ -283,7 +307,7 @@ export const sourceConfigService = {
       throw new Error(`SOURCE_IMPORT_JSON_INVALID:${error?.message || 'parse failed'}`);
     }
 
-    const tvboxSources = parseTVBoxSources(parsed);
+    const tvboxSources = parseTVBoxSources(parsed, { bundleId });
     if (tvboxSources.length) return tvboxSources;
 
     if (Array.isArray(parsed)) {
@@ -292,6 +316,7 @@ export const sourceConfigService = {
         sourceType: 'movie',
         text,
         format: 'json',
+        bundleId,
       })];
     }
 
@@ -301,7 +326,9 @@ export const sourceConfigService = {
   async importFile(file) {
     const parsedSources = await this.parseLocalFile(file);
     const currentSources = this.read();
-    const nextSources = [...currentSources, ...parsedSources];
+    const importedBundleIds = new Set(parsedSources.map(source => source.bundleId).filter(Boolean));
+    const retainedSources = currentSources.filter(source => !importedBundleIds.has(source.bundleId));
+    const nextSources = [...retainedSources, ...parsedSources];
     sourceRepository.saveAll(nextSources);
     return nextSources;
   },
