@@ -14,6 +14,7 @@ export function normalizeMovie({ sourceId, item, index = 0, sourceMetadata = {} 
       referer: sourceMetadata.referer,
       cookies: sourceMetadata.cookies,
       tvboxIJKProfiles: sourceMetadata.tvboxIJKProfiles,
+      tvboxParseConfig: sourceMetadata.tvboxParseConfig,
     }).filter(([, value]) => value !== undefined && value !== null && value !== '')
   );
   const normalizeCandidate = (candidate = {}) => ({
