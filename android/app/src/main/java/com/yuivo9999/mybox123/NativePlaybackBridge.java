@@ -294,7 +294,7 @@ public final class NativePlaybackBridge {
             state.put("wantPlay", wantPlay);
             state.put("positionMs", currentPositionMs());
             state.put("durationMs", currentDurationMs());
-        } catch (Exception ignored) {}
+        } catch (Exception stateError) {}
         return state.toString();
     }
 
