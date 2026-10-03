@@ -65,6 +65,9 @@ dependencies {
     implementation "org.mozilla:rhino:1.7.15"
     // HTML DOM + CSS selector engine for Drpy jq/pdfh/pdfa/pd compatibility.
     implementation "org.jsoup:jsoup:1.20.1"
+    // Native TVBox DoH transport. Uses the system resolver only for DoH bootstrap.
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
+    implementation "com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0"
 }
 
 apply from: 'capacitor.build.gradle'
