@@ -270,7 +270,12 @@ export function createMovieAdapter(config, transport = null) {
     requireCapability('search');
     const query = String(params.query ?? params.keyword ?? '').trim().toLowerCase();
     if (!query) return getList(params, options);
-    const movies = await ensureMovies(options);
+    // Prefer source-side keyword search for HTTP VOD endpoints. This avoids
+    // downloading an entire source catalogue just to find one title.
+    const movies = await ensureMovies({
+      ...options,
+      keyword: query,
+    });
     const filtered = movies.filter(item =>
       [item.title, item.subtitle, item.description, item.category]
         .some(value => String(value ?? '').toLowerCase().includes(query))
