@@ -26,7 +26,7 @@ export function createNativePlayerAdapter(hooks={}) {
  if(typeof window!=='undefined'){window.TVBoxWebView=window.TVBoxWebView||{};window.TVBoxWebView.onPlayerEvent=eventHandler;}
  const adapter={
   get capabilities(){return capabilities;},
-  load(next){if(released)throw new Error('PLAYER_ADAPTER_RELEASED');input=next;state=PlayerState.LOADING;emit('loading');return call('loadMedia',{url:next.url,headers:next.headers??{},cookies:next.cookies??'',referer:next.referer??'',userAgent:next.userAgent??'',token:next.token,protocol:next.protocol,playerHint:next.playerHint}).then(()=>input);},
+  load(next){if(released)throw new Error('PLAYER_ADAPTER_RELEASED');input=next;state=PlayerState.LOADING;emit('loading');const headers={...(next.headers??{})};if(next.referer&&!headers.Referer&&!headers.referer)headers.Referer=next.referer;if(next.userAgent&&!headers['User-Agent']&&!headers['user-agent'])headers['User-Agent']=next.userAgent;return call('loadMedia',{url:next.url,headers,cookies:next.cookies??'',referer:next.referer??'',userAgent:next.userAgent??'',token:next.token,protocol:next.protocol,playerHint:next.playerHint}).then(()=>input);},
   prepare(){if(!input)throw new Error('PLAYER_INPUT_REQUIRED');state=PlayerState.PREPARING;return call('prepareMedia',{});},
   play(){if(!input)throw new Error('PLAYER_INPUT_REQUIRED');return call('playMedia',{});},
   pause(){return call('pauseMedia',{});},
