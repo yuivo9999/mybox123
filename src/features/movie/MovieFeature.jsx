@@ -179,66 +179,64 @@ function MovieDetail({movie,movies,sources=[],selectedSourceId,onMovie,onBack,on
 }
 
 function OtherSourceSearchDialog({title,currentSourceId,sources=[],onClose,onMovie,onPlay}){
- const [results,setResults]=useState([]);
- const [failed,setFailed]=useState([]);
- const [loading,setLoading]=useState(true);
- const [error,setError]=useState('');
+ const [state,setState]=useState({results:[],failed:[],loading:true,completed:0,total:0,error:''});
  useEffect(()=>{
    const controller=new AbortController();
    let active=true;
-   setLoading(true); setError(''); setResults([]); setFailed([]);
    const otherSources=sources.filter(source=>source?.sourceType==='movie'&&source?.enabled!==false&&source.sourceId!==currentSourceId);
-   if(!otherSources.length){
-     setLoading(false);
-     setError('暂无其他已启用影视源可搜索');
-     return ()=>{active=false;controller.abort();};
-   }
-   searchMovieSources(otherSources,title,{signal:controller.signal,pageSize:12,timeoutMs:4500,onSourceResult:(entry)=>{
-       if(!active)return;
-       if(entry.status==='fulfilled') setResults(current=>[...current,entry]);
-       else setFailed(current=>[...current,entry]);
-     }})
-     .then(result=>{
-       if(!active)return;
-       setResults(result.results??[]);
-       setFailed(result.failed??[]);
-     })
-     .catch(err=>{
-       if(!active || err?.name==='AbortError')return;
-       setError(err?.message||'搜索失败');
-     })
-     .finally(()=>{if(active)setLoading(false);});
+   setState({results:[],failed:[],loading:true,completed:0,total:otherSources.length,error:''});
+   if(!otherSources.length){setState({results:[],failed:[],loading:false,completed:0,total:0,error:'暂无其他已启用影视源可搜索'});return ()=>{active=false;controller.abort();};}
+   searchMovieSources(otherSources,title,{signal:controller.signal,pageSize:12,timeoutMs:4500,onSourceResult:(entry,meta)=>{
+     if(!active)return;
+     setState(current=>({
+       ...current,
+       results:entry.status==='fulfilled'?[...current.results,entry]:current.results,
+       failed:entry.status==='rejected'?[...current.failed,entry]:current.failed,
+       completed:meta?.completed??current.completed,
+     }));
+   }}).then(result=>{
+     if(!active)return;
+     setState(current=>({...current,loading:false,results:result.results??current.results,failed:result.failed??current.failed,completed:result.completed??current.completed}));
+   }).catch(err=>{
+     if(!active||err?.name==='AbortError')return;
+     setState(current=>({...current,loading:false,error:err?.message||'搜索失败'}));
+   });
    return ()=>{active=false;controller.abort();};
  },[title,currentSourceId,sources]);
 
- const total=results.reduce((sum,item)=>sum+(item.items?.length??0),0);
- return <div className="modal-backdrop" onClick={event=>{if(event.target===event.currentTarget)onClose()}}>
-   <div className="modal" style={{maxWidth:560,maxHeight:'82vh',overflow:'auto'}}>
-     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
-       <div><b>其他源搜索</b><span style={{display:'block',fontSize:12,color:'#8f9aaa',marginTop:4}}>同名：{title}</span></div>
+ const total=state.results.reduce((sum,item)=>sum+(item.items?.length??0),0);
+ return <div className="android-search-backdrop" onClick={event=>{if(event.target===event.currentTarget)onClose()}}>
+   <div className="android-search-dialog" role="dialog" aria-modal="true" aria-label="其他源搜索">
+     <div className="android-search-header">
+       <div><b>其他源搜索</b><small>《{title}》 · 逐个影视源搜索</small></div>
        <button className="icon-button" aria-label="关闭" onClick={onClose}><X size={18}/></button>
      </div>
-     <div className="info-card" style={{marginTop:12,marginBottom:12,padding:10}}>
+     <div className="android-search-status">
        <Search size={15}/>
-       <span style={{fontSize:11}}>已启用影视源逐个搜索，当前源不会重复搜索；每个源返回后立即显示。</span>
+       <span>{state.loading ? `正在逐源搜索 · ${state.completed}/${state.total}` : `搜索完成 · ${total} 条结果`}</span>
+       {state.loading&&<span className="android-search-live-dot" aria-label="流式显示中">流式</span>}
      </div>
-     {loading&&<div className="empty compact"><span>正在搜索其他影视源…</span></div>}
-     {!loading&&error&&<div className="empty compact"><span>{error}</span></div>}
-     {!loading&&!error&&total===0&&<div className="empty compact"><span>没有找到《{title}》的其他来源</span></div>}
-     {!loading&&!error&&results.filter(item=>(item.items?.length??0)>0).map(group=>
-       <section key={group.sourceId} style={{marginBottom:14}}>
-         <div className="section-title" style={{marginBottom:7}}><h3>{group.sourceName}</h3><span style={{fontSize:12,color:'#8f9aaa'}}>{group.items.length} 条</span></div>
-         <div style={{display:'grid',gap:8}}>
-           {group.items.map(item=><button className="menu" key={item.contentId} onClick={()=>{if(onPlay) onPlay(item,0,item?.sourceId,'detail'); else onMovie(item)}} style={{width:'100%',textAlign:'left'}}>
-             <SmartImage src={item.poster} alt={item.title}/>
-             <span style={{minWidth:0,flex:1}}><b>{item.title}</b><small>{item.year||'—'} · {item.category||'—'}{item.episodeCount?' · '+item.episodeCount+'集':''}</small></span>
-             <ChevronRight size={17}/>
-           </button>)}
-         </div>
-       </section>
-     )}
-     {!loading&&failed.length>0&&<div style={{fontSize:11,color:'#8f9aaa',paddingTop:4}}>另有 {failed.length} 个源未返回结果，已跳过，不影响其他源结果。</div>}
-     <div className="actions" style={{marginTop:12}}><button className="secondary" onClick={onClose}>关闭</button></div>
+     <div className="android-search-results">
+       {state.results.filter(group=>(group.items?.length??0)>0).map(group=>
+         <section className="android-search-source-group" key={group.sourceId}>
+           <div className="android-search-source-title"><b>{group.sourceName}</b><span>{group.items.length} 条</span></div>
+           <div className="android-search-source-items">
+             {group.items.map((item,index)=><button className="android-search-result-row" key={item.contentId || item.episodeId || group.sourceId+':'+index} onClick={()=>{if(onPlay) onPlay(item,0,item?.sourceId,'detail'); else onMovie(item);}}>
+               <span className="android-search-result-copy"><b>{item.title||'未命名'}</b><small>{item.year||'—'} · {item.category||'—'}{item.episodeCount?' · '+item.episodeCount+'集':''}</small></span>
+               <ChevronRight size={17}/>
+             </button>)}
+           </div>
+         </section>
+       )}
+       {state.loading&&state.results.length===0&&<div className="android-search-empty"><Search size={20}/><span>正在搜索第一个影视源，结果会逐个出现…</span></div>}
+       {!state.loading&&state.error&&<div className="android-search-empty"><span>{state.error}</span></div>}
+       {!state.loading&&!state.error&&!total&&<div className="android-search-empty"><span>没有找到《{title}》的其他来源</span></div>}
+       {state.failed.length>0&&<div className="android-search-failed">另有 {state.failed.length} 个源未返回结果，已自动跳过。</div>}
+     </div>
+     <div className="android-search-footer">
+       <span>{state.loading ? '不会并行请求全部源，不会阻塞当前页面。' : '点击任一结果可直接进入该来源的播放流程。'}</span>
+       <button className="secondary" onClick={onClose}>关闭</button>
+     </div>
    </div>
  </div>;
 }
