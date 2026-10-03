@@ -13,9 +13,9 @@ import java.util.Set;
 /**
  * Controlled native boundary for TVBox extension sources.
  *
- * Drpy now has bounded native HTTP plus constrained rule-function operations.
- * CSP/JAR/ext remain explicitly unsupported, and selector-based Drpy rules still
- * require a dedicated DOM/parser layer before they can be executed.
+ * Drpy has bounded native HTTP plus constrained rule-function operations and a
+ * Jsoup-backed jq/pdfh/pdfa/pd selector layer. CSP and EXT remain explicitly
+ * unsupported here; JAR uses its separate CatVod Spider bridge.
  */
 public final class TVBoxExtensionBridge {
     public static final String JS_NAME = "TVBoxExtensionBridge";
@@ -35,7 +35,7 @@ public final class TVBoxExtensionBridge {
             result.put("available", true);
             result.put("supportedKinds", new JSONArray().put("drpy-js"));
             result.put("supportedOperations", new JSONArray().put("load").put("request").put("search").put("detail").put("episodes").put("playUrl"));
-            result.put("runtimeVersion", "drpy-sandbox-3");
+            result.put("runtimeVersion", "drpy-sandbox-4-dom");
             result.put("reason", "DRPY_SANDBOX_RULE_OPERATIONS");
             return result.toString();
         } catch (Exception e) {
