@@ -7,6 +7,26 @@ import { errorService } from './errorService.js';
 
 export const movieRegistry = createMovieRegistry();
 
+/**
+ * Movie adapter dispatch boundary.
+ *
+ * Only standard HTTP VOD sources are allowed into the generic HTTP adapter.
+ * TVBox CSP/Drpy/ext/JAR-provider sources must stay out of this path unless
+ * a dedicated executor is explicitly implemented later.
+ *
+ * Local/user-created movie sources do not carry sourceCapability, so they
+ * continue to use the existing generic adapter path.
+ */
+export function canUseHttpMovieAdapter(source = {}) {
+  const capability = String(source.sourceCapability || '').trim();
+  const adapterType = String(source.adapterType || '').trim();
+
+  if (capability.startsWith('tvbox-') || adapterType.startsWith('tvbox-')) return false;
+  if (!capability && !adapterType) return true;
+
+  return capability === 'direct-http-vod' && adapterType === 'http-vod';
+}
+
 function cacheKey(sourceId) {
   return createCacheKey({
     namespace: CacheNamespace.SOURCE,
@@ -63,7 +83,13 @@ export async function syncMovieSources(sourceConfigs = [], selectedSourceId = nu
 
   // 影视源采用按需加载：没有明确选择时不请求任何影视源。
   sourceConfigs
-    .filter(source => source.enabled !== false && source.sourceType === 'movie' && source.sourceId === selectedSourceId && (source.sourceRef || source.url))
+    .filter(source =>
+      source.enabled !== false
+      && source.sourceType === 'movie'
+      && source.sourceId === selectedSourceId
+      && canUseHttpMovieAdapter(source)
+      && (source.sourceRef || source.url)
+    )
     .forEach(source => {
       movieRegistry.register(createMovieAdapter({
         ...source,
