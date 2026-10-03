@@ -162,11 +162,16 @@ export async function syncMovieSources(sourceConfigs = [], selectedSourceId = nu
         timeoutMs: options.timeoutMs,
         signal: options.signal,
       });
+      const taggedValue = (result.value ?? []).map(item => ({
+        ...item,
+        sourceCategoryId: activeCategory.id,
+        sourceCategoryName: activeCategory.name,
+      }));
 
       return {
         status: 'fulfilled',
         sourceId: adapter.sourceId,
-        value: result.value,
+        value: taggedValue,
         categories: normalizedCategories,
         activeCategory,
         stale: result.stale,
