@@ -105,11 +105,16 @@ function MovieSearch({movies,initial,recordSearch,onMovie,onPlay,onBack,onQuery,
 
 function GlobalMovieSearch({query,sources=[],onMovie,onPlay}){
  const [state,setState]=useState({loading:true,groups:[],failed:[],error:''});
+ const normalizedQuery=String(query||'').trim();
  useEffect(()=>{
+   if(normalizedQuery.length<2){
+     setState({loading:false,groups:[],failed:[],error:''});
+     return undefined;
+   }
    const controller=new AbortController();
    let active=true;
    setState({loading:true,groups:[],failed:[],error:''});
-   searchMovieSources(sources,query,{signal:controller.signal,concurrency:4,pageSize:20,timeoutMs:5000})
+   searchMovieSources(sources,normalizedQuery,{signal:controller.signal,concurrency:4,pageSize:20,timeoutMs:5000})
      .then(result=>{
        if(!active)return;
        setState({loading:false,groups:result.results??[],failed:result.failed??[],error:''});
@@ -119,8 +124,9 @@ function GlobalMovieSearch({query,sources=[],onMovie,onPlay}){
        setState({loading:false,groups:[],failed:[],error:error?.message||'搜索失败'});
      });
    return()=>{active=false;controller.abort();};
- },[query,sources]);
+ },[normalizedQuery,sources]);
  const total=state.groups.reduce((sum,group)=>sum+(group.items?.length??0),0);
+ if(normalizedQuery.length<2)return <EmptyState text="至少输入 2 个字符后开始全源搜索"/>;
  if(state.loading)return <div className="empty state-view"><Search size={22}/><b>正在搜索全部影视源</b><span>正在并发搜索 {sources.filter(source=>source?.sourceType==='movie'&&source?.enabled!==false).length} 个已启用影视源…</span></div>;
  if(state.error)return <EmptyState text={state.error}/>;
  if(!total)return <EmptyState text={<>没有找到“{query}”的同名影视剧</>}/>;
