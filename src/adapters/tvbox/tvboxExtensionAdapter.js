@@ -52,7 +52,7 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
   );
 
   const execute = async (operation, payload = {}, options = {}) => {
-    if (!effectiveRuntime || typeof effectiveRuntime.execute !== 'function') {
+    if (!effectiveRuntime || typeof effectiveRuntime.execute !== 'function' || (typeof effectiveRuntime.isAvailable === 'function' && !effectiveRuntime.isAvailable())) {
       throw unavailable(operation);
     }
 
@@ -88,7 +88,11 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
   return {
     sourceId,
     definition,
-    isRuntimeAvailable: () => Boolean(effectiveRuntime && typeof effectiveRuntime.execute === 'function'),
+    isRuntimeAvailable: () => Boolean(
+      effectiveRuntime &&
+      typeof effectiveRuntime.execute === 'function' &&
+      (typeof effectiveRuntime.isAvailable !== 'function' || effectiveRuntime.isAvailable())
+    ),
     healthCheck,
     execute,
     load: (payload, options) => execute('load', payload, options),
