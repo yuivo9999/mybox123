@@ -33,9 +33,10 @@ public final class TVBoxExtensionBridge {
             result.put("contractVersion", CONTRACT_VERSION);
             result.put("available", false);
             result.put("runtimeVersion", JSONObject.NULL);
-            result.put("supportedKinds", new JSONArray());
-            result.put("supportedOperations", new JSONArray());
-            result.put("reason", "TVBOX_EXTENSION_RUNTIME_NOT_IMPLEMENTED");
+            result.put("supportedKinds", new JSONArray().put("drpy-js"));
+            result.put("supportedOperations", new JSONArray().put("load"));
+            result.put("runtimeVersion", "drpy-sandbox-1");
+            result.put("reason", "DRPY_LOAD_ONLY");
             return result.toString();
         } catch (Exception e) {
             return "{\"available\":false,\"reason\":\"TVBOX_EXTENSION_CAPABILITY_ERROR\"}";
@@ -56,8 +57,20 @@ public final class TVBoxExtensionBridge {
             if (!KINDS.contains(kind)) {
                 return error("TVBOX_EXTENSION_KIND_UNSUPPORTED", operation, kind);
             }
+            if (!"drpy-js".equals(kind) || !"load".equals(operation)) {
+                return error("TVBOX_EXTENSION_OPERATION_UNSUPPORTED", operation, kind);
+            }
 
-            return error("TVBOX_EXTENSION_RUNTIME_UNAVAILABLE", operation, kind);
+            JSONObject payloadObject = input.optJSONObject("payload");
+            String script = payloadObject == null ? "" : payloadObject.optString("script", "");
+            String ruleJson = DrpySandboxRuntime.evaluateDefinition(script);
+            JSONObject result = new JSONObject();
+            result.put("ok", true);
+            result.put("operation", operation);
+            result.put("kind", kind);
+            result.put("contractVersion", CONTRACT_VERSION);
+            result.put("rule", new JSONObject(ruleJson));
+            return result.toString();
         } catch (Exception e) {
             return error("TVBOX_EXTENSION_INVALID_REQUEST", "", "");
         }
