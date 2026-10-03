@@ -47,6 +47,7 @@ export function createTVBoxExtJsonAdapter(config = {}, transport = null) {
     kind: 'ext',
     tvboxExtFormat: config.tvboxExtFormat ?? null,
     tvboxExt: ext ?? null,
+    tvboxParseConfig: config.tvboxParseConfig ?? null,
   });
 
   const resolveUrl = () => {
@@ -89,6 +90,7 @@ export function createTVBoxExtJsonAdapter(config = {}, transport = null) {
         userAgent: config.userAgent,
         referer: config.referer,
         cookies: config.cookies,
+        tvboxParseConfig: definition.tvboxParseConfig,
       },
     }));
   };
