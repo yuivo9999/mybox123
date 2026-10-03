@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Heart, ListVideo } from 'lucide-react';
 import { movieService } from '../../services/movieService.js';
 import { playbackService } from '../../services/playbackService.js';
 import { usePersistentState } from '../../state/usePersistentState.js';
@@ -172,6 +173,24 @@ export function MoviePlaybackPage({
         onSelectTheme={handleSelectTheme}
       />
 
+      <section className="movie-playback-context" aria-label="当前影视播放信息">
+        <div className="movie-playback-context-main">
+          <button className="movie-playback-back" type="button" onClick={onBack} aria-label="返回影视详情"><ChevronLeft size={18} /></button>
+          <div className="movie-playback-title">
+            <b>{movie?.title || request?.metadata?.title || '正在播放'}</b>
+            <span>{currentEpisode?.title || `第 ${episodeIndex + 1} 集`} · {candidateLabel}</span>
+          </div>
+          <button className="movie-playback-fav" type="button" onClick={() => request?.contentId && toggleFavorite?.('content', request.contentId)} aria-label="收藏">
+            <Heart size={17} fill={favorites.some(item => item.targetType === 'content' && item.targetId === request?.contentId) ? 'currentColor' : 'none'} />
+          </button>
+        </div>
+        <div className="movie-playback-context-actions">
+          <button type="button" disabled={episodeIndex <= 0} onClick={() => onEpisode?.(movie, episodeIndex - 1, source, request?.metadata?.returnRoute || 'detail')}><ChevronLeft size={15} />上一集</button>
+          <button type="button" onClick={() => setSourceModalOpen(true)}><ListVideo size={15} />选集/换源</button>
+          <button type="button" disabled={episodeIndex >= episodes.length - 1} onClick={() => onEpisode?.(movie, episodeIndex + 1, source, request?.metadata?.returnRoute || 'detail')}>下一集<ChevronRight size={15} /></button>
+        </div>
+      </section>
+
       {/* 2. Video Playback Window matching the top window in image */}
       <SangtianPlayerWindow
         videoRef={videoRef}
@@ -187,6 +206,12 @@ export function MoviePlaybackPage({
         }}
         playbackRate={playbackRate}
         onChangePlaybackRate={handleChangePlaybackRate}
+        title={movie?.title || request?.metadata?.title || '正在播放'}
+        episodeLabel={currentEpisode?.title || `第 ${episodeIndex + 1} 集`}
+        sourceLabel={candidateLabel}
+        onOpenSourceModal={() => setSourceModalOpen(true)}
+        onPreviousEpisode={episodeIndex > 0 ? () => onEpisode?.(movie, episodeIndex - 1, source, request?.metadata?.returnRoute || 'detail') : undefined}
+        onNextEpisode={episodeIndex < episodes.length - 1 ? () => onEpisode?.(movie, episodeIndex + 1, source, request?.metadata?.returnRoute || 'detail') : undefined}
         videoContainerRef={videoContainerRef}
         terminalTag="BASH"
       >
