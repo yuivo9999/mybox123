@@ -70,7 +70,8 @@ public final class DrpyHttpRuntime {
         InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
         byte[] bytes = readBounded(stream);
         Charset responseCharset = StandardCharsets.UTF_8;
-        String charset = connection.getContentEncoding();
+        String contentType = connection.getContentType();
+        String charset = extractCharset(contentType);
         if (charset != null) {
             try { responseCharset = Charset.forName(charset); } catch (Exception ignored) {}
         }
@@ -101,6 +102,20 @@ public final class DrpyHttpRuntime {
             }
             return output.toByteArray();
         }
+    }
+
+    private static String extractCharset(String contentType) {
+        if (contentType == null) return null;
+        String lower = contentType.toLowerCase();
+        int index = lower.indexOf("charset=");
+        if (index < 0) return null;
+        String value = contentType.substring(index + 8).trim();
+        int semicolon = value.indexOf(';');
+        if (semicolon >= 0) value = value.substring(0, semicolon).trim();
+        if (value.startsWith("\"") && value.endsWith("\"") && value.length() > 1) {
+            value = value.substring(1, value.length() - 1);
+        }
+        return value;
     }
 
     public static final class Response {
