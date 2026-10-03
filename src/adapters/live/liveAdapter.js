@@ -9,24 +9,6 @@ import { createTVBoxExtensionAdapter } from '../tvbox/tvboxExtensionAdapter.js';
 
 export function createLiveAdapter(config, transport = null) {
   const sourceId = config.sourceId;
-  const attachTVBoxPlaybackMetadata = (value) => {
-    const metadata = {
-      tvboxIJKProfiles: config.tvboxIJKProfiles ?? {},
-      tvboxParseConfig: config.tvboxParseConfig ?? null,
-    };
-    if (!Array.isArray(value)) return value;
-    return value.map((channel) => ({
-      ...channel,
-      ...metadata,
-      sourceRefs: Array.isArray(channel?.sourceRefs)
-        ? channel.sourceRefs.map((ref) => ({ ...ref, ...metadata }))
-        : channel?.sourceRefs,
-      streams: Array.isArray(channel?.streams)
-        ? channel.streams.map((stream) => ({ ...stream, ...metadata }))
-        : channel?.streams,
-    }));
-  };
-
   // TVBox Live Provider（CSP/Drpy/JAR/ext）不是直接 URL。
   // 必须经过独立扩展运行时解析，严禁送入普通 HTTP Live Adapter。
   if (config.adapterType === 'tvbox-live-extension' || config.sourceCapability === 'tvbox-live-provider') {
@@ -40,16 +22,11 @@ export function createLiveAdapter(config, transport = null) {
     return {
       sourceId,
       capabilities: {},
-      getChannels: async (options = {}) => attachTVBoxPlaybackMetadata(await extensionAdapter.load({}, options)),
+      getChannels: async (options = {}) => extensionAdapter.load({}, options),
       getCategories: async () => [],
       getStreams: async (channelRef, options = {}) => {
         const streams = await extensionAdapter.execute('streams', { channelRef }, options);
-        if (!Array.isArray(streams)) return [];
-        return streams.map((stream) => ({
-          ...stream,
-          tvboxIJKProfiles: config.tvboxIJKProfiles ?? {},
-          tvboxParseConfig: config.tvboxParseConfig ?? null,
-        }));
+        return Array.isArray(streams) ? streams : [];
       },
       getEPG: (channelRef, range = {}, options = {}) => extensionAdapter.execute('epg', { channelRef, range }, options),
       getSnapshotState: () => ({
@@ -102,7 +79,7 @@ export function createLiveAdapter(config, transport = null) {
         ...item,
         epg: [...(item.epg ?? []), ...epgPrograms.filter((program) => program.channelRef === item.sourceItemId || program.channelRef === item.channelKey)],
       }));
-      const normalized = withEPG.map((item, index) => normalizeLiveChannel({ sourceId, item, index, capabilities, sourceMetadata: { tvboxIJKProfiles: config.tvboxIJKProfiles ?? {}, tvboxParseConfig: config.tvboxParseConfig ?? null } }));
+      const normalized = withEPG.map((item, index) => normalizeLiveChannel({ sourceId, item, index, capabilities }));
       snapshot = normalized;
       lastSuccessfulSnapshot = normalized;
       lastSuccessfulAt = Date.now();
