@@ -61,9 +61,14 @@ export function createMovieAdapter(config, transport = null) {
     }
     let finalUrl = sourceDefinition.endpoint;
     if (finalUrl.includes('api.php') || finalUrl.includes('provide/vod') || finalUrl.includes('/vod/')) {
-      if (!finalUrl.includes('ac=')) {
-        finalUrl += (finalUrl.includes('?') ? '&' : '?') + 'ac=videolist';
-      }
+      const query = new URLSearchParams();
+      if (!/[?&]ac=/.test(finalUrl)) query.set('ac', 'videolist');
+      if (options.categoryId != null && String(options.categoryId).trim()) query.set('t', String(options.categoryId).trim());
+      if (options.page != null && Number(options.page) > 1) query.set('pg', String(Math.max(1, Number(options.page))));
+      if (options.keyword != null && String(options.keyword).trim()) query.set('wd', String(options.keyword).trim());
+      if (options.limit != null && Number(options.limit) > 0) query.set('limit', String(Math.min(100, Number(options.limit))));
+      const suffix = query.toString();
+      if (suffix) finalUrl += (finalUrl.includes('?') ? '&' : '?') + suffix;
     }
 
     const requestHeaders = { ...(config.headers ?? {}) };
