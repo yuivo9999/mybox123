@@ -5,6 +5,7 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
   if (!video) throw new Error('PLAYER_ELEMENT_REQUIRED');
   let state=PlayerState.IDLE,input=null,released=false,buffering=false;
   let hlsInstance=null;
+  let hlsRecoveryCount=0;
 
   const cleanupHls = () => {
     if (hlsInstance) {
@@ -36,6 +37,7 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
       if(released)throw new Error('PLAYER_ADAPTER_RELEASED');
       input=next;
       state=PlayerState.LOADING;
+      hlsRecoveryCount=0;
       cleanupHls();
       video.pause();
       video.removeAttribute('src');
@@ -55,6 +57,7 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
             hls.loadSource(next.url);
           });
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            hlsRecoveryCount = 0;
             endBuffering();
             state = PlayerState.PREPARING;
             emit('prepared');
@@ -66,10 +69,24 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
             if (data.fatal) {
               switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
-                  hls.startLoad();
+                  if (hlsRecoveryCount < 1) {
+                    hlsRecoveryCount += 1;
+                    hls.startLoad();
+                  } else {
+                    cleanupHls();
+                    state = PlayerState.ERROR;
+                    emit('error', { nativeError: new Error(data.details || 'HLS_FATAL_NETWORK_ERROR') });
+                  }
                   break;
                 case Hls.ErrorTypes.MEDIA_ERROR:
-                  hls.recoverMediaError();
+                  if (hlsRecoveryCount < 1) {
+                    hlsRecoveryCount += 1;
+                    hls.recoverMediaError();
+                  } else {
+                    cleanupHls();
+                    state = PlayerState.ERROR;
+                    emit('error', { nativeError: new Error(data.details || 'HLS_FATAL_MEDIA_ERROR') });
+                  }
                   break;
                 default:
                   cleanupHls();
