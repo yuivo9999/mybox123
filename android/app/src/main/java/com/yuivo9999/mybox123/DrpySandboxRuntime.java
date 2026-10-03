@@ -74,6 +74,109 @@ public final class DrpySandboxRuntime {
         }
     }
 
+
+    /**
+     * Execute a deliberately small operation surface against a previously
+     * defined Drpy rule. The script is evaluated in the same sandbox as load;
+     * no Java classes or Android objects are exposed. Only explicitly defined
+     * rule functions are callable. String-based Drpy selectors such as 一级/二级
+     * are not interpreted here and must remain unsupported until a DOM adapter
+     * is added.
+     */
+    public static String executeOperation(
+            String source,
+            String operation,
+            String payloadJson,
+            HttpRequestHandler requestHandler
+    ) {
+        if (source == null || source.trim().isEmpty()) throw new IllegalArgumentException("DRPY_SCRIPT_REQUIRED");
+        if (source.length() > MAX_SCRIPT_CHARS) throw new IllegalArgumentException("DRPY_SCRIPT_TOO_LARGE");
+
+        ContextFactory factory = new ContextFactory() {
+            @Override protected Context makeContext() {
+                Context cx = super.makeContext();
+                cx.setInstructionObserverThreshold(10_000);
+                cx.setMaximumInterpreterStackDepth(1000);
+                return cx;
+            }
+
+            @Override protected void observeInstructionCount(Context cx, int instructionCount) {
+                Integer count = (Integer) cx.getThreadLocal("tvboxDrpyInstructionCount");
+                int total = (count == null ? 0 : count) + instructionCount;
+                if (total > MAX_INSTRUCTIONS) throw new SecurityException("DRPY_SCRIPT_INSTRUCTION_LIMIT");
+                cx.putThreadLocal("tvboxDrpyInstructionCount", total);
+            }
+        };
+
+        Context cx = factory.enterContext();
+        try {
+            cx.setLanguageVersion(Context.VERSION_ES6);
+            cx.setOptimizationLevel(-1);
+            cx.setClassShutter(fullClassName -> false);
+
+            Scriptable scope = cx.initSafeStandardObjects();
+            if (requestHandler != null) {
+                BaseFunction request = new HttpRequestFunction(requestHandler);
+                ScriptableObject.putProperty(scope, "request", request);
+                ScriptableObject.putProperty(scope, "req", request);
+                ScriptableObject.putProperty(scope, "fetch", request);
+            }
+            ScriptableObject.putProperty(scope, "console", Context.javaToJS(new SafeConsole(), scope));
+
+            String safePayload = payloadJson == null || payloadJson.trim().isEmpty() ? "{}" : payloadJson;
+            Object parsedPayload = cx.evaluateString(
+                    scope,
+                    "JSON.parse(" + JSONObject.quote(safePayload) + ")",
+                    "tvbox-drpy-payload",
+                    1,
+                    null
+            );
+            ScriptableObject.putProperty(scope, "input", parsedPayload);
+            ScriptableObject.putProperty(scope, "params", parsedPayload);
+
+            cx.evaluateString(scope, source, "tvbox-drpy-extension", 1, null);
+            Object rule = ScriptableObject.getProperty(scope, "rule");
+            if (!(rule instanceof Scriptable)) throw new IllegalArgumentException("DRPY_RULE_REQUIRED");
+
+            String functionName = operationFunctionName(operation);
+            Object fn = ScriptableObject.getProperty((Scriptable) rule, functionName);
+            if (!(fn instanceof BaseFunction)) {
+                fn = ScriptableObject.getProperty(scope, functionName);
+            }
+            if (!(fn instanceof BaseFunction)) {
+                throw new UnsupportedOperationException("DRPY_OPERATION_FUNCTION_UNSUPPORTED:" + operation);
+            }
+
+            Object result = ((BaseFunction) fn).call(
+                    cx,
+                    scope,
+                    (Scriptable) rule,
+                    new Object[]{parsedPayload}
+            );
+            if (result == null || result == Scriptable.NOT_FOUND) return "null";
+
+            ScriptableObject.putProperty(scope, "__tvboxOperationResult", result);
+            Object json = cx.evaluateString(
+                    scope,
+                    "JSON.stringify(__tvboxOperationResult)",
+                    "tvbox-drpy-operation-json",
+                    1,
+                    null
+            );
+            return json == null ? "null" : Context.toString(json);
+        } finally {
+            Context.exit();
+        }
+    }
+
+    private static String operationFunctionName(String operation) {
+        if ("search".equals(operation)) return "search";
+        if ("detail".equals(operation)) return "detail";
+        if ("episodes".equals(operation)) return "episodes";
+        if ("playUrl".equals(operation)) return "playUrl";
+        throw new IllegalArgumentException("DRPY_OPERATION_UNSUPPORTED:" + operation);
+    }
+
     public interface HttpRequestHandler {
         DrpyHttpRuntime.Response request(String method, String url, String body, String contentType) throws IOException;
     }
