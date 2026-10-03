@@ -36,6 +36,12 @@ export function SangtianPlayerWindow({
   ];
   const currentAspect = aspectOptions.find(item => item.id === aspectMode) || aspectOptions[0];
 
+  const handleCycleAspect = () => {
+    const currentIndex = aspectOptions.findIndex(item => item.id === aspectMode);
+    const nextIndex = (currentIndex + 1) % aspectOptions.length;
+    setAspectMode(aspectOptions[nextIndex].id);
+  };
+
   const formatTime = value => {
     if (!Number.isFinite(value)) return '00:00';
     const total = Math.max(0, Math.floor(value));
