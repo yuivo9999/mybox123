@@ -40,6 +40,7 @@ export function createPlaybackCore(task,hooks={}) {
   if(event.event==='bufferingEnd'){if(task.request.kind===PlaybackKind.LIVE)transition(PlayerState.PLAYING);else if(stateMachine.state===PlayerState.BUFFERING)transition(PlayerState.PLAYING);emit('bufferingEnd');}
   if(event.event==='buffering')transition(PlayerState.BUFFERING);
   if(event.event==='qualityChanged')emit('qualityChanged',event);
+  if(event.event==='decoderChanged')emit('decoderChanged',{decoder:event.data??event});
   if(event.event==='episodeChanged')emit('episodeChanged',event);
   if(event.event==='reconnecting')transition(PlayerState.RECONNECTING);
   if(event.event==='completed'&&task.request.kind===PlaybackKind.VOD)transition(PlayerState.COMPLETED);
