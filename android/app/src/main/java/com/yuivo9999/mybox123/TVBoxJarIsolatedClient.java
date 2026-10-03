@@ -9,16 +9,17 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
 import android.os.Messenger;
-import android.os.RemoteException;
 
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.json.JSONObject;
 
 /** Host-side protocol client for the isolated CatVod boundary. Execution stays disabled until proxy handlers are implemented. */
 public final class TVBoxJarIsolatedClient implements AutoCloseable {
     private static final long DEFAULT_TIMEOUT_MS = 8_000L;
     private final Context context;
+    private final TVBoxJarHostProxy hostProxy;
     private final HandlerThread callbackThread = new HandlerThread("tvbox-jar-isolated-callback");
     private final Handler callbackHandler;
     private final Messenger incoming;
@@ -29,11 +30,37 @@ public final class TVBoxJarIsolatedClient implements AutoCloseable {
 
     public TVBoxJarIsolatedClient(Context context) {
         this.context = context.getApplicationContext();
+        this.hostProxy = new TVBoxJarHostProxy(this.context);
         callbackThread.start();
         callbackHandler = new Handler(callbackThread.getLooper()) {
             @Override public void handleMessage(Message message) {
+                String requestId = message.getData().getString(TVBoxJarExecutionService.KEY_REQUEST_ID, "");
+                String payload = message.getData().getString(TVBoxJarExecutionService.KEY_PAYLOAD, "");
+                if (message.what == TVBoxJarExecutionService.MSG_NETWORK_REQUEST || message.what == TVBoxJarExecutionService.MSG_FILE_READ) {
+                    String result;
+                    try {
+                        JSONObject object = new JSONObject(payload == null || payload.isEmpty() ? "{}" : payload);
+                        result = message.what == TVBoxJarExecutionService.MSG_NETWORK_REQUEST
+                                ? hostProxy.network(object)
+                                : hostProxy.readFile(object);
+                    } catch (Exception error) {
+                        result = "{\\"ok\\":false,\\"code\\":\\"TVBOX_JAR_PROXY_REQUEST_INVALID\\"}";
+                    }
+                    if (message.replyTo != null) {
+                        Message response = Message.obtain(null,
+                                message.what == TVBoxJarExecutionService.MSG_NETWORK_REQUEST
+                                        ? TVBoxJarExecutionService.MSG_NETWORK_RESULT
+                                        : TVBoxJarExecutionService.MSG_FILE_RESULT);
+                        Bundle data = new Bundle();
+                        data.putString(TVBoxJarExecutionService.KEY_REQUEST_ID, requestId);
+                        data.putString(TVBoxJarExecutionService.KEY_PAYLOAD, result);
+                        response.setData(data);
+                        try { message.replyTo.send(response); } catch (Exception ignored) { }
+                    }
+                    return;
+                }
                 synchronized (responses) {
-                    responses.put(message.getData().getString(TVBoxJarExecutionService.KEY_REQUEST_ID, ""), message.getData().getString(TVBoxJarExecutionService.KEY_PAYLOAD, ""));
+                    responses.put(requestId, payload);
                     responses.notifyAll();
                 }
             }
