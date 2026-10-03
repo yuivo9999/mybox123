@@ -8,7 +8,7 @@ import { SmartImage, EmptyState } from '../../components/StateViews.jsx';
 import { MoviePlaybackPage } from './MoviePlaybackPage.jsx';
 
 export function MovieFeature(props){
- const { route,tab,selected,movies=[],channels=[],history,progress,selectedSources={},sources=[],favorites,onMovie,onPlay,onTab,onBack,onLive,recordSearch,toggleFavorite,onSelectMovieSource }=props;
+ const { route,tab,selected,movies=[],channels=[],history,progress,selectedSources={},sources=[],favorites,onMovie,onPlay,onTab,onBack,onLive,recordSearch,toggleFavorite,onSelectMovieSource,movieCategories=[],movieActiveCategory=null,movieCategoryLoading=false,onLoadMovieCategory }=props;
  const page=usePageState(); const movieState=page.movies;
  useEffect(()=>{
   const pageKey=route==='search'?'search':tab==='movies'?'movies':'home';
@@ -22,8 +22,8 @@ export function MovieFeature(props){
  if(route==='search') return <MovieSearch movies={movies} sources={sources} initial={page.search.query} recordSearch={recordSearch} onMovie={onMovie} onPlay={onPlay} onBack={onBack} onQuery={query=>pageStateStore.patch('search',{query})}/>;
  if(route==='detail'){const movie=feature.getDetail(selected?.contentId??selected) || (selected?.contentId ? selected : null);if(!movie)return <MovieEmpty text="影视内容不存在" onBack={onBack}/>;return <MovieDetail movie={movie} movies={movies} sources={sources} selectedSourceId={selectedSources?.movie} onMovie={onMovie} favorite={favorites.some(i=>i.targetType==='content'&&i.targetId===movie.contentId)} onBack={onBack} onPlay={onPlay} onFavorite={()=>toggleFavorite('content',movie.contentId)}/>;}
  if(route==='movie-play') return <MoviePlaybackPage request={selected} movies={movies} favorites={favorites} toggleFavorite={toggleFavorite} onBack={onBack} onEpisode={onPlay} onMovie={onMovie} onTab={onTab}/>
- if(tab==='movies') return <MovieCatalog movies={movies} sources={sources} state={movieState} setState={patch=>pageStateStore.patch('movies',patch)} onMovie={onMovie} onPlay={onPlay} onSearch={()=>onMovie(null,'search')} recordSearch={recordSearch}/>;
- return <MovieHome feature={feature} channels={channels} sources={sources} selectedSourceId={selectedSources?.movie} onSelectMovieSource={onSelectMovieSource} onTab={onTab} onMovie={onMovie} onPlay={onPlay} onLive={onLive} onSearch={()=>onMovie(null,'search')}/>;
+ if(tab==='movies') return <MovieCatalog movies={movies} sources={sources} state={movieState} setState={patch=>pageStateStore.patch('movies',patch)} movieCategories={movieCategories} movieActiveCategory={movieActiveCategory} movieCategoryLoading={movieCategoryLoading} onLoadMovieCategory={onLoadMovieCategory} onMovie={onMovie} onPlay={onPlay} onSearch={()=>onMovie(null,'search')} recordSearch={recordSearch}/>;
+ return <MovieHome feature={feature} channels={channels} sources={sources} selectedSourceId={selectedSources?.movie} movieCategories={movieCategories} movieActiveCategory={movieActiveCategory} movieCategoryLoading={movieCategoryLoading} onLoadMovieCategory={onLoadMovieCategory} onSelectMovieSource={onSelectMovieSource} onTab={onTab} onMovie={onMovie} onPlay={onPlay} onLive={onLive} onSearch={()=>onMovie(null,'search')}/>;
 }
 
 export function createMovieFeature({movies=[],history=[],progress=[]}={}){return{
@@ -35,26 +35,33 @@ export function createMovieFeature({movies=[],history=[],progress=[]}={}){return
  getRelated:(movie)=>movieService.getRelated({movies,movie}),
 };}
 
-function MovieHome({feature,channels,sources=[],selectedSourceId,onSelectMovieSource,onTab,onMovie,onPlay,onLive,onSearch}){
+function MovieHome({feature,channels,sources=[],selectedSourceId,movieCategories=[],movieActiveCategory,movieCategoryLoading,onLoadMovieCategory,onSelectMovieSource,onTab,onMovie,onPlay,onLive,onSearch}){
  const home=feature.getHome();
  const movieSources=sources.filter(source=>source.sourceType==='movie'&&source.enabled!==false);
  const sourceSelector=<MovieSourceSelector sources={movieSources} selectedSourceId={selectedSourceId} onChange={onSelectMovieSource}/>;
+ const categoryItems=movieCategories.filter(item=>!item.sourceId||item.sourceId===selectedSourceId);
+ const active=movieActiveCategory&&(!selectedSourceId||movieActiveCategory.sourceId===selectedSourceId)
+   ? movieActiveCategory
+   : categoryItems[0] ?? null;
+ const currentMovies=active
+   ? moviesForCategory(home, active)
+   : [];
  if(!movieSources.length) return <Page><header className="top-header"><div><span className="eyebrow">TVBOX REACT</span><h2>首页</h2></div><button className="icon-button" aria-label="搜索" onClick={onSearch}><Search/></button></header><div className="empty state-view"><Film size={24}/><b>暂无影视源</b><span>当前还没有配置影视内容源</span><button className="primary" onClick={()=>onTab('sources')}>去源管理</button></div></Page>;
- if(!selectedSourceId || !home.categories.length) return <Page><header className="top-header"><div><span className="eyebrow">TVBOX REACT</span><h2>首页</h2></div><button className="icon-button" aria-label="搜索" onClick={onSearch}><Search/></button></header>{sourceSelector}<div className="empty state-view"><Film size={24}/><b>{selectedSourceId?'当前源暂无影视内容':'请选择一个影视源'}</b><span>{selectedSourceId?'可以在顶部切换其他源':'4k.json 已导入，源列表已准备好；选择后才会开始加载影视内容。'}</span></div></Page>;
  return <Page><header className="top-header"><div><span className="eyebrow">TVBOX REACT</span><h2>首页</h2></div><button className="icon-button" aria-label="搜索" onClick={onSearch}><Search/></button></header>{sourceSelector}
- {home.banner&&<section className="hero recommendation-banner"><SmartImage src={home.banner.image} alt={home.banner.title}/><div><span className="eyebrow">推荐</span><h1>{home.banner.title}</h1><p>{home.banner.description}</p><button className="primary" onClick={()=>home.banner.movie&&onMovie(home.banner.movie)}><Play size={16}/>立即观看</button></div></section>}
- <SectionTitle title="热门电影" action="更多" onAction={()=>{pageStateStore.patch('movies',{category:'电影',page:1});onTab('movies')}}/><MovieGrid movies={home.popularMovies} onMovie={onMovie}/>
- <SectionTitle title="热门剧集" action="更多" onAction={()=>{pageStateStore.patch('movies',{category:'电视剧',page:1});onTab('movies')}}/><MovieGrid movies={home.popularSeries} onMovie={onMovie}/>
- <SectionTitle title="热播综艺" action="更多" onAction={()=>{pageStateStore.patch('movies',{category:'综艺',page:1});onTab('movies')}}/><MovieGrid movies={home.popularVariety} onMovie={onMovie}/>
- <SectionTitle title="电影榜单"/><MovieGrid movies={home.movieRanking} onMovie={onMovie}/>
- <SectionTitle title="电视榜单"/><MovieGrid movies={home.tvRanking} onMovie={onMovie}/>
- <SectionTitle title="综艺榜单"/><MovieGrid movies={home.varietyRanking} onMovie={onMovie}/>
- <SectionTitle title="电影筛选" action="进入" onAction={()=>{pageStateStore.patch('movies',{category:'电影',page:1});onTab('movies')}}/><div className="chips">{home.taxonomy.movie.map(item=><button key={item} onClick={()=>{pageStateStore.patch('movies',{category:'电影',filters:{categoryId:getCategoryIdByLabel('movie',item)},page:1});onTab('movies')}}>{item}</button>)}</div>
- <SectionTitle title="电视筛选" action="进入" onAction={()=>{pageStateStore.patch('movies',{category:'电视剧',page:1});onTab('movies')}}/><div className="chips">{home.taxonomy.tv.map(item=><button key={item} onClick={()=>{pageStateStore.patch('movies',{category:'电视剧',filters:{categoryId:getCategoryIdByLabel('tv',item)},page:1});onTab('movies')}}>{item}</button>)}</div>
- <SectionTitle title="综艺筛选" action="进入" onAction={()=>{pageStateStore.patch('movies',{category:'综艺',page:1});onTab('movies')}}/><div className="chips">{home.taxonomy.variety.map(item=><button key={item} onClick={()=>{pageStateStore.patch('movies',{category:'综艺',filters:{categoryId:getCategoryIdByLabel('variety',item)},page:1});onTab('movies')}}>{item}</button>)}</div>
- <SectionTitle title="继续观看"/><div className="continue-row">{home.continueWatching.length?home.continueWatching.map(({movie,episodeIndex,history:item})=><div className="continue" key={item.historyId} onClick={()=>onPlay(movie,episodeIndex)}><SmartImage src={movie.poster} fallback={<div className="image-placeholder"><Film size={18}/></div>}/><div><b>{movie.title}</b><small>{movie.episodes?.[episodeIndex]?.title??'继续观看'} · {Math.floor((item.positionSeconds??0)/60)} 分钟</small></div></div>):<MovieEmpty compact text="暂无观看记录"/>}</div>
- <SectionTitle title="最新内容"/><MovieGrid movies={home.latest} onMovie={onMovie}/>
- <SectionTitle title="Live 快捷入口"/><div className="live-banner" onClick={()=>onTab('live')}><span><b>Live 直播中心</b><small>{channels.length} 个频道</small></span><ChevronLeft className="flip"/></div>{channels[0]&&<button className="movie-live-entry" onClick={()=>onLive(channels[0])}><Play size={15}/>直接播放示例频道</button>}</Page>;
+  <SectionTitle title="内容分类" action={movieCategoryLoading?'加载中…':'按需加载'}/>
+  <div className="chips category-lazy-chips">{categoryItems.map(category=><button className={active?.id===category.id?'active':''} key={category.sourceId+':'+category.id+':'+category.name} disabled={movieCategoryLoading} onClick={()=>onLoadMovieCategory?.(category)}>{category.name}</button>)}</div>
+  {!active&&<div className="empty state-view"><Film size={22}/><b>正在读取分类</b><span>只读取分类索引，不下载整库内容。</span></div>}
+  {active&&<><SectionTitle title={active.name} action="更多" onAction={()=>{pageStateStore.patch('movies',{category:active.name,page:1});onTab('movies')}}/>{movieCategoryLoading?<div className="empty compact"><span>正在加载“{active.name}”…</span></div>:currentMovies.length?<MovieGrid movies={currentMovies} onMovie={onMovie}/>:<MovieEmpty compact text={`“${active.name}”暂无内容或该源暂未返回结果`}/>}</>}
+  <SectionTitle title="继续观看"/><div className="continue-row">{home.continueWatching.length?home.continueWatching.map(({movie,episodeIndex,history:item})=><div className="continue" key={item.historyId} onClick={()=>onPlay(movie,episodeIndex)}><SmartImage src={movie.poster} fallback={<div className="image-placeholder"><Film size={18}/></div>}/><div><b>{movie.title}</b><small>{movie.episodes?.[episodeIndex]?.title??'继续观看'} · {Math.floor((item.positionSeconds??0)/60)} 分钟</small></div></div>):<MovieEmpty compact text="暂无观看记录"/>}</div>
+  <SectionTitle title="Live 快捷入口"/><div className="live-banner" onClick={()=>onTab('live')}><span><b>Live 直播中心</b><small>{channels.length} 个频道</small></span><ChevronLeft className="flip"/></div>{channels[0]&&<button className="movie-live-entry" onClick={()=>onLive(channels[0])}><Play size={15}/>直接播放示例频道</button>}
+ </Page>;
+}
+function moviesForCategory(home, category){
+ const sourceItems=(home?.allMovies??[]);
+ return sourceItems.filter(movie =>
+   String(movie.sourceCategoryId??'')===String(category?.id??'')
+   || String(movie.sourceCategoryName??'')===String(category?.name??'')
+ );
 }
 
 function MovieSourceSelector({sources=[],selectedSourceId,onChange}){
@@ -68,8 +75,8 @@ function MovieSourceSelector({sources=[],selectedSourceId,onChange}){
  </section>;
 }
 
-function MovieCatalog({movies,state,setState,onMovie,onPlay,onSearch,recordSearch,sources=[]}){
- const home=useMemo(()=>movieService.getHome({movies}),[movies]); const categories=['全部','电影','电视剧','综艺'];
+function MovieCatalog({movies,state,setState,onMovie,onPlay,onSearch,recordSearch,sources=[],movieCategories=[],movieActiveCategory,movieCategoryLoading,onLoadMovieCategory}){
+ const home=useMemo(()=>movieService.getHome({movies}),[movies]); const categories=movieCategories.length?movieCategories.filter(item=>!item.sourceId||item.sourceId===sources.find(source=>source.sourceType==='movie'&&source.enabled!==false)?.sourceId):[];
  const [queryInput,setQueryInput]=useState('');
  const submitSearch=()=>{
   const keyword=String(queryInput||'').trim();
@@ -80,11 +87,11 @@ function MovieCatalog({movies,state,setState,onMovie,onPlay,onSearch,recordSearc
  };
  const selectedType=state.category==='电影'?'movie':state.category==='电视剧'?'tv':state.category==='综艺'?'variety':null;
  const subcategories=selectedType?(home.taxonomy?.[selectedType]??[]):[];
- const listMeta=movieService.list({movies,...state}); const apply=(patch)=>setState({...patch,page:1});
+ const listMeta=movieCategoryLoading ? {items:[],page:state.page,pageSize:state.pageSize,total:0,hasMore:false} : (movieActiveCategory ? {items:moviesForCategory(home,movieActiveCategory).slice((Math.max(1,state.page)-1)*state.pageSize,Math.max(1,state.page)*state.pageSize),page:Math.max(1,state.page),pageSize:state.pageSize,total:moviesForCategory(home,movieActiveCategory).length,hasMore:Math.max(1,state.page)*state.pageSize<moviesForCategory(home,movieActiveCategory).length} : movieService.list({movies,...state})); const apply=(patch)=>setState({...patch,page:1});
  const filters=home.filters??{}; const values=(key)=>['全部',...(filters[key]??[])];
  return <Page><Header title="影视"/><div className="searchbox"><Search size={18}/><input value={queryInput} onChange={e=>setQueryInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')submitSearch()}} placeholder="搜索影视内容"/><button className="secondary search-submit" type="button" onClick={submitSearch}>搜索</button>{queryInput&&<button className="icon-button" aria-label="清空搜索" type="button" onClick={()=>setQueryInput('')}><X size={16}/></button>}</div>
- <div className="chips">{categories.map(item=><button className={state.category===item?'active':''} onClick={()=>apply({category:item,filters:{...state.filters,categoryId:''}})} key={item}>{item}</button>)}</div>
- {selectedType&&<div className="chips">{subcategories.map(item=>{const selected=state.filters.categoryId===item.id;return <button className={selected?'active':''} onClick={()=>setState({filters:{...state.filters,categoryId:selected?'':item.id},page:1})} key={item.id}>{item.label}</button>})}</div>}
+ <div className="chips category-lazy-chips">{categories.map(item=>{const selected=(movieActiveCategory?.id===item.id)||(state.category===item.name);return <button className={selected?'active':''} disabled={movieCategoryLoading} onClick={()=>{setState({category:item.name,page:1,filters:{...state.filters,categoryId:''}});onLoadMovieCategory?.(item)}} key={item.sourceId+':'+item.id+':'+item.name}>{item.name}</button>})}</div>
+ {movieCategoryLoading&&<div className="empty compact"><span>正在加载“{movieActiveCategory?.name||state.category||'当前分类'}”…</span></div>}
  <div className="filter-row"><select value={state.filters.type||'全部'} onChange={e=>setState({filters:{...state.filters,type:e.target.value==='全部'?'':e.target.value},page:1})}>{values('types').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.year||'全部'} onChange={e=>setState({filters:{...state.filters,year:e.target.value==='全部'?'':e.target.value},page:1})}>{values('years').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.region||'全部'} onChange={e=>setState({filters:{...state.filters,region:e.target.value==='全部'?'':e.target.value},page:1})}>{values('regions').map(x=><option key={x}>{x}</option>)}</select><select value={state.filters.status||'全部'} onChange={e=>setState({filters:{...state.filters,status:e.target.value==='全部'?'':e.target.value},page:1})}>{values('statuses').map(x=><option key={x}>{x}</option>)}</select><select value={state.sort} onChange={e=>setState({sort:e.target.value,page:1})}>{[['default','默认'],['latest','最新'],['popular','热门'],['time','时间'],['title','名称']].map(([v,l])=><option value={v} key={v}>{l}</option>)}</select></div>
  {listMeta.items.length
    ? <MovieGrid movies={listMeta.items} onMovie={onMovie}/>
