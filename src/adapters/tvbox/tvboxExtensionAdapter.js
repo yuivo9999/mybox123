@@ -51,6 +51,20 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
     },
   );
 
+  const request = async (payload = {}, options = {}) => execute('request', payload, options);
+
+  const resolveScript = async (payload = {}, options = {}) => {
+    if (String(payload.script || '').trim()) return String(payload.script);
+    const ext = definition.tvboxExt;
+    if (typeof ext === 'string' && /^https?:\\/\\//i.test(ext.trim())) {
+      const response = await request({ url: ext.trim(), method: 'GET' }, options);
+      if (!response?.body) throw new Error('DRPY_EXTENSION_SCRIPT_EMPTY');
+      return String(response.body);
+    }
+    if (typeof ext === 'string' && ext.trim()) return ext;
+    throw new Error('DRPY_EXTENSION_SCRIPT_REQUIRED');
+  };
+
   const execute = async (operation, payload = {}, options = {}) => {
     if (!effectiveRuntime || typeof effectiveRuntime.execute !== 'function' || (typeof effectiveRuntime.isAvailable === 'function' && !effectiveRuntime.isAvailable())) {
       throw unavailable(operation);
@@ -67,7 +81,9 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
   const healthCheck = async (options = {}) => {
     try {
       await execute('healthCheck', {}, options);
-      return {
+      const load = async (payload = {}, options = {}) => execute('load', { ...payload, script: await resolveScript(payload, options) }, options);
+
+  return {
         ok: true,
         sourceId,
         status: 'healthy',
@@ -95,8 +111,8 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
     ),
     healthCheck,
     execute,
-    load: (payload, options) => execute('load', payload, options),
-    request: (payload, options) => execute('request', payload, options),
+    load,
+    request,
     search: (payload, options) => execute('search', payload, options),
     detail: (payload, options) => execute('detail', payload, options),
     episodes: (payload, options) => execute('episodes', payload, options),
