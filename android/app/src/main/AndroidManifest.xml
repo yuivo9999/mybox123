@@ -25,6 +25,11 @@
 
         </activity>
 
+        <service
+            android:name=".TVBoxJarExecutionService"
+            android:exported="false"
+            android:isolatedProcess="true" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
