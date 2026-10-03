@@ -167,7 +167,7 @@ export function parseTXTLiveMetadata(text) {
 }
 
 
-export function parseTXTLiveMetadataStream(text, onChannel) {
+export async function parseTXTLiveMetadataStream(text, onChannel) {
   if (!text) return [];
   const cleanText = String(text).replace(/^\\uFEFF/, '');
   const lines = cleanText.split(/\\r?\\n/);
@@ -213,7 +213,7 @@ export function parseTXTLiveMetadataStream(text, onChannel) {
       deferredRef: { lineIndex },
     };
     channels.push(channel);
-    if (typeof onChannel === 'function') onChannel(channel);
+    if (typeof onChannel === 'function') await onChannel(channel);
   }
   return channels;
 }
