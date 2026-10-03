@@ -3,6 +3,8 @@ import { ChevronLeft, Clock3, Database, Film, Info, Radio, Search, Server, Setti
 import { LiveFeature } from '../features/live/LiveFeature.jsx';
 import { SmartImage, EmptyState } from '../components/StateViews.jsx';
 import { sourceConfigService } from '../services/sourceConfigService.js';
+import { FONT_CATALOG, getFontById } from '../config/fontCatalog.js';
+import { ensureFont } from '../services/fontLoader.js';
 
 function Main({tab,movies,channels,favorites,history,sources,searches,progress,settings,onTab,onMovie,onLive,onLiveChannel,onSearchHistory,toggleFavorite,onClearData,onClearHistory,onSaveSources,onClearSearches,onRemoveSearch,onClearCache,onSourceEnabled,onSourceActive,onTestSource,onRemoveSource,onUpdateSettings}){
  const [favoriteSection,setFavoriteSection]=useState('movies');
@@ -55,11 +57,13 @@ function Main({tab,movies,channels,favorites,history,sources,searches,progress,s
    <SettingMenu icon={Radio} title="默认直播线路" value={settings?.defaultLiveSource||'自动选择'} onClick={()=>onUpdateSettings?.({defaultLiveSource:nextSource(sources,'live',settings?.defaultLiveSource)})}/>
    <SectionTitle title="外观设置"/>
    <SettingMenu icon={Settings} title="主题" value={settings?.theme==='sangtian'?'桑田山河':settings?.theme==='light'?'浅色':'深色'} onClick={()=>onUpdateSettings?.({theme:cycle(settings?.theme||'sangtian',['sangtian','dark','light'])})}/>
-   <SettingMenu icon={Settings} title="字体" value={settings?.fontSize==='large'?'大':settings?.fontSize==='small'?'小':'中'} onClick={()=>onUpdateSettings?.({fontSize:cycle(settings?.fontSize,['small','medium','large'])})}/>
+   <SettingMenu icon={Settings} title="字体" value={getFontById(settings?.fontFamily).name} onClick={()=>setFontPicker(true)}/>
+   <SettingMenu icon={Settings} title="字体大小" value={settings?.fontSize==='large'?'大':settings?.fontSize==='small'?'小':'中'} onClick={()=>onUpdateSettings?.({fontSize:cycle(settings?.fontSize||'medium',['small','medium','large'])})}/>
    <SettingMenu icon={Settings} title="卡片显示" value={settings?.cardStyle==='compact'?'紧凑':'海报'} onClick={()=>onUpdateSettings?.({cardStyle:settings?.cardStyle==='compact'?'poster':'compact'})}/>
    <SettingMenu icon={Settings} title="显示密度" value={settings?.density==='compact'?'紧凑':'舒适'} onClick={()=>onUpdateSettings?.({density:settings?.density==='compact'?'comfortable':'compact'})}/>
    <SectionTitle title="数据设置"/>
    <Menu icon={Trash2} title="清除历史" onClick={()=>setConfirm({type:'history'})}/><Menu icon={Trash2} title="清除搜索记录" onClick={()=>setConfirm({type:'searches'})}/><Menu icon={Database} title="清除缓存" onClick={()=>{onClearCache();}}/>
+   {fontPicker&&<FontPickerDialog value={settings?.fontFamily} onCancel={()=>setFontPicker(false)} onApply={(fontId)=>{onUpdateSettings?.({fontFamily:fontId});setFontPicker(false)}}/>}
    {confirm&&<ConfirmDialog title="确认清理？" onCancel={()=>setConfirm(null)} onConfirm={()=>{if(confirm.type==='history')onClearHistory();else onClearSearches();setConfirm(null)}}/>}
   </Page>;
  }
@@ -269,4 +273,35 @@ const rotateOrder=(order=['exo','ijk','native'])=>{const normalized=['exo','ijk'
 const nextSource=(sources,type,current)=>{const list=sources.filter(source=>source.sourceType===type&&source.enabled!==false);if(!list.length)return null;const ids=[null,...list.map(source=>source.sourceId)];const index=Math.max(0,ids.indexOf(current));return ids[(index+1)%ids.length]??null};
 const Menu=({icon:Icon,title,onClick,badge})=><button className="menu" onClick={onClick}><Icon size={19}/><span>{title}</span>{badge>0&&<em>{badge}</em>}<ChevronLeft className="flip" size={17}/></button>;
 const SettingMenu=({icon:Icon,title,value,onClick})=><button className="menu setting-menu" onClick={onClick}><Icon size={19}/><span>{title}<small>{value}</small></span><ChevronLeft className="flip" size={17}/></button>;
+
+function FontPickerDialog({value,onCancel,onApply}){
+ const [draft,setDraft]=useState(value||FONT_CATALOG[0].id);
+ const [loading,setLoading]=useState(false);
+ const selected=getFontById(draft);
+ const choose=async(font)=>{setDraft(font.id);setLoading(true);await ensureFont(font);setLoading(false);};
+ return <div className="modal-backdrop font-picker-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)onCancel()}}>
+   <div className="font-picker-modal" role="dialog" aria-modal="true" aria-label="选择字体">
+     <div className="font-picker-head">
+       <div><b>选择字体</b><small>18 款轻量中文字体 · 单选</small></div>
+       <button className="icon-button" type="button" aria-label="关闭" onClick={onCancel}><X size={17}/></button>
+     </div>
+     <div className="font-picker-preview" style={{fontFamily:'"' + selected.family + '",sans-serif'}}>
+       <span>预览</span><b>风起时，花落无声。山水相映，清晰易读。</b>
+     </div>
+     <div className="font-picker-list" role="radiogroup" aria-label="中文字体列表">
+       {FONT_CATALOG.map(font=>{
+         const checked=draft===font.id;
+         return <button key={font.id} type="button" role="radio" aria-checked={checked} className={'font-picker-item'+(checked?' selected':'')} onClick={()=>choose(font)} style={{fontFamily:'"' + font.family + '",sans-serif'}}>
+           <span className="font-picker-copy"><b>{font.name}</b><small>{font.alias} · {font.style}</small></span>
+           <span className={'font-picker-radio'+(checked?' checked':'')} aria-hidden="true">{checked&&<Check size={12}/>}</span>
+         </button>;
+       })}
+     </div>
+     <div className="font-picker-footer">
+       <small>{selected.source} · {selected.license}{loading?' · 正在加载预览…':''}</small>
+       <div><button className="secondary" type="button" onClick={onCancel}>不选</button><button className="primary" type="button" onClick={()=>onApply(draft)}>选择</button></div>
+     </div>
+   </div>
+ </div>;
+}
 export {Main as MainPage};
