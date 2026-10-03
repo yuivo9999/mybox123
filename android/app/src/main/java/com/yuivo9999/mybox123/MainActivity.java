@@ -7,6 +7,7 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private NativePlaybackBridge playbackBridge;
+    private TVBoxExtensionBridge tvBoxExtensionBridge;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -15,6 +16,9 @@ public class MainActivity extends BridgeActivity {
         WebView webView = getBridge().getWebView();
         playbackBridge = new NativePlaybackBridge(this, webView);
         webView.addJavascriptInterface(playbackBridge, NativePlaybackBridge.JS_NAME);
+
+        tvBoxExtensionBridge = new TVBoxExtensionBridge();
+        webView.addJavascriptInterface(tvBoxExtensionBridge, TVBoxExtensionBridge.JS_NAME);
     }
 
     @Override
@@ -23,6 +27,7 @@ public class MainActivity extends BridgeActivity {
             playbackBridge.release();
             playbackBridge = null;
         }
+        tvBoxExtensionBridge = null;
         super.onDestroy();
     }
 }
