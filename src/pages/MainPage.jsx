@@ -33,7 +33,14 @@ function Main({tab,movies,channels,favorites,history,sources,searches,progress,s
 function SourceList({sources,onEnabled,onActive,onTest,onRemove}){
   return <div className="source-list">{sources.map(source=>{
     const isTesting = source.status === '测试中';
-    const isUnsupported = source.sourceCapability === 'tvbox-extension' || source.adapterType === 'tvbox-extension';
+    const isUnsupported = String(source.sourceCapability || '').startsWith('tvbox-')
+      || String(source.adapterType || '').startsWith('tvbox-');
+    const capabilityLabel = source.tvboxAdapterKind === 'drpy-js' ? 'Drpy JS待适配'
+      : source.tvboxAdapterKind === 'csp' ? 'CSP待适配'
+      : source.tvboxAdapterKind === 'jar' || source.tvboxAdapterKind === 'http-vod-with-jar' ? 'JAR待适配'
+      : source.tvboxAdapterKind === 'ext' ? 'ext待适配'
+      : source.tvboxAdapterKind === 'live-provider' ? 'Live提供器待适配'
+      : isUnsupported ? 'TVBox扩展待适配' : '';
     const statusColor = (source.status==='正常'||source.status==='可用') ? '#22c55e' : (source.status==='不可用'||source.status==='异常') ? '#f87171' : isTesting ? '#38bdf8' : '#94a3b8';
     return (
       <div className="menu source-row" key={source.sourceId}>
@@ -43,7 +50,7 @@ function SourceList({sources,onEnabled,onActive,onTest,onRemove}){
           <small>
             {source.sourceType}{source.liveMode==='tv1'?' · TV1专用':''} ·
             <span style={{color: statusColor, fontWeight: 600}}> {source.status}</span>
-            {isUnsupported && <span style={{color:'#f59e0b',fontWeight:600}}> · TVBox扩展待适配</span>}
+            {isUnsupported && <span style={{color:'#f59e0b',fontWeight:600}}> · {capabilityLabel}</span>}
             {source.isActive?' · 当前使用':''}
           </small>
         </span>
