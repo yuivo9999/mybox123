@@ -41,7 +41,7 @@ export async function testSource(source, options = {}) {
   return { ok: false, sourceId: source.sourceId, status: 'unsupported', checkedAt: Date.now() };
 }
 
-export async function syncAllSources({ movieSourceId = null, includeMovie = true, includeLive = true } = {}) {
+export async function syncAllSources({ movieSourceId = null, includeMovie = true, includeLive = true, liveSourceIds = null } = {}) {
   let sources = sourceRepository.getAll().filter(source => source.enabled !== false);
   const movieResult = includeMovie
     ? await sourceRegistryService.syncMovieSources(sources, movieSourceId)
@@ -64,7 +64,7 @@ export async function syncAllSources({ movieSourceId = null, includeMovie = true
      .filter(source => source.sourceType === 'live' && source.liveMode !== 'tv1' && (source.sourceRef || source.url))
     .forEach(source => sourceRegistryService.registerLiveSource(source));
 
-  const liveResult = await liveService.sync();
+  const liveResult = await liveService.sync(liveSourceIds);
   userDataService.migrateContentIdentities(movieResult.movies);
 
   const detectedTv1SourceIds = new Set(
