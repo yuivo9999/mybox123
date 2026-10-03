@@ -210,7 +210,7 @@ export function MoviePlaybackPage({
         description={movie?.description}
         episodes={episodes}
         currentEpisodeId={request?.episodeId}
-        onSelectEpisode={idx => onEpisode?.(movie, idx, source)}
+        onSelectEpisode={idx => onEpisode?.(movie, idx, source, request?.metadata?.returnRoute || 'detail')}
         sources={sources}
         currentSource={source}
         onSelectSource={switchSource}
