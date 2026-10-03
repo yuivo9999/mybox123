@@ -52,7 +52,7 @@ export function parseJSONMovies(input) {
     return [{
       sourceItemId: String(item.sourceItemId ?? item.vod_id ?? item.id ?? `item-${index + 1}`),
       title: String(item.title ?? item.name ?? item.vod_name ?? `内容 ${index + 1}`),
-      type: item.type ?? item.vod_type ?? item.contentType ?? 'movie',
+      type: item.type ?? item.vod_type ?? item.contentType ?? item.mediaType ?? '',
       category: item.category ?? item.type_name ?? item.vod_class ?? item.group ?? item.categoryName ?? '未分类',
       poster: item.poster ?? item.pic ?? item.vod_pic ?? item.image ?? '',
       backdrop: item.backdrop ?? item.pic_slide ?? '',
