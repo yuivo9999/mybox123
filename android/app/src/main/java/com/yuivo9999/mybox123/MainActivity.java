@@ -26,7 +26,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
-    protected void onDestroy() {
+    public void onDestroy() {
         if (playbackBridge != null) {
             playbackBridge.release();
             playbackBridge = null;
