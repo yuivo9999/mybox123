@@ -3,8 +3,8 @@ import { userDataService } from './userDataService.js';
 import { syncAllSources, testSource } from './sourceRuntimeService.js';
 
 export const sourceManagementService = {
-  async reload() {
-    return syncAllSources();
+  async reload(options = {}) {
+    return syncAllSources(options);
   },
   async save(sources) {
     sourceRepository.saveAll(sources);
@@ -31,7 +31,7 @@ export const sourceManagementService = {
       enabled: item.sourceId === sourceId ? true : item.enabled,
       lastUsedAt: item.sourceId === sourceId ? now : item.lastUsedAt ?? null,
     })));
-    return this.reload();
+    return sources;
   },
   async remove(sourceId) {
     const sources = sourceRepository.getAll();
