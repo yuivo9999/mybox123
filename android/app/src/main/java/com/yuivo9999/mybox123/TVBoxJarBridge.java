@@ -41,12 +41,12 @@ public final class TVBoxJarBridge {
     private static final long SPIDER_TIMEOUT_MS = 20_000L;
 
     private final Context context;
-    private final TVBoxJarExecutor executor;
+    private final TVBoxJarIsolatedClient isolatedClient;
     private final ExecutorService executionExecutor = Executors.newSingleThreadExecutor();
 
     public TVBoxJarBridge(Context context) {
         this.context = context.getApplicationContext();
-        this.executor = new TVBoxJarExecutor(this.context);
+        this.isolatedClient = new TVBoxJarIsolatedClient(this.context);
     }
 
     @JavascriptInterface
@@ -59,9 +59,10 @@ public final class TVBoxJarBridge {
             result.put("supportedKinds", new org.json.JSONArray().put("jar"));
             result.put("supportedOperations", new org.json.JSONArray().put("prepare").put("inspect").put("home").put("category").put("detail").put("search").put("play"));
             result.put("executionEnabled", true);
-            result.put("executionMode", "host-process");
-            result.put("isolatedProcessReady", false);
-            result.put("isolatedProcessMode", "protocol-only");
+            result.put("executionMode", "isolated-in-memory-dex");
+            result.put("isolatedProcessReady", true);
+            result.put("isolatedProcessMode", "in-memory-dex");
+            result.put("networkAccess", "not-granted-to-isolated-process");
             result.put("isolatedProcessNetworkProxyRequired", true);
             result.put("reason", "CATVOD_SPIDER_ABI_DEXCLASSLOADER_HOST_PROCESS");
             return result.toString();
@@ -133,9 +134,10 @@ public final class TVBoxJarBridge {
         result.put("size", target.length());
         result.put("md5", actualMd5);
         result.put("executionEnabled", true);
-        result.put("executionMode", "host-process");
+        result.put("executionMode", "isolated-in-memory-dex");
         result.put("isolatedProcessReady", true);
-        result.put("isolatedProcessMode", "protocol-only");
+        result.put("isolatedProcessMode", "in-memory-dex");
+        result.put("networkAccess", "not-granted-to-isolated-process");
         result.put("isolatedProcessNetworkProxyRequired", true);
         result.put("reused", reused);
         return result.toString();
@@ -152,7 +154,7 @@ public final class TVBoxJarBridge {
         if (!jarFile.isFile() || jarFile.length() > MAX_JAR_BYTES) throw new SecurityException("TVBOX_JAR_NOT_READY");
         Future<String> future = executionExecutor.submit(new Callable<String>() {
             @Override public String call() throws Exception {
-                return executor.invoke(jarFile, className, operation, data);
+                return isolatedClient.execute(jarFile, className, operation, data.toString());
             }
         });
         try {
@@ -270,6 +272,7 @@ public final class TVBoxJarBridge {
 
     public void release() {
         executionExecutor.shutdownNow();
+        isolatedClient.close();
     }
 
     private String error(String code) {
