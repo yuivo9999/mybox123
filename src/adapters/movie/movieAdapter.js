@@ -34,6 +34,7 @@ export function createMovieAdapter(config, transport = null) {
     tvboxJar: config.tvboxJar ?? undefined,
     tvboxType: config.tvboxType ?? undefined,
     timeoutMs: Number.isFinite(Number(config.timeoutMs)) ? Number(config.timeoutMs) : undefined,
+    categories: Array.isArray(config.categories) ? config.categories : [],
   });
 
   let lastError = null;
@@ -62,9 +63,12 @@ export function createMovieAdapter(config, transport = null) {
     let finalUrl = sourceDefinition.endpoint;
     if (finalUrl.includes('api.php') || finalUrl.includes('provide/vod') || finalUrl.includes('/vod/')) {
       const query = new URLSearchParams();
-      if (!/[?&]ac=/.test(finalUrl)) query.set('ac', 'videolist');
+      const categoryOnly = options.categoryOnly === true;
+      // 分类/列表/搜索统一走 ac=list，避免默认 videolist 把整个资源库拉回本地。
+      if (!/[?&]ac=/.test(finalUrl)) query.set('ac', 'list');
+      else if (categoryOnly) finalUrl = finalUrl.replace(/([?&])ac=[^&]*/i, '$1ac=list');
       if (options.categoryId != null && String(options.categoryId).trim() && !/[?&]t=/.test(finalUrl)) query.set('t', String(options.categoryId).trim());
-      if (options.page != null && Number(options.page) > 1 && !/[?&]pg=/.test(finalUrl)) query.set('pg', String(Math.max(1, Number(options.page))));
+      if (options.page != null && Number(options.page) > 0 && !/[?&]pg=/.test(finalUrl)) query.set('pg', String(Math.max(1, Number(options.page))));
       if (options.keyword != null && String(options.keyword).trim() && !/[?&]wd=/.test(finalUrl)) query.set('wd', String(options.keyword).trim());
       if (options.limit != null && Number(options.limit) > 0 && !/[?&]limit=/.test(finalUrl)) query.set('limit', String(Math.min(100, Number(options.limit))));
       const suffix = query.toString();
@@ -226,8 +230,26 @@ export function createMovieAdapter(config, transport = null) {
 
   const getCategories = async (options = {}) => {
     requireCapability('categories');
-    const movies = await ensureMovies(options);
-    return [...new Set(movies.map(item => item.category).filter(Boolean))];
+    if (sourceDefinition.categories.length) {
+      return sourceDefinition.categories.map((item, index) => {
+        if (item && typeof item === 'object') {
+          return {
+            id: String(item.type_id ?? item.id ?? item.typeId ?? item.value ?? index + 1),
+            name: String(item.type_name ?? item.name ?? item.label ?? item.title ?? '').trim(),
+          };
+        }
+        return { id: String(index + 1), name: String(item ?? '').trim() };
+      }).filter(item => item.name);
+    }
+    const response = await request({ ...options, categoryOnly: true, page: 1, limit: 1 });
+    const body = String(await response.text()).replace(/^\\uFEFF/, '').trim();
+    const value = JSON.parse(body);
+    const raw = value?.class ?? value?.classes ?? value?.categories ?? value?.type ?? value?.data?.class ?? [];
+    const list = Array.isArray(raw) ? raw : [];
+    return list.map((item, index) => ({
+      id: String(item?.type_id ?? item?.typeId ?? item?.id ?? item?.value ?? index + 1),
+      name: String(item?.type_name ?? item?.name ?? item?.label ?? item?.title ?? item ?? '').trim(),
+    })).filter(item => item.name);
   };
 
   const filterItems = (movies, params = {}) => {
