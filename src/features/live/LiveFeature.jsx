@@ -286,8 +286,6 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   );
 }
 
-const Page = ({ children }) => <main className="page">{children}</main>;
-const Header = ({ title }) => <header><div><span className="eyebrow">TVBOX REACT · LIVE</span><h2>{title}</h2></div></header>;
 export function LiveChannelPanel({ channel, channels = [], favorites = [], onBack, onPlay, onChannel, toggleFavorite }) {
   const feature = useMemo(() => createLiveFeature({ channels }), [channels]);
   const [epg, setEpg] = useState(channel?.epg ?? []);
