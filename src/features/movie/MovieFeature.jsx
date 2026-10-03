@@ -59,8 +59,10 @@ function MovieHome({feature,movies=[],channels,sources=[],selectedSourceId,movie
 function moviesForCategory(movies=[], category){
  const sourceItems=movies??[];
  return sourceItems.filter(movie =>
-   String(movie.sourceCategoryId??'')===String(category?.id??'')
-   || String(movie.sourceCategoryName??'')===String(category?.name??'')
+   (movie.sourceCategoryIds??[]).map(String).includes(String(category?.id??'')) ||
+   (movie.sourceCategoryNames??[]).includes(String(category?.name??'')) ||
+   String(movie.sourceCategoryId??'')===String(category?.id??'') ||
+   String(movie.sourceCategoryName??'')===String(category?.name??'')
  );
 }
 
