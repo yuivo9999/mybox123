@@ -567,6 +567,7 @@ public final class NativePlaybackBridge {
                 }
             } catch (Throwable ignored) {}
         }
+        }
 
         // Playback policy is authoritative over an imported IJK profile.
         if ("hardware".equals(decoderMode)) {
