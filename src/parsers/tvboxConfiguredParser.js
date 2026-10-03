@@ -46,7 +46,7 @@ function buildParseUrl(parse, mediaUrl) {
   const endpoint = String(parse?.url || '').trim();
   if (!endpoint || !mediaUrl) return '';
   if (endpoint.includes('{url}')) return endpoint.replaceAll('{url}', encodeURIComponent(mediaUrl));
-  return endpoint + (endpoint.includes('=') || endpoint.endsWith('?') || endpoint.endsWith('&') ? encodeURIComponent(mediaUrl) : encodeURIComponent(mediaUrl));
+  return endpoint + (endpoint.includes('=') || endpoint.endsWith('?') || endpoint.endsWith('&') ? encodeURIComponent(mediaUrl) : `?url=${encodeURIComponent(mediaUrl)}`);
 }
 
 function buildHeaders(parse, candidate) {
