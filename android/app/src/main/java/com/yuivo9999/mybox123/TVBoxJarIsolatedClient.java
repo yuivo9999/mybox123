@@ -6,7 +6,7 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Looper;
+import android.os.HandlerThread;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
@@ -19,17 +19,27 @@ import java.util.concurrent.TimeUnit;
 public final class TVBoxJarIsolatedClient implements AutoCloseable {
     private static final long DEFAULT_TIMEOUT_MS = 8_000L;
     private final Context context;
-    private final Messenger incoming = new Messenger(new Handler(Looper.getMainLooper()) {
-        @Override public void handleMessage(Message message) {
-            synchronized (responses) { responses.put(message.getData().getString(TVBoxJarExecutionService.KEY_REQUEST_ID, ""), message.getData().getString(TVBoxJarExecutionService.KEY_PAYLOAD, "")); responses.notifyAll(); }
-        }
-    });
+    private final HandlerThread callbackThread = new HandlerThread("tvbox-jar-isolated-callback");
+    private final Handler callbackHandler;
+    private final Messenger incoming;
     private final java.util.Map<String, String> responses = new java.util.HashMap<>();
     private Messenger remote;
     private boolean bound;
     private ServiceConnection connection;
 
-    public TVBoxJarIsolatedClient(Context context) { this.context = context.getApplicationContext(); }
+    public TVBoxJarIsolatedClient(Context context) {
+        this.context = context.getApplicationContext();
+        callbackThread.start();
+        callbackHandler = new Handler(callbackThread.getLooper()) {
+            @Override public void handleMessage(Message message) {
+                synchronized (responses) {
+                    responses.put(message.getData().getString(TVBoxJarExecutionService.KEY_REQUEST_ID, ""), message.getData().getString(TVBoxJarExecutionService.KEY_PAYLOAD, ""));
+                    responses.notifyAll();
+                }
+            }
+        };
+        incoming = new Messenger(callbackHandler);
+    }
 
     public synchronized void connect() throws InterruptedException {
         if (bound && remote != null) return;
@@ -70,10 +80,7 @@ public final class TVBoxJarIsolatedClient implements AutoCloseable {
         try { if (connection != null) context.unbindService(connection); } catch (Exception ignored) { }
         connection = null;
         remote = null; bound = false;
+        callbackThread.quitSafely();
     }
 
-    private static final class NoopConnection implements ServiceConnection {
-        public void onServiceConnected(ComponentName name, android.os.IBinder service) {}
-        public void onServiceDisconnected(ComponentName name) {}
-    }
 }
