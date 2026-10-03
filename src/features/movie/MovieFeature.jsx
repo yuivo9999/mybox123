@@ -6,7 +6,7 @@ import { SmartImage, EmptyState } from '../../components/StateViews.jsx';
 import { MoviePlaybackPage } from './MoviePlaybackPage.jsx';
 
 export function MovieFeature(props){
- const { route,tab,selected,movies=[],channels=[],history,progress,selectedSources={},sources=[],favorites,onMovie,onPlay,onTab,onBack,onLive,recordSearch,toggleFavorite }=props;
+ const { route,tab,selected,movies=[],channels=[],history,progress,selectedSources={},sources=[],favorites,onMovie,onPlay,onTab,onBack,onLive,recordSearch,toggleFavorite,onSelectMovieSource }=props;
  const page=usePageState(); const movieState=page.movies;
  useEffect(()=>{
   const pageKey=route==='search'?'search':tab==='movies'?'movies':'home';
@@ -21,7 +21,7 @@ export function MovieFeature(props){
  if(route==='detail'){const movie=feature.getDetail(selected?.contentId??selected);if(!movie)return <MovieEmpty text="影视内容不存在" onBack={onBack}/>;return <MovieDetail movie={movie} movies={movies} sources={sources} selectedSourceId={selectedSources?.movie} onMovie={onMovie} favorite={favorites.some(i=>i.targetType==='content'&&i.targetId===movie.contentId)} onBack={onBack} onPlay={onPlay} onFavorite={()=>toggleFavorite('content',movie.contentId)}/>;}
  if(route==='movie-play') return <MoviePlaybackPage request={selected} movies={movies} favorites={favorites} toggleFavorite={toggleFavorite} onBack={onBack} onEpisode={onPlay} onMovie={onMovie} onTab={onTab}/>
  if(tab==='movies') return <MovieCatalog movies={movies} state={movieState} setState={patch=>pageStateStore.patch('movies',patch)} onMovie={onMovie} onSearch={()=>onMovie(null,'search')} recordSearch={recordSearch}/>;
- return <MovieHome feature={feature} channels={channels} onTab={onTab} onMovie={onMovie} onPlay={onPlay} onLive={onLive} onSearch={()=>onMovie(null,'search')}/>;
+ return <MovieHome feature={feature} channels={channels} sources={sources} selectedSourceId={selectedSources?.movie} onSelectMovieSource={onSelectMovieSource} onTab={onTab} onMovie={onMovie} onPlay={onPlay} onLive={onLive} onSearch={()=>onMovie(null,'search'}/>;
 }
 
 export function createMovieFeature({movies=[],history=[],progress=[]}={}){return{
@@ -33,15 +33,29 @@ export function createMovieFeature({movies=[],history=[],progress=[]}={}){return
  getRelated:(movie)=>movieService.getRelated({movies,movie}),
 };}
 
-function MovieHome({feature,channels,onTab,onMovie,onPlay,onLive,onSearch}){
+function MovieHome({feature,channels,sources=[],selectedSourceId,onSelectMovieSource,onTab,onMovie,onPlay,onLive,onSearch}){
  const home=feature.getHome();
- if(!feature.getHome().categories.length) return <Page><header className="top-header"><div><span className="eyebrow">TVBOX REACT</span><h2>首页</h2></div><button className="icon-button" aria-label="搜索" onClick={onSearch}><Search/></button></header><div className="empty state-view"><Film size={24}/><b>暂无影视源</b><span>当前还没有配置影视内容源</span><button className="primary" onClick={()=>onTab('sources')}>去源管理</button></div></Page>;
- return <Page><header className="top-header"><div><span className="eyebrow">TVBOX REACT</span><h2>首页</h2></div><button className="icon-button" aria-label="搜索" onClick={onSearch}><Search/></button></header>
+ const movieSources=sources.filter(source=>source.sourceType==='movie'&&source.enabled!==false);
+ const sourceSelector=<MovieSourceSelector sources={movieSources} selectedSourceId={selectedSourceId} onChange={onSelectMovieSource}/>;
+ if(!movieSources.length) return <Page><header className="top-header"><div><span className="eyebrow">TVBOX REACT</span><h2>首页</h2></div><button className="icon-button" aria-label="搜索" onClick={onSearch}><Search/></button></header><div className="empty state-view"><Film size={24}/><b>暂无影视源</b><span>当前还没有配置影视内容源</span><button className="primary" onClick={()=>onTab('sources')}>去源管理</button></div></Page>;
+ if(!selectedSourceId || !home.categories.length) return <Page><header className="top-header"><div><span className="eyebrow">TVBOX REACT</span><h2>首页</h2></div><button className="icon-button" aria-label="搜索" onClick={onSearch}><Search/></button></header>{sourceSelector}<div className="empty state-view"><Film size={24}/><b>{selectedSourceId?'当前源暂无影视内容':'请选择一个影视源'}</b><span>{selectedSourceId?'可以在顶部切换其他源':'4k.json 已导入，源列表已准备好；选择后才会开始加载影视内容。'}</span></div></Page>;
+ return <Page><header className="top-header"><div><span className="eyebrow">TVBOX REACT</span><h2>首页</h2></div><button className="icon-button" aria-label="搜索" onClick={onSearch}><Search/></button></header>{sourceSelector}
  {home.banner&&<section className="hero recommendation-banner"><SmartImage src={home.banner.image} alt={home.banner.title}/><div><span className="eyebrow">推荐</span><h1>{home.banner.title}</h1><p>{home.banner.description}</p><button className="primary" onClick={()=>home.banner.movie&&onMovie(home.banner.movie)}><Play size={16}/>立即观看</button></div></section>}
  <SectionTitle title="分类快捷入口"/><div className="chips">{home.categories.map(item=><button key={item} onClick={()=>{pageStateStore.patch('movies',{category:item,page:1});onTab('movies')}}>{item}</button>)}</div>
  <SectionTitle title="继续观看"/><div className="continue-row">{home.continueWatching.length?home.continueWatching.map(({movie,episodeIndex,history:item})=><div className="continue" key={item.historyId} onClick={()=>onPlay(movie,episodeIndex)}><SmartImage src={movie.poster} fallback={<div className="image-placeholder"><Film size={18}/></div>}/><div><b>{movie.title}</b><small>{movie.episodes?.[episodeIndex]?.title??'继续观看'} · {Math.floor((item.positionSeconds??0)/60)} 分钟</small></div></div>):<MovieEmpty compact text="暂无观看记录"/>}</div>
  <SectionTitle title="推荐内容" action="全部" onAction={()=>onTab('movies')}/><MovieGrid movies={home.recommended} onMovie={onMovie}/><SectionTitle title="热门影视"/><MovieGrid movies={home.popular} onMovie={onMovie}/><SectionTitle title="最新影视"/><MovieGrid movies={home.latest} onMovie={onMovie}/>
  <SectionTitle title="Live 快捷入口"/><div className="live-banner" onClick={()=>onTab('live')}><span><b>Live 直播中心</b><small>{channels.length} 个频道</small></span><ChevronLeft className="flip"/></div>{channels[0]&&<button className="movie-live-entry" onClick={()=>onLive(channels[0])}><Play size={15}/>直接播放示例频道</button>}</Page>;
+}
+
+function MovieSourceSelector({sources=[],selectedSourceId,onChange}){
+ return <section className="source-selector" style={{marginBottom:16}}>
+   <div className="section-title" style={{marginBottom:8}}><h3>影视源</h3><span style={{fontSize:12,color:'#8f9aaa'}}>{sources.length} 个可用源</span></div>
+   <select aria-label="选择影视源" value={selectedSourceId||''} onChange={e=>{if(e.target.value) onChange?.(e.target.value)}} style={{width:'100%'}}>
+     <option value="">请选择一个影视源（选择后才开始加载）</option>
+     {sources.map(source=><option key={source.sourceId} value={source.sourceId}>{source.name}</option>)}
+   </select>
+   <small style={{display:'block',marginTop:6,color:'#8f9aaa'}}>一次只加载当前选择的影视源，避免 4k.json 中多个源同时请求。</small>
+ </section>;
 }
 
 function MovieCatalog({movies,state,setState,onMovie,onSearch,recordSearch}){
