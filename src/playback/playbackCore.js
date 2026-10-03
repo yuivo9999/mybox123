@@ -119,7 +119,7 @@ export function createPlaybackCore(task,hooks={}) {
   await Promise.resolve(player.prepare());
   const startPosition=Number(task.request.metadata?.startPositionSeconds??0);
   if(task.request.kind===PlaybackKind.VOD&&startPosition>0)player.seek(startPosition);
-  if(input.playerHint?.autoplay||task.request.kind===PlaybackKind.LIVE)await player.play();
+  if(input.playerHint?.autoplay!==false)await player.play();
   return input;
  };
 
