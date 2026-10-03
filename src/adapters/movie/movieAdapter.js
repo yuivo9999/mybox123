@@ -1,7 +1,7 @@
 import { parseJSONMovies } from './jsonParser.js';
 import { normalizeMovie } from './normalizeMovie.js';
 import { ErrorCode, toAppError } from '../../models/errors.js';
-import { resilientFetch } from '../../utils/resilientFetch.js';
+import { requestAdapter } from '../../services/requestAdapter.js';
 
 const DEFAULT_CAPABILITIES = Object.freeze([
   'search',
@@ -15,7 +15,7 @@ const DEFAULT_CAPABILITIES = Object.freeze([
   'recommendations',
 ]);
 
-export function createMovieAdapter(config, transport = fetch) {
+export function createMovieAdapter(config, transport = null) {
   const sourceId = String(config.sourceId ?? '').trim();
   if (!sourceId) throw new Error('MOVIE_SOURCE_ID_REQUIRED');
 
@@ -50,10 +50,12 @@ export function createMovieAdapter(config, transport = fetch) {
 
     let response;
     try {
-      response = await resilientFetch(finalUrl, {
+      response = await requestAdapter.request(finalUrl, {
         headers: config.headers ?? {},
         signal: options.signal,
-      }, transport);
+        timeoutMs: options.timeoutMs,
+        transport,
+      });
     } catch (error) {
       throw toAppError(error, {
         code: ErrorCode.NETWORK,
