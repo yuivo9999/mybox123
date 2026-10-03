@@ -329,6 +329,54 @@ function isDirectMovieEndpoint(api, site = {}) {
   return classifyTVBoxCapability({ ...site, api }).sourceCapability === 'direct-http-vod';
 }
 
+function normalizeTVBoxParseConfig(parsed = {}) {
+  const parses = Array.isArray(parsed?.parses) ? parsed.parses
+    .filter(item => item && typeof item === 'object')
+    .map((item, index) => ({
+      id: String(item.name || `parse-${index + 1}`).trim(),
+      name: String(item.name || `解析-${index + 1}`).trim(),
+      type: Number.isFinite(Number(item.type)) ? Number(item.type) : 0,
+      url: String(item.url || '').trim(),
+      ext: item.ext && typeof item.ext === 'object' ? {
+        flag: Array.isArray(item.ext.flag) ? item.ext.flag.map(value => String(value).trim()).filter(Boolean) : [],
+        header: item.ext.header && typeof item.ext.header === 'object' ? { ...item.ext.header } : {},
+      } : {},
+    }))
+    .filter(item => item.url || item.id);
+
+  const flags = Array.isArray(parsed?.flags)
+    ? [...new Set(parsed.flags.map(value => String(value).replace(/\\r?\\n/g, '').trim()).filter(Boolean))]
+    : [];
+
+  const rules = Array.isArray(parsed?.rules) ? parsed.rules
+    .filter(item => item && typeof item === 'object')
+    .map(item => ({
+      host: String(item.host || '').trim(),
+      rule: Array.isArray(item.rule) ? item.rule.map(value => String(value).trim()).filter(Boolean) : [],
+      filter: Array.isArray(item.filter) ? item.filter.map(value => String(value).trim()).filter(Boolean) : [],
+    }))
+    .filter(item => item.host || item.rule.length)
+    : [];
+
+  const ads = Array.isArray(parsed?.ads)
+    ? parsed.ads.map(value => String(value).trim()).filter(Boolean)
+    : [];
+
+  const doh = Array.isArray(parsed?.doh) ? parsed.doh
+    .filter(item => item && typeof item === 'object')
+    .map(item => ({
+      name: String(item.name || '').trim(),
+      url: String(item.url || '').trim(),
+      hosts: Array.isArray(item.hosts) ? item.hosts.map(value => String(value).trim()).filter(Boolean) : [],
+      ips: Array.isArray(item.ips) ? item.ips.map(value => String(value).trim()).filter(Boolean) : [],
+      regex: Array.isArray(item.regex) ? item.regex.map(value => String(value).trim()).filter(Boolean) : [],
+    }))
+    .filter(item => item.name || item.url || item.hosts.length)
+    : [];
+
+  return { parses, flags, rules, ads, doh };
+}
+
 function normalizeTVBoxIJKProfiles(value) {
   if (!Array.isArray(value)) return {};
   const profiles = {};
