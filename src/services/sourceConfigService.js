@@ -216,7 +216,7 @@ function classifyTVBoxSite(site = {}) {
   const key = String(site.key || '').trim();
   const api = String(site.api || '').trim();
   const text = `${name} ${key} ${api}`;
-  const liveLike = /(直播|央视|CCTV|体育|赛事|竞技|网红|310直播)/i.test(text);
+  const liveLike = /(直播|体育赛事|赛事直播|竞技直播|网红直播|310直播)/i.test(text);
   if (liveLike) return 'live';
   return 'movie';
 }
