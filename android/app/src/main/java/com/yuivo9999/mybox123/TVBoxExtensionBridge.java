@@ -61,7 +61,7 @@ public final class TVBoxExtensionBridge {
             JSONObject payloadObject = input.optJSONObject("payload");
             if ("load".equals(operation)) {
                 String script = payloadObject == null ? "" : payloadObject.optString("script", "");
-                String ruleJson = DrpySandboxRuntime.evaluateDefinition(script);
+                String ruleJson = DrpySandboxRuntime.evaluate(script, DrpyHttpRuntime::request);
                 JSONObject result = new JSONObject();
                 result.put("ok", true);
                 result.put("operation", operation);
