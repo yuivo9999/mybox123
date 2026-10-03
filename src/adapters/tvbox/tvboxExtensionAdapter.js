@@ -78,12 +78,14 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
     });
   };
 
+  const load = async (payload = {}, options = {}) => (
+    execute('load', { ...payload, script: await resolveScript(payload, options) }, options)
+  );
+
   const healthCheck = async (options = {}) => {
     try {
       await execute('healthCheck', {}, options);
-      const load = async (payload = {}, options = {}) => execute('load', { ...payload, script: await resolveScript(payload, options) }, options);
-
-  return {
+      return {
         ok: true,
         sourceId,
         status: 'healthy',
