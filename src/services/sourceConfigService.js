@@ -221,8 +221,11 @@ function classifyTVBoxSite(site = {}) {
   return 'movie';
 }
 
-function isDirectMovieEndpoint(api) {
-  return /^https?:\/\//i.test(String(api || '').trim());
+function isDirectMovieEndpoint(api, site = {}) {
+  const raw = String(api || '').trim();
+  const type = Number(site.type);
+  if (type !== 1 || !/^https?:\/\//i.test(raw)) return false;
+  return /(?:api\.php\/)?provide\/vod(?:\/|\?|$)/i.test(raw) || /\/api\.php(?:\/|\?|$)/i.test(raw);
 }
 
 function parseTVBoxSources(parsed, { bundleId = null } = {}) {
@@ -236,11 +239,9 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
 
       const api = String(site.api || '').trim();
       const sourceType = classifyTVBoxSite(site);
-      const direct = isDirectMovieEndpoint(api);
-      const isSupportedDirect = sourceType === 'movie' && direct;
-      const adapterType = direct
-        ? (sourceType === 'live' ? 'tvbox-live-reference' : 'http-vod')
-        : 'tvbox-extension';
+      const directMovie = isDirectMovieEndpoint(api, site);
+      const isSupportedDirect = sourceType === 'movie' && directMovie;
+      const adapterType = isSupportedDirect ? 'http-vod' : 'tvbox-extension';
 
       const sourceId = `tvbox_${sourceType}_${stableHash(`${resolvedBundleId}|${sourceType}|${site.key || api || index}`)}`;
       const name = String(site.name || site.key || `TVBox${sourceType === 'live' ? '直播' : '影视'}-${index + 1}`).trim();
@@ -262,7 +263,7 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
         tvboxApi: api,
         tvboxDefinition: { ...site },
         tvboxUnsupportedReason: isSupportedDirect ? null : (
-          !api ? '缺少 api' : sourceType === 'live' ? '需要 Live 专用适配器' : 'api 为 TVBox 扩展标识，当前没有对应 CSP/JAR 执行器'
+          !api ? '缺少 api' : sourceType === 'live' ? 'TVBox site 不是直接直播地址，当前没有 Live 专用适配器' : '当前源不是标准 type=1 VOD HTTP 接口，可能依赖 CSP/JAR/JS 扩展'
         ),
         ...(site.jar != null ? { tvboxJar: site.jar } : {}),
         ...(site.ext != null ? { tvboxExt: site.ext } : {}),
