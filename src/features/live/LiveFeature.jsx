@@ -24,18 +24,13 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   const page = usePageState();
   const videoRef = useRef(null);
 
-  const [selectedChannelId, setSelectedChannelId] = useState(channels[0]?.channelId || '');
+  const [selectedChannelId, setSelectedChannelId] = useState('');
   const [activeStreamIndex, setActiveStreamIndex] = useState(0);
   const [viewMode, setViewMode] = useState('generic');
 
-  useEffect(() => {
-    if (!selectedChannelId && channels.length > 0) {
-      setSelectedChannelId(channels[0].channelId);
-    }
-  }, [channels, selectedChannelId]);
-
   const activeChannel = useMemo(() => {
-    return channels.find(c => c.channelId === selectedChannelId) || channels[0] || null;
+    if (!selectedChannelId) return null;
+    return channels.find(c => c.channelId === selectedChannelId) || null;
   }, [channels, selectedChannelId]);
 
   const activeStream = useMemo(() => {
@@ -116,7 +111,6 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
               ref={videoRef}
               controls
               playsInline
-              autoPlay
               className="sangtian-video-element"
             />
           </SangtianPlayerWindow>
