@@ -10,6 +10,14 @@ export const SOURCE_ADAPTER_TYPE = Object.freeze({
   TVBOX_LIVE_EXTENSION: 'tvbox-live-extension',
 });
 
+function isSafeExtJsonSource(source) {
+  if (source?.tvboxAdapterKind !== 'ext') return false;
+  if (source?.tvboxExt && typeof source.tvboxExt === 'object' && !Array.isArray(source.tvboxExt)) return true;
+  if (typeof source?.tvboxExt !== 'string') return false;
+  const value = source.tvboxExt.trim();
+  return /^https?:\/\//i.test(value) && /\.json(?:[?#].*)?$/i.test(value);
+}
+
 export function createSourceAdapter(source, options = {}) {
   if (!source || typeof source !== 'object') throw new Error('SOURCE_ADAPTER_SOURCE_REQUIRED');
 
@@ -20,7 +28,7 @@ export function createSourceAdapter(source, options = {}) {
     if (source.tvboxAdapterKind === 'jar' || source.sourceCapability === 'tvbox-jar' || source.sourceCapability === 'tvbox-http-vod-with-jar') {
       return createTVBoxJarAdapter(source, options.jarRuntime);
     }
-    if (source.tvboxAdapterKind === 'ext' && typeof source.tvboxExt === 'string' && /^https?:\/\//i.test(source.tvboxExt.trim()) && /(?:\.json|\.json(?:\?|$))/i.test(source.tvboxExt.trim())) {
+    if (isSafeExtJsonSource(source)) {
       return createTVBoxExtJsonAdapter(source, options.transport ?? null);
     }
     return createTVBoxExtensionAdapter(source, options.runtime);
