@@ -97,7 +97,10 @@ public final class NativePlaybackBridge {
 
         textureView = new TextureView(activity);
         textureView.setVisibility(TextureView.GONE);
-        textureView.setOpaque(false);
+        // The native surface must own the video pixels. Keeping this TextureView
+        // transparent can expose the WebView poster/static image when no frame is
+        // committed, which makes an audio-only playback look like a frozen picture.
+        textureView.setOpaque(true);
 
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -107,15 +110,28 @@ public final class NativePlaybackBridge {
 
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override public void onSurfaceTextureAvailable(android.graphics.SurfaceTexture st, int w, int h) {
-                surface = new Surface(st);
-                attachSurface();
+                mainHandler.post(() -> {
+                    try {
+                        if (surface != null) surface.release();
+                        surface = new Surface(st);
+                        textureView.bringToFront();
+                        attachSurface();
+                    } catch (Throwable ignored) {}
+                });
             }
 
             @Override public void onSurfaceTextureSizeChanged(android.graphics.SurfaceTexture st, int w, int h) {
-                attachSurface();
+                mainHandler.post(() -> {
+                    try {
+                        textureView.bringToFront();
+                        attachSurface();
+                    } catch (Throwable ignored) {}
+                });
             }
 
             @Override public boolean onSurfaceTextureDestroyed(android.graphics.SurfaceTexture st) {
+                // Detach the decoder before destroying the underlying Surface.
+                detachSurface();
                 if (surface != null) {
                     surface.release();
                     surface = null;
@@ -157,7 +173,9 @@ public final class NativePlaybackBridge {
             releaseCurrentEngine();
 
             textureView.setVisibility(TextureView.VISIBLE);
+            textureView.bringToFront();
             createCurrentEngine();
+            attachSurface();
             return ok("engine", selectedEngine);
         } catch (Exception e) {
             return error("PLAYER_LOAD_ERROR:" + safeMessage(e));
@@ -356,6 +374,7 @@ public final class NativePlaybackBridge {
         wantPlay = false;
         releaseCurrentEngine();
         if (textureView != null) {
+            detachSurface();
             textureView.setVisibility(TextureView.GONE);
         }
         emit("released", null);
@@ -456,7 +475,9 @@ public final class NativePlaybackBridge {
             }
         });
 
-        exoPlayer.setVideoTextureView(textureView);
+        // The bridge owns the TextureView Surface lifecycle for all engines.
+        // Do not also call setVideoTextureView(), which installs a second
+        // SurfaceTexture lifecycle on the same TextureView.
         exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(url)));
         attachSurface();
     }
@@ -640,13 +661,23 @@ public final class NativePlaybackBridge {
 
     private void attachSurface() {
         if (surface == null) return;
-        if (ENGINE_EXO.equals(selectedEngine) && exoPlayer != null) {
-            exoPlayer.setVideoSurface(surface);
-        } else if (ENGINE_IJK.equals(selectedEngine) && ijkPlayer != null) {
-            ijkPlayer.setSurface(surface);
-        } else if (nativePlayer != null) {
-            nativePlayer.setSurface(surface);
+        try {
+            if (ENGINE_EXO.equals(selectedEngine) && exoPlayer != null) {
+                exoPlayer.setVideoSurface(surface);
+            } else if (ENGINE_IJK.equals(selectedEngine) && ijkPlayer != null) {
+                ijkPlayer.setSurface(surface);
+            } else if (nativePlayer != null) {
+                nativePlayer.setSurface(surface);
+            }
+        } catch (Throwable e) {
+            emit("error", errorObject("VIDEO_SURFACE_ATTACH_ERROR:" + safeMessage(e)));
         }
+    }
+
+    private void detachSurface() {
+        try { if (exoPlayer != null) exoPlayer.setVideoSurface(null); } catch (Throwable ignored) {}
+        try { if (ijkPlayer != null) ijkPlayer.setSurface(null); } catch (Throwable ignored) {}
+        try { if (nativePlayer != null) nativePlayer.setSurface(null); } catch (Throwable ignored) {}
     }
 
     private synchronized String fallbackOrError(String reason) {
