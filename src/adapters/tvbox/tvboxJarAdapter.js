@@ -1,4 +1,6 @@
 import { createTVBoxJarRuntime } from './tvboxJarRuntime.js';
+import { parseTVBoxResult } from '../movie/jsonParser.js';
+import { normalizeMovie } from '../movie/normalizeMovie.js';
 
 export function createTVBoxJarAdapter(config = {}, runtime = null) {
   const effectiveRuntime = runtime ?? createTVBoxJarRuntime();
@@ -42,6 +44,28 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
   const search = (payload = {}) => invoke('search', payload);
   const play = (payload = {}) => invoke('play', payload);
 
+  const normalizeResult = (result) => {
+    const raw = result?.result ?? result;
+    const items = parseTVBoxResult(raw);
+    return items.map((item, index) => normalizeMovie({
+      sourceId,
+      item,
+      index,
+      sourceMetadata: {
+        sourceCapability: 'tvbox-jar',
+        adapterType: 'tvbox-extension',
+        tvboxAdapterKind: 'jar',
+        tvboxRequiresJar: true,
+        tvboxJar: definition.tvboxJar,
+      },
+    }));
+  };
+
+  const getMovies = async (payload = {}) => normalizeResult(await home(payload));
+  const searchMovies = async (payload = {}) => normalizeResult(await search(payload));
+  const getCategory = async (payload = {}) => normalizeResult(await category(payload));
+  const getDetail = async (payload = {}) => normalizeResult(await detail(payload));
+
   return {
     sourceId,
     definition,
@@ -55,6 +79,11 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
     detail,
     search,
     play,
+    normalizeResult,
+    getMovies,
+    searchMovies,
+    getCategory,
+    getDetail,
     execute,
   };
 }
