@@ -211,6 +211,20 @@ function resolveLiveSourceRef(value) {
   return '';
 }
 
+function classifyTVBoxSite(site = {}) {
+  const name = String(site.name || site.key || '').trim();
+  const key = String(site.key || '').trim();
+  const api = String(site.api || '').trim();
+  const text = `${name} ${key} ${api}`;
+  const liveLike = /(直播|央视|CCTV|体育|赛事|竞技|网红|310直播)/i.test(text);
+  if (liveLike) return 'live';
+  return 'movie';
+}
+
+function isDirectMovieEndpoint(api) {
+  return /^https?:\\/\\//i.test(String(api || '').trim());
+}
+
 function parseTVBoxSources(parsed, { bundleId = null } = {}) {
   const imported = [];
   const resolvedBundleId = bundleId || `bundle_tvbox_${stableHash(JSON.stringify(parsed))}`;
@@ -218,19 +232,40 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
 
   if (Array.isArray(parsed.sites)) {
     parsed.sites.forEach((site, index) => {
-      if (!site?.api) return;
-      const api = String(site.api).trim();
-      if (!/^https?:\/\//i.test(api)) return;
+      if (!site || typeof site !== 'object') return;
+
+      const api = String(site.api || '').trim();
+      const sourceType = classifyTVBoxSite(site);
+      const direct = isDirectMovieEndpoint(api);
+      const isSupportedDirect = sourceType === 'movie' && direct;
+      const adapterType = direct
+        ? (sourceType === 'live' ? 'tvbox-live-reference' : 'http-vod')
+        : 'tvbox-extension';
+
+      const sourceId = `tvbox_${sourceType}_${stableHash(`${resolvedBundleId}|${sourceType}|${site.key || api || index}`)}`;
+      const name = String(site.name || site.key || `TVBox${sourceType === 'live' ? '直播' : '影视'}-${index + 1}`).trim();
+
       imported.push({
-        sourceId: `tvbox_movie_${stableHash(`${resolvedBundleId}|movie|${site.key || site.api || index}`)}`,
+        sourceId,
         bundleId: resolvedBundleId,
-        sourceKey: `movie|${site.key || site.api || index}`,
-        name: String(site.name || site.key || `TVBox影视-${index + 1}`).trim(),
-        sourceType: 'movie',
+        sourceKey: `${sourceType}|${site.key || api || index}`,
+        name,
+        sourceType,
         sourceRef: api,
         url: api,
-        enabled: true,
-        status: '未测试',
+        enabled: isSupportedDirect,
+        status: isSupportedDirect ? '未测试' : '待适配',
+        sourceCapability: isSupportedDirect ? 'direct-http' : 'tvbox-extension',
+        adapterType,
+        tvboxType: Number.isFinite(Number(site.type)) ? Number(site.type) : null,
+        tvboxKey: String(site.key || '').trim(),
+        tvboxApi: api,
+        tvboxDefinition: { ...site },
+        tvboxUnsupportedReason: isSupportedDirect ? null : (
+          !api ? '缺少 api' : sourceType === 'live' ? '需要 Live 专用适配器' : 'api 为 TVBox 扩展标识，当前没有对应 CSP/JAR 执行器'
+        ),
+        ...(site.jar != null ? { tvboxJar: site.jar } : {}),
+        ...(site.ext != null ? { tvboxExt: site.ext } : {}),
         createdAt: Date.now(),
       });
     });
@@ -261,9 +296,11 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
           sourceType: 'live',
           sourceRef,
           url: sourceRef,
-          liveMode: /\.txt(?:[?#]|$)/i.test(sourceRef) ? 'tv1' : 'generic',
+          liveMode: /\\.txt(?:[?#]|$)/i.test(sourceRef) ? 'tv1' : 'generic',
           enabled: true,
           status: '未测试',
+          sourceCapability: 'direct-live',
+          adapterType: 'live-reference',
           createdAt: Date.now(),
         });
       });
