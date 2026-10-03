@@ -18,7 +18,7 @@ function normalizeText(value) { return String(value ?? '').trim().toLowerCase();
 function applyFilters(items, filters = {}) {
   return items.filter((movie) => {
     if (filters.year && String(movie.year) !== String(filters.year)) return false;
-    if (filters.type && filters.type !== '全部' && movie.category !== filters.type) return false;
+    if (filters.type && filters.type !== '全部' && movie.type !== filters.type) return false;
     if (filters.region && filters.region !== '全部' && movie.region !== filters.region) return false;
     if (filters.status && filters.status !== '全部' && movie.status !== filters.status) return false;
     return true;
@@ -90,7 +90,8 @@ export const movieService = {
     const regions = [...new Set(movies.map((movie) => movie.region).filter(Boolean))];
     const years = [...new Set(movies.map((movie) => movie.year).filter(Boolean))].sort((a,b) => Number(b)-Number(a));
     const statuses = [...new Set(movies.map((movie) => movie.status).filter(Boolean))];
-    return { continueWatching, recommended: movies.slice(0, limit), popular: movies.slice(0, limit), latest: [...movies].sort((a,b)=>Number(b.year||0)-Number(a.year||0)).slice(0, limit), categories, filters: { regions, years, statuses } };
+    const types = [...new Set(movies.map((movie) => movie.type).filter(Boolean))];
+    return { continueWatching, recommended: movies.slice(0, limit), popular: movies.slice(0, limit), latest: [...movies].sort((a,b)=>Number(b.year||0)-Number(a.year||0)).slice(0, limit), categories, filters: { types, regions, years, statuses } };
   },
   clearCache() { cacheStorage.clear(CacheNamespace.MOVIE); cacheStorage.clear(CacheNamespace.DETAIL); cacheStorage.clear(CacheNamespace.EPISODE); },
 };
