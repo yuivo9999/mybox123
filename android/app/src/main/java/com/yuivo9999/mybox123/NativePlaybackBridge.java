@@ -390,6 +390,7 @@ public final class NativePlaybackBridge {
 
         ijkPlayer.setOnPreparedListener(mp -> {
             prepared = true;
+            emit("decoderChanged", decoderObject());
             emit("prepared", null);
             if (wantPlay) {
                 try { ijkPlayer.start(); } catch (Throwable e) { fallbackOrError("IJK_PLAY:" + safeMessage(e)); }
