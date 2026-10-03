@@ -82,6 +82,10 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
     execute('load', { ...payload, script: await resolveScript(payload, options) }, options)
   );
 
+  const getCapabilities = () => effectiveRuntime?.getCapabilities?.() || { available: false, supportedKinds: [] };
+  const getDefinition = () => ({ ...definition, status: isRuntimeAvailable() ? 'runtime' : 'unsupported' });
+  const getStatus = () => ({ status: isRuntimeAvailable() ? 'runtime' : 'unsupported', error: isRuntimeAvailable() ? null : unavailable('status') });
+
   const healthCheck = async (options = {}) => {
     try {
       await execute('healthCheck', {}, options);
@@ -106,6 +110,9 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
   return {
     sourceId,
     definition,
+    getCapabilities,
+    getDefinition,
+    getStatus,
     isRuntimeAvailable: () => Boolean(
       effectiveRuntime &&
       typeof effectiveRuntime.execute === 'function' &&
