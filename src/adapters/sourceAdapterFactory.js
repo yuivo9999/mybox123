@@ -12,9 +12,17 @@ export const SOURCE_ADAPTER_TYPE = Object.freeze({
 
 function isSafeExtJsonSource(source) {
   if (source?.tvboxAdapterKind !== 'ext') return false;
-  if (source?.tvboxExt && typeof source.tvboxExt === 'object' && !Array.isArray(source.tvboxExt)) return true;
-  if (typeof source?.tvboxExt !== 'string') return false;
-  const value = source.tvboxExt.trim();
+  if (source?.tvboxExtFormat && !['json-vod', 'remote-json', 'inline-json'].includes(source.tvboxExtFormat)) return false;
+  const ext = source?.tvboxExt;
+  if (ext && typeof ext === 'object' && !Array.isArray(ext)) {
+    const serialized = JSON.stringify(ext);
+    return serialized.length <= 5 * 1024 * 1024
+      && (Array.isArray(ext.movies) || Array.isArray(ext.vod) || Array.isArray(ext.list)
+        || Array.isArray(ext.data) || Array.isArray(ext.result)
+        || Array.isArray(ext.data?.list) || Array.isArray(ext.result?.list));
+  }
+  if (typeof ext !== 'string') return false;
+  const value = ext.trim();
   if (/^https?:\/\//i.test(value)) return /\.json(?:[?#].*)?$/i.test(value);
   return (value.startsWith('{') || value.startsWith('[')) && value.length <= 5 * 1024 * 1024;
 }
