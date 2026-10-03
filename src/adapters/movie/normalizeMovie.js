@@ -13,6 +13,7 @@ export function normalizeMovie({ sourceId, item, index = 0, sourceMetadata = {} 
       userAgent: sourceMetadata.userAgent,
       referer: sourceMetadata.referer,
       cookies: sourceMetadata.cookies,
+      tvboxIJKProfiles: sourceMetadata.tvboxIJKProfiles,
     }).filter(([, value]) => value !== undefined && value !== null && value !== '')
   );
   const normalizeCandidate = (candidate = {}) => ({
