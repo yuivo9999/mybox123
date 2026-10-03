@@ -45,10 +45,16 @@ export function App(){
    if(persistent.settings?.initialized) void reloadSources();
  },[persistent.settings?.initialized]);
  useEffect(()=>{
-   if(tab==='live'&&contentState.channels.length===0&&contentState.status!=='loading'){
-     const hasLive=persistent.sources?.some(s=>s.sourceType==='live'&&s.enabled!==false);
-     if(hasLive) void reloadSources();
-   }
+   if(tab!=='live'||contentState.channels.length!==0||contentState.status==='loading') return;
+   // TV1 专用源由 LiveFeature 按源生命周期独立懒加载；这里不能因为
+   // contentState.channels 为空而反复触发全局 reload，否则只有 TV1 源时会形成循环刷新。
+   const hasReloadableLive=persistent.sources?.some(source => (
+     source.sourceType==='live'
+     && source.liveMode!=='tv1'
+     && source.enabled!==false
+     && Boolean(source.sourceRef||source.url)
+   ));
+   if(hasReloadableLive) void reloadSources();
  },[tab,contentState.channels.length,contentState.status,persistent.sources]);
  useEffect(()=>webViewRuntime.mount({onBack:()=>{
    if(typeof document!=='undefined'&&document.fullscreenElement){void webViewRuntime.setFullscreen(false);return true}
