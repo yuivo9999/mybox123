@@ -17,6 +17,7 @@ export function SangtianPlayerWindow({
   onFullscreen,
   terminalTag = 'BASH',
   children,
+  videoContainerRef,
 }) {
   const [showTerminal, setShowTerminal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -156,7 +157,7 @@ export function SangtianPlayerWindow({
       </div>
 
       {/* Window Body - Video / Terminal */}
-      <div className="sangtian-window-body">
+      <div ref={videoContainerRef} className="sangtian-window-body">
         {(isLandscape || isWebFullscreen) && (
           <div className="fullscreen-quick-exit">
             {isLandscape && (
