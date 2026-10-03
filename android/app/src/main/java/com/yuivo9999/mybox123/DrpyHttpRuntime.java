@@ -77,13 +77,13 @@ public final class DrpyHttpRuntime {
         InputStream stream = status >= 400 ? connection.getErrorStream() : connection.getInputStream();
         byte[] bytes = readBounded(stream);
         Charset responseCharset = StandardCharsets.UTF_8;
-        String contentType = connection.getContentType();
-        String charset = extractCharset(contentType);
+        String responseContentType = connection.getContentType();
+        String charset = extractCharset(responseContentType);
         if (charset != null) {
             try { responseCharset = Charset.forName(charset); } catch (Exception ignored) {}
         }
 
-        Response result = new Response(status, connection.getContentType(), new String(bytes, responseCharset), connection.getHeaderFields());
+        Response result = new Response(status, responseContentType, new String(bytes, responseCharset), connection.getHeaderFields());
         connection.disconnect();
         return result;
     }
