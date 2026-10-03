@@ -183,8 +183,30 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     setResolvedPlaybackInput(null);
     setPlaybackError('');
     if (channel.deferredRef) {
-      const tv1Source = channel.sourceRefs?.some(ref => enabledTv1Sources.some(source => source.sourceId === ref.sourceId));
       void loadChannelStreams(channel);
+    }
+  };
+
+  const playChannel = async (channel, streamId = null) => {
+    selectChannel(channel);
+    if (channel?.streams?.length) {
+      onPlay?.(channel, streamId);
+      return;
+    }
+    if (!channel?.deferredRef) return;
+    setStreamLoading(true);
+    try {
+      const streams = await resolveLiveChannelStreams(channel, { sources: enabledTv1Sources });
+      if (!streams.length) {
+        setTv1Error(new Error('该频道没有可用播放线路'));
+        return;
+      }
+      setResolvedStreams(prev => ({ ...prev, [channel.channelId]: streams }));
+      onPlay?.({ ...channel, streams }, streamId || streams[0]?.streamId || null);
+    } catch (error) {
+      if (error?.name !== 'AbortError') setTv1Error(error);
+    } finally {
+      setStreamLoading(false);
     }
   };
 
@@ -362,7 +384,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
                           <button aria-label={'收藏 ' + channel.name} className={favorite ? 'channel-favorite active-fav' : 'channel-favorite'} onClick={event => { event.stopPropagation(); toggleFavorite('channel', channel.channelId); }}>
                             <Heart size={15} fill={favorite ? 'currentColor' : 'none'} />
                           </button>
-                          <button aria-label={'播放 ' + channel.name} className="secondary live-channel-play" disabled={isResolving} onClick={event => { event.stopPropagation(); selectChannel(channel); if (channel.streams?.length) onPlay?.(channel); }}>
+                          <button aria-label={'播放 ' + channel.name} className="secondary live-channel-play" disabled={isResolving} onClick={event => { event.stopPropagation(); void playChannel(channel); }}>
                             <Play size={15} />
                           </button>
                         </div>
