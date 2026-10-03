@@ -7,14 +7,16 @@ import android.os.HandlerThread;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
+import android.os.ParcelFileDescriptor;
 
 import org.json.JSONObject;
 
 /**
- * Isolated-process protocol boundary for future CatVod Spider execution.
+ * Isolated-process CatVod Spider execution boundary.
  *
- * Execution remains disabled until the Spider itself is hosted in this process
- * and all required file/network operations are routed through the host proxy.
+ * The Spider is loaded from an FD into memory. The isolated process is not
+ * granted host file/network permissions; the proxy protocol remains reserved
+ * for a future proxy-aware Spider ABI.
  */
 public final class TVBoxJarExecutionService extends Service {
     public static final String ACTION = "com.yuivo9999.mybox123.TVBOX_JAR_EXECUTE";
@@ -31,6 +33,9 @@ public final class TVBoxJarExecutionService extends Service {
     private static final int MAX_PROXY_BODY_CHARS = 192 * 1024;
     public static final String KEY_REQUEST_ID = "requestId";
     public static final String KEY_PAYLOAD = "payload";
+    public static final String KEY_OPERATION = "operation";
+    public static final String KEY_CLASS_NAME = "className";
+    public static final String KEY_JAR_FD = "jarFd";
 
     private HandlerThread handlerThread;
     private Messenger messenger;
@@ -65,12 +70,10 @@ public final class TVBoxJarExecutionService extends Service {
                 return;
             }
             if (message.what == MSG_EXECUTE) {
-                reply(message, error("TVBOX_JAR_ISOLATED_EXECUTION_NOT_ENABLED"), MSG_RESULT);
+                execute(message);
                 return;
             }
-            // These messages are reserved for the isolated Spider runtime to
-            // request host-side resources. The current process does not execute
-            // a Spider yet, so receiving them directly is rejected.
+            // These messages are reserved for a future proxy-aware Spider ABI.
             if (message.what == MSG_NETWORK_REQUEST) {
                 reply(message, error("TVBOX_JAR_NETWORK_PROXY_REQUEST_UNEXPECTED"), MSG_NETWORK_RESULT);
                 return;
@@ -86,6 +89,27 @@ public final class TVBoxJarExecutionService extends Service {
                 return;
             }
             super.handleMessage(message);
+        }
+    }
+
+    private void execute(Message request) {
+        ParcelFileDescriptor descriptor = null;
+        try {
+            String operation = request.getData().getString(KEY_OPERATION, "");
+            String className = request.getData().getString(KEY_CLASS_NAME, "");
+            String payload = request.getData().getString(KEY_PAYLOAD, "{}");
+            descriptor = request.getData().getParcelable(KEY_JAR_FD);
+            if (descriptor == null) throw new IllegalArgumentException("TVBOX_JAR_FD_REQUIRED");
+            JSONObject data = new JSONObject(payload == null || payload.isEmpty() ? "{}" : payload);
+            TVBoxJarIsolatedExecutor executor = new TVBoxJarIsolatedExecutor(getApplicationContext());
+            reply(request, executor.invoke(descriptor, className, operation, data), MSG_RESULT);
+            descriptor = null;
+        } catch (Throwable error) {
+            reply(request, error(error.getMessage() == null ? "TVBOX_JAR_ISOLATED_EXECUTION_ERROR" : error.getMessage()), MSG_RESULT);
+        } finally {
+            if (descriptor != null) {
+                try { descriptor.close(); } catch (Exception ignored) { }
+            }
         }
     }
 
@@ -106,9 +130,10 @@ public final class TVBoxJarExecutionService extends Service {
             return new JSONObject()
                     .put("ok", true)
                     .put("protocolVersion", PROTOCOL_VERSION)
-                    .put("executionEnabled", false)
-                    .put("executionMode", "isolated-process-protocol-only")
+                    .put("executionEnabled", true)
+                    .put("executionMode", "isolated-in-memory-dex")
                     .put("networkProxyRequired", true)
+                    .put("networkAccess", "not-granted-to-isolated-process")
                     .put("hostFileProxyRequired", true)
                     .put("maxMessageChars", MAX_MESSAGE_CHARS)
                     .put("networkMessage", MSG_NETWORK_REQUEST)
