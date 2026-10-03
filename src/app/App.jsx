@@ -20,10 +20,13 @@ import { ErrorCode } from '../models/errors.js';
 export function App(){
  const session=useSessionState(); const persistent=usePersistentState(); const {tab,route,selected}=session;
  const [contentState,setContentState]=useState({status:'idle',movies:[],channels:[],error:null});
- const reloadSources=async()=>{
+ const reloadSources=async(movieSourceIdOverride=undefined)=>{
    setContentState(state=>({...state,status:'loading',error:null}));
    try{
-     const result=await sourceManagementService.reload();
+     const selectedMovieSourceId = movieSourceIdOverride !== undefined
+     ? movieSourceIdOverride
+     : (persistent.selectedSources?.movie ?? persistent.settings?.defaultMovieSource ?? null);
+   const result=await sourceManagementService.reload({ movieSourceId: selectedMovieSourceId });
      const movies=contentService.getMovies(result.movies);
      const failed=result.results.filter(item=>item.status==='rejected');
      setContentState({status:failed.length&&!movies.length&&!result.channels.length?'error':'success',movies,channels:result.channels,error:failed.length?failed:null});
@@ -79,7 +82,12 @@ export function App(){
  };
  const saveSources=async(next)=>{const validIds=new Set(next.map(source=>source.sourceId));const current=persistent.settings||{};const patch={};if(current.defaultMovieSource&&!validIds.has(current.defaultMovieSource))patch.defaultMovieSource=null;if(current.defaultLiveSource&&!validIds.has(current.defaultLiveSource))patch.defaultLiveSource=null;await sourceManagementService.save(next);if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();};
  const setSourceEnabled=async(id,enabled)=>{await sourceManagementService.setEnabled(id,enabled);const source=persistent.sources.find(item=>item.sourceId===id);const patch={};if(!enabled&&source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;if(!enabled&&source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();};
- const setSourceActive=async(id)=>{await sourceManagementService.setActive(id);persistent.reload?.();};
+ const setSourceActive=async(id)=>{
+   const source=persistent.sources.find(item=>item.sourceId===id);
+   await sourceManagementService.setActive(id);
+   persistent.reload?.();
+   await reloadSources(source?.sourceType==='movie' ? id : undefined);
+ };
  const removeSource=async(id)=>{const source=persistent.sources.find(item=>item.sourceId===id);await sourceManagementService.remove(id);const patch={};if(source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;if(source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();};
  const nav=(key)=>sessionStateStore.patch({tab:key,route:null,selected:null});
  const openSearchHistory=(keyword)=>{pageStateStore.patch('search',{query:keyword});sessionStateStore.patch({tab:'movies',route:'search',selected:null});};
@@ -133,7 +141,7 @@ export function App(){
 
         // 3. Show normal content features
         return movieActive 
-          ? <MovieFeature route={route} tab={tab} selected={selected} movies={contentState.movies} channels={contentState.channels} history={persistent.history} progress={persistent.progress} selectedSources={persistent.selectedSources} sources={persistent.sources} favorites={persistent.favorites} onMovie={openMovie} onPlay={playMovie} onTab={nav} onBack={()=>sessionStateStore.patch({route:route==='movie-play'?'detail':null,selected:route==='movie-play'?selected:null})} onLive={playLive} recordSearch={persistent.recordSearch} toggleFavorite={persistent.toggleFavorite}/>
+          ? <MovieFeature route={route} tab={tab} selected={selected} movies={contentState.movies} channels={contentState.channels} history={persistent.history} progress={persistent.progress} selectedSources={persistent.selectedSources} sources={persistent.sources} onSelectMovieSource={setSourceActive} favorites={persistent.favorites} onMovie={openMovie} onPlay={playMovie} onTab={nav} onBack={()=>sessionStateStore.patch({route:route==='movie-play'?'detail':null,selected:route==='movie-play'?selected:null})} onLive={playLive} recordSearch={persistent.recordSearch} toggleFavorite={persistent.toggleFavorite}/>
           : route === 'live-channel' ? <LiveChannelPanel channel={selected} channels={contentState.channels} favorites={persistent.favorites} onBack={()=>sessionStateStore.patch({route:null,selected:null,tab:'live'})} onPlay={playLive} onChannel={openLiveChannel} toggleFavorite={persistent.toggleFavorite}/>
           : route === 'live-play' ? <PlaybackPage request={selected} kind="live" channels={contentState.channels} favorites={persistent.favorites} onChannel={openLiveChannel} onPlay={playLive} toggleFavorite={persistent.toggleFavorite} onTab={nav} onBack={()=>sessionStateStore.patch({route:'live-channel',selected:contentState.channels.find(c=>c.channelId===selected?.channelId)??null})}/>
           : <MainPage tab={tab} movies={contentState.movies} channels={contentState.channels} favorites={persistent.favorites} history={persistent.history} progress={persistent.progress} settings={persistent.settings} sources={persistent.sources} searches={persistent.searches} onTab={nav} onMovie={openMovie} onLive={playLive} onLiveChannel={openLiveChannel} onSearchHistory={openSearchHistory} toggleFavorite={persistent.toggleFavorite} onClearData={persistent.clearUserData} onClearHistory={persistent.clearHistory} onClearSearches={persistent.clearSearches} onRemoveSearch={persistent.removeSearch} onClearCache={persistent.clearCache} onSourceEnabled={setSourceEnabled} onSourceActive={setSourceActive} onUpdateSettings={persistent.updateSettings} onTestSource={testSource} onSaveSources={saveSources} onRemoveSource={removeSource}/>;
