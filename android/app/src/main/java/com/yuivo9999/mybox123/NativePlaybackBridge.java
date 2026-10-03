@@ -70,6 +70,7 @@ public final class NativePlaybackBridge {
     private Map<String, List<IjkOption>> ijkProfiles = Collections.emptyMap();
     private String ijkProfile = "";
     private boolean fallbackEnabled = true;
+    private boolean livePlayback = false;
     private List<String> configuredFallbackOrder = Collections.emptyList();
     private String selectedEngine = ENGINE_EXO;
     private String actualExoDecoderName = "";
@@ -144,6 +145,7 @@ public final class NativePlaybackBridge {
             ijkProfiles = readIjkProfiles(hint == null ? null : hint.optJSONObject("ijkProfiles"));
             ijkProfile = hint == null ? "" : hint.optString("ijkProfile", "").trim();
             fallbackEnabled = hint == null || hint.optBoolean("fallbackEnabled", true);
+            livePlayback = hint != null && hint.optBoolean("live", false);
             configuredFallbackOrder = readStringList(hint == null ? null : hint.optJSONArray("fallbackOrder"));
             engineOrder = buildEngineOrder(requested, url, input.optString("protocol", ""));
 
@@ -545,12 +547,10 @@ public final class NativePlaybackBridge {
         List<IjkOption> options = ijkProfiles.get(ijkProfile);
         if (options == null || options.isEmpty()) {
             // Preserve the existing project defaults when no TVBox profile is available.
-            ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec",
-                    "software".equals(decoderMode) ? 0 : 1);
+            ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1);
             ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 1);
             ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1);
-            return;
-        }
+        } else {
         for (IjkOption option : options) {
             try {
                 if (option.category == IjkMediaPlayer.OPT_CATEGORY_PLAYER
@@ -566,6 +566,13 @@ public final class NativePlaybackBridge {
                     }
                 }
             } catch (Throwable ignored) {}
+        }
+
+        // Playback policy is authoritative over an imported IJK profile.
+        if ("hardware".equals(decoderMode)) {
+            ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1);
+        } else if ("software".equals(decoderMode)) {
+            ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 0);
         }
     }
 
@@ -616,6 +623,27 @@ public final class NativePlaybackBridge {
     }
 
     private synchronized String fallbackOrError(String reason) {
+        if (ENGINE_IJK.equals(selectedEngine)
+                && "hardware".equals(decoderMode)
+                && !livePlayback
+                && fallbackEnabled) {
+            lastPositionMs = currentPositionMs();
+            releaseCurrentEngine();
+            decoderMode = "software";
+            prepared = false;
+            try {
+                createCurrentEngine();
+                emit("reconnecting", errorObject("fallback:ijk_hardware_to_software:" + reason));
+                if (lastPositionMs > 0) {
+                    seekMedia("{\"seconds\":" + (lastPositionMs / 1000L) + "}");
+                }
+                prepareMedia("{}");
+                return ok("fallbackDecoder", "software");
+            } catch (Throwable next) {
+                return fallbackOrError("IJK_SOFTWARE_FALLBACK_" + safeMessage(next));
+            }
+        }
+
         if (engineIndex + 1 < engineOrder.size()) {
             lastPositionMs = currentPositionMs();
             releaseCurrentEngine();
