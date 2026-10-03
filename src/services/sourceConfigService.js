@@ -327,8 +327,20 @@ export const sourceConfigService = {
     const parsedSources = await this.parseLocalFile(file);
     const currentSources = this.read();
     const importedBundleIds = new Set(parsedSources.map(source => source.bundleId).filter(Boolean));
+    const replacedSources = currentSources.filter(source => importedBundleIds.has(source.bundleId));
+    const previousById = new Map(replacedSources.map(source => [source.sourceId, source]));
+    const normalizedImportedSources = parsedSources.map(source => {
+      const previous = previousById.get(source.sourceId);
+      if (!previous) return source;
+      return {
+        ...source,
+        enabled: previous.enabled !== false,
+        isActive: previous.isActive === true,
+        createdAt: previous.createdAt || source.createdAt,
+      };
+    });
     const retainedSources = currentSources.filter(source => !importedBundleIds.has(source.bundleId));
-    const nextSources = [...retainedSources, ...parsedSources];
+    const nextSources = [...retainedSources, ...normalizedImportedSources];
     sourceRepository.saveAll(nextSources);
     return nextSources;
   },
