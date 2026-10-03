@@ -207,6 +207,32 @@ public final class DrpySandboxRuntime {
                 catch (Exception e) { throw new RuntimeException("DRPY_URLENCODE_ERROR"); }
             }
         });
+        ScriptableObject.putProperty(scope, "btoa", new BaseFunction() {
+            @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+                String value = args.length > 0 ? Context.toString(args[0]) : "";
+                return Base64.encodeToString(value.getBytes(StandardCharsets.UTF_8), Base64.NO_WRAP);
+            }
+        });
+        ScriptableObject.putProperty(scope, "atob", new BaseFunction() {
+            @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+                String value = args.length > 0 ? Context.toString(args[0]) : "";
+                return new String(Base64.decode(value, Base64.DEFAULT), StandardCharsets.UTF_8);
+            }
+        });
+        ScriptableObject.putProperty(scope, "encodeURIComponent", new BaseFunction() {
+            @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+                String value = args.length > 0 ? Context.toString(args[0]) : "";
+                try { return URLEncoder.encode(value, StandardCharsets.UTF_8.name()).replace("+", "%20"); }
+                catch (Exception e) { throw new RuntimeException("DRPY_ENCODE_URI_ERROR"); }
+            }
+        });
+        ScriptableObject.putProperty(scope, "decodeURIComponent", new BaseFunction() {
+            @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+                String value = args.length > 0 ? Context.toString(args[0]) : "";
+                try { return URLDecoder.decode(value, StandardCharsets.UTF_8.name()); }
+                catch (Exception e) { throw new RuntimeException("DRPY_DECODE_URI_ERROR"); }
+            }
+        });
         ScriptableObject.putProperty(scope, "urldecode", new BaseFunction() {
             @Override public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) throws RuntimeException {
                 String value = args.length > 0 ? Context.toString(args[0]) : "";
