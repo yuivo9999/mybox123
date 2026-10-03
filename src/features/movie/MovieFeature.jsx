@@ -44,7 +44,7 @@ function MovieHome({feature,movies=[],channels,sources=[],selectedSourceId,movie
    ? movieActiveCategory
    : categoryItems[0] ?? null;
  const currentMovies=active
-   ? moviesForCategory(home, active)
+   ? moviesForCategory(movies, active)
    : [];
  if(!movieSources.length) return <Page><header className="top-header"><div><span className="eyebrow">TVBOX REACT</span><h2>首页</h2></div><button className="icon-button" aria-label="搜索" onClick={onSearch}><Search/></button></header><div className="empty state-view"><Film size={24}/><b>暂无影视源</b><span>当前还没有配置影视内容源</span><button className="primary" onClick={()=>onTab('sources')}>去源管理</button></div></Page>;
  return <Page><header className="top-header"><div><span className="eyebrow">TVBOX REACT</span><h2>首页</h2></div><button className="icon-button" aria-label="搜索" onClick={onSearch}><Search/></button></header>{sourceSelector}
@@ -56,8 +56,8 @@ function MovieHome({feature,movies=[],channels,sources=[],selectedSourceId,movie
   <SectionTitle title="Live 快捷入口"/><div className="live-banner" onClick={()=>onTab('live')}><span><b>Live 直播中心</b><small>{channels.length} 个频道</small></span><ChevronLeft className="flip"/></div>{channels[0]&&<button className="movie-live-entry" onClick={()=>onLive(channels[0])}><Play size={15}/>直接播放示例频道</button>}
  </Page>;
 }
-function moviesForCategory(home, category){
- const sourceItems=(home?.allMovies??[]);
+function moviesForCategory(movies=[], category){
+ const sourceItems=movies??[];
  return sourceItems.filter(movie =>
    String(movie.sourceCategoryId??'')===String(category?.id??'')
    || String(movie.sourceCategoryName??'')===String(category?.name??'')
@@ -87,7 +87,7 @@ function MovieCatalog({movies,state,setState,onMovie,onPlay,onSearch,recordSearc
  };
  const selectedType=state.category==='电影'?'movie':state.category==='电视剧'?'tv':state.category==='综艺'?'variety':null;
  const subcategories=selectedType?(home.taxonomy?.[selectedType]??[]):[];
- const listMeta=movieCategoryLoading ? {items:[],page:state.page,pageSize:state.pageSize,total:0,hasMore:false} : (movieActiveCategory ? {items:moviesForCategory(home,movieActiveCategory).slice((Math.max(1,state.page)-1)*state.pageSize,Math.max(1,state.page)*state.pageSize),page:Math.max(1,state.page),pageSize:state.pageSize,total:moviesForCategory(home,movieActiveCategory).length,hasMore:Math.max(1,state.page)*state.pageSize<moviesForCategory(home,movieActiveCategory).length} : movieService.list({movies,...state})); const apply=(patch)=>setState({...patch,page:1});
+ const listMeta=movieCategoryLoading ? {items:[],page:state.page,pageSize:state.pageSize,total:0,hasMore:false} : (movieActiveCategory ? {items:moviesForCategory(movies,movieActiveCategory).slice((Math.max(1,state.page)-1)*state.pageSize,Math.max(1,state.page)*state.pageSize),page:Math.max(1,state.page),pageSize:state.pageSize,total:moviesForCategory(home,movieActiveCategory).length,hasMore:Math.max(1,state.page)*state.pageSize<moviesForCategory(home,movieActiveCategory).length} : movieService.list({movies,...state})); const apply=(patch)=>setState({...patch,page:1});
  const filters=home.filters??{}; const values=(key)=>['全部',...(filters[key]??[])];
  return <Page><Header title="影视"/><div className="searchbox"><Search size={18}/><input value={queryInput} onChange={e=>setQueryInput(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')submitSearch()}} placeholder="搜索影视内容"/><button className="secondary search-submit" type="button" onClick={submitSearch}>搜索</button>{queryInput&&<button className="icon-button" aria-label="清空搜索" type="button" onClick={()=>setQueryInput('')}><X size={16}/></button>}</div>
  <div className="chips category-lazy-chips">{categories.map(item=>{const selected=(movieActiveCategory?.id===item.id)||(state.category===item.name);return <button className={selected?'active':''} disabled={movieCategoryLoading} onClick={()=>{setState({category:item.name,page:1,filters:{...state.filters,categoryId:''}});onLoadMovieCategory?.(item)}} key={item.sourceId+':'+item.id+':'+item.name}>{item.name}</button>})}</div>
