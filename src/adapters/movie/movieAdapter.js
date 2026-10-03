@@ -110,10 +110,26 @@ export function createMovieAdapter(config, transport = null) {
     try {
       const response = await request(options);
       const body = await response.text();
+      const normalizedBody = String(body ?? '').replace(/^\uFEFF/, '').trim();
+      if (!normalizedBody) {
+        throw toAppError(new Error('MOVIE_SOURCE_EMPTY_RESPONSE'), {
+          code: ErrorCode.SOURCE_EMPTY,
+          scope: 'movie-source-empty',
+          context: { sourceId },
+        });
+      }
+      const contentType = String(response?.headers?.get?.('content-type') ?? '').toLowerCase();
+      if (contentType.includes('text/html') && !/^\s*[{[]/.test(normalizedBody)) {
+        throw toAppError(new Error('MOVIE_SOURCE_HTML_RESPONSE'), {
+          code: ErrorCode.SOURCE_RESPONSE,
+          scope: 'movie-source-response',
+          context: { sourceId, contentType },
+        });
+      }
 
       let raw;
       try {
-        raw = parseJSONMovies(body);
+        raw = parseJSONMovies(normalizedBody);
       } catch (error) {
         throw toAppError(error, {
           code: ErrorCode.PARSE,
