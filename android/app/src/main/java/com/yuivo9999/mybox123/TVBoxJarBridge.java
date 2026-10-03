@@ -60,7 +60,7 @@ public final class TVBoxJarBridge {
             result.put("supportedOperations", new org.json.JSONArray().put("prepare").put("inspect").put("home").put("category").put("detail").put("search").put("play"));
             result.put("executionEnabled", true);
             result.put("executionMode", "host-process");
-            result.put("isolatedProcessReady", true);
+            result.put("isolatedProcessReady", false);
             result.put("isolatedProcessMode", "protocol-only");
             result.put("isolatedProcessNetworkProxyRequired", true);
             result.put("reason", "CATVOD_SPIDER_ABI_DEXCLASSLOADER_HOST_PROCESS");
