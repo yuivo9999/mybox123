@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeft, Clock3, Database, Film, Info, Radio, Search, Server, Settings, Trash2, Check, Download, Upload } from 'lucide-react';
+import { ChevronLeft, Clock3, Database, Film, Info, Radio, Search, Server, Settings, Trash2, Check, Download, Upload, X } from 'lucide-react';
 import { LiveFeature } from '../features/live/LiveFeature.jsx';
 import { SmartImage, EmptyState } from '../components/StateViews.jsx';
 import { sourceConfigService } from '../services/sourceConfigService.js';
@@ -68,6 +68,8 @@ function Main({tab,movies,channels,favorites,history,sources,searches,progress,s
  return <Page><Header title="我的"/><div className="profile"><div className="avatar">T</div><div><b>TVBox 用户</b><span>本地数据独立存储 · 产品架构版</span></div></div><Menu icon={Clock3} title="播放历史" onClick={()=>onTab('history')} badge={history.length}/><Menu icon={Search} title="搜索历史" onClick={()=>onTab('search-history')} badge={searches.length}/><Menu icon={Server} title="源管理" onClick={()=>onTab('sources')} badge={sources.length}/><Menu icon={Settings} title="设置" onClick={()=>onTab('settings')}/><Menu icon={Database} title="数据管理" onClick={()=>onTab('data-management')}/><Menu icon={Info} title="关于" onClick={()=>onTab('about')}/></Page>;
 }
 function SourceList({sources,onEnabled,onActive,onTest,onRemove}){
+  const [removeId,setRemoveId]=useState(null);
+  const removeSource=sources.find(source=>source.sourceId===removeId);
   return <div className="source-list">{sources.map(source=>{
     const isTesting = source.status === '测试中';
     const isUnsupported = String(source.sourceCapability || '').startsWith('tvbox-')
@@ -93,11 +95,22 @@ function SourceList({sources,onEnabled,onActive,onTest,onRemove}){
         </span>
         <button className={source.isActive?'primary':'secondary'} disabled={isUnsupported} onClick={()=>onActive?.(source.sourceId)}>{source.isActive?'当前使用':isUnsupported?'待适配':'设为当前'}</button>
         <button className="secondary" disabled={isTesting||isUnsupported} onClick={()=>onTest(source)}>{isTesting?'测试中…':isUnsupported?'暂不可测':'测试'}</button>
-        <button className="secondary" disabled={isUnsupported} onClick={()=>onEnabled(source.sourceId,!source.enabled)}>{source.enabled?<><Check size={15}/>停用</>:<>启用</>}</button>
-        <button className="icon-button" onClick={()=>onRemove(source.sourceId)} aria-label="删除源">×</button>
+        <div className="source-actions">
+          <button className="secondary source-action" disabled={isUnsupported} onClick={()=>onEnabled(source.sourceId,!source.enabled)} aria-label={source.enabled?'停用源':'启用源'}>
+            {source.enabled?<><Check size={15}/>停用</>:<>启用</>}
+          </button>
+          <button className="icon-button source-delete" onClick={()=>setRemoveId(source.sourceId)} aria-label="删除源" title="删除源"><X size={17}/></button>
+        </div>
       </div>
     );
-  })}{!sources.length&&<Empty text="暂无内容源"/>}</div>;
+  })}
+  {!sources.length&&<Empty text="暂无内容源"/>}
+  {removeSource&&<ConfirmDialog
+    title={`确定删除“${removeSource.name}”吗？`}
+    onCancel={()=>setRemoveId(null)}
+    onConfirm={()=>{onRemove(removeSource.sourceId);setRemoveId(null)}}
+  />}
+  </div>;
 }
 const SourceForm=({value,onCancel,onSave})=>{
   const [name,setName]=useState(value.name);
