@@ -249,22 +249,25 @@ Native bridge 不可用时：
 
 ## 11. 阶段交接记录
 
-- 阶段：
-- 完成日期：
-- Commit：
-- request adapter：
-- 修改 requestManager：
-- 修改的 service：
-- 未修改且明确保留的网络链路：
-- Browser 行为：
-- Android 行为：
-- cancel：
-- timeout：
-- error：
-- 已验证请求：
-- 未完成：
-- 风险：
-- 下一阶段：
-- 下一 AI 第一件事：
-- 下一 AI 必须先检查：
-- 不要重复做：
+- 阶段：阶段 3：React 请求层 Android 适配实施
+- 完成日期：2026-10-03
+- Commit：9dce6153d79903f43045c1c4865468a7e3e75815、ca6b3312704013493400b31801946835f91ee095、e9dfb5d1f89dfb96954cdd474a01cc234a193c07、fee58e6b5794f57a5fa049279704e5f87712a79d、9eb6593d6f7a8f0bc97485e0612aee69427a5a9e、c32df82ec67fbae2444460e8943021ec3e8c7f8e、2fefdea23bcfb9df23609e9612c7048a2828037f
+- request adapter：src/services/requestAdapter.js；内部拆分 browserRequest / nativeRequest
+- 修改 requestManager：未改写核心实现；保留 concurrency=4、deduplication、AbortController、cancel、cancelAll。Stage 3 通过 request adapter 消费其传递的 signal。
+- 修改的 service：src/services/requestAdapter.js、src/services/movieSourceService.js、src/services/sourceRegistryService.js
+- 修改的 adapter：src/adapters/movie/movieAdapter.js、src/adapters/live/liveAdapter.js
+- 修改的测试：tests/architecture/test-runner.mjs 增加请求层 Android/Browser/HLS 边界静态契约检查
+- 未修改且明确保留的网络链路：src/parsers/hlsParser.js 的 manifest 可选 fetch、src/player/html5PlayerAdapter.js 的 HLS.js/HTML5 Video、src/player/nativePlayerAdapter.js 的媒体 bridge、图片加载链路
+- Browser 行为：无 nativeHttp capability 时继续走原 resilientFetch；显式 transport 仍可用于测试/集成覆盖
+- Android 行为：webViewRuntime.capabilities.nativeHttp === true 时统一进入 webViewRuntime.nativeHttpRequest；未启用时不散落 Android 判断
+- 返回契约：Native 响应在 request adapter 层统一为 fetch-like ok/status/headers/body/url/text/json，业务 service 不需要同时兼容两套对象
+- cancel：requestManager 的 AbortSignal 向下传递；Native bridge 仅保证取消后结果不再回到 JS 业务调用方，不宣称底层传输已取消
+- timeout：Native 继续使用阶段 2 的 1000–120000ms 约束和 connect/read timeout；Browser 继续保留 resilientFetch 原有 timeout 逻辑；显式 timeoutMs 可由 service/adapter 传入
+- error：request adapter 接入 errorService.classifyNetwork；ABORTED/AbortError 不被错误包装成普通网络错误；Native bridge 错误码保持阶段 2 契约
+- 已验证请求：已增加静态架构契约，覆盖 Browser fallback、Native capability 选择、requestManager cancel/Abort、Movie/Live adapter 接入、HLS 边界；尚未在 Android 真机/模拟器上执行第三方真实 HTTP 请求，因此不能把静态验证冒充真机验证
+- 未完成：真实 Android Native HTTP 请求验收；需要阶段 5 真机/模拟器验收后补充真实 URL、状态码、timeout、error、cancel 证据
+- 风险：resilientFetch.js 的历史公共 CORS proxy fallback 仍保留于 Browser 路径；Android capability 可用时不会先走该 fallback。CapacitorHttp 底层没有取消句柄，cancel 仍属于 JS 结果隔离语义
+- 下一阶段：04_GitHub_Actions_APK构建实施.md
+- 下一 AI 第一件事：先读取本阶段交接记录并检查 requestAdapter.js、requestManager.js、webViewRuntime.capabilities.nativeHttp 的当前实现
+- 下一 AI 必须先检查：真实 Android 环境中的 Native 请求、HTTP 非 2xx、timeout、bridge error、cancel 不污染业务状态，以及 Browser 模式未回归
+- 不要重复做：不要重新设计 Native HTTP 协议；不要把 CapacitorHttp 全局 patch 到 fetch/XHR；不要把 HLS/MP4/播放器请求机械改成普通 API bridge；不要删除 requestManager
