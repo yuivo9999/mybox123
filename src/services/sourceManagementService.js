@@ -1,6 +1,7 @@
 import { sourceRepository } from '../repositories/sourceRepository.js';
 import { userDataService } from './userDataService.js';
 import { syncAllSources, testSource } from './sourceRuntimeService.js';
+import { tv1LiveService } from './tv1LiveService.js';
 
 export const sourceManagementService = {
   async reload(options = {}) {
@@ -15,7 +16,10 @@ export const sourceManagementService = {
     const sources = sourceRepository.getAll();
     const source = sources.find(item => item.sourceId === sourceId);
     if (!source) return this.reload();
-    if (!enabled) userDataService.clearSelectedSource(source.sourceType, sourceId);
+    if (!enabled) {
+      userDataService.clearSelectedSource(source.sourceType, sourceId);
+      if (source.sourceType === 'live' && source.liveMode === 'tv1') tv1LiveService.clear(sourceId);
+    }
     sourceRepository.saveAll(sources.map(item => item.sourceId === sourceId ? { ...item, enabled: Boolean(enabled), isActive: enabled ? item.isActive : false } : item));
     return this.reload();
   },
@@ -38,6 +42,7 @@ export const sourceManagementService = {
     const sources = sourceRepository.getAll();
     const source = sources.find(item => item.sourceId === sourceId);
     if (source) {
+      if (source.sourceType === 'live' && source.liveMode === 'tv1') tv1LiveService.clear(sourceId);
       const selected = userDataService.getSnapshot().selectedSources;
       if (selected[source.sourceType] === sourceId) userDataService.clearSelectedSource(source.sourceType, sourceId);
     }
