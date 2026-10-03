@@ -401,6 +401,7 @@ function normalizeTVBoxIJKProfiles(value) {
 
 function parseTVBoxSources(parsed, { bundleId = null } = {}) {
   const imported = [];
+  const tvboxParseConfig = normalizeTVBoxParseConfig(parsed);
   const resolvedBundleId = bundleId || `bundle_tvbox_${stableHash(JSON.stringify(parsed))}`;
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return imported;
 
@@ -447,6 +448,9 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
         tvboxDefinition: { ...site },
         ...(Object.keys(normalizeTVBoxIJKProfiles(parsed.ijk)).length
           ? { tvboxIJKProfiles: normalizeTVBoxIJKProfiles(parsed.ijk) }
+          : {}),
+        ...(tvboxParseConfig.parses.length || tvboxParseConfig.flags.length || tvboxParseConfig.rules.length || tvboxParseConfig.ads.length || tvboxParseConfig.doh.length
+          ? { tvboxParseConfig }
           : {}),
         ...(isTVBoxLiveProvider ? { tvboxLiveProvider: true } : {}),
         tvboxUnsupportedReason: isSupportedDirect || safeExtJson || isSupportedJar ? null : (
