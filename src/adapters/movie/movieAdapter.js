@@ -230,16 +230,13 @@ export function createMovieAdapter(config, transport = null) {
 
   const getCategories = async (options = {}) => {
     requireCapability('categories');
-    if (sourceDefinition.categories.length) {
-      return sourceDefinition.categories.map((item, index) => {
-        if (item && typeof item === 'object') {
-          return {
-            id: String(item.type_id ?? item.id ?? item.typeId ?? item.value ?? index + 1),
-            name: String(item.type_name ?? item.name ?? item.label ?? item.title ?? '').trim(),
-          };
-        }
-        return { id: String(index + 1), name: String(item ?? '').trim() };
-      }).filter(item => item.name);
+    if (sourceDefinition.categories.length
+      && sourceDefinition.categories.every(item => item && typeof item === 'object'
+        && (item.type_id != null || item.id != null || item.typeId != null || item.value != null))) {
+      return sourceDefinition.categories.map((item, index) => ({
+        id: String(item.type_id ?? item.id ?? item.typeId ?? item.value ?? index + 1),
+        name: String(item.type_name ?? item.name ?? item.label ?? item.title ?? '').trim(),
+      })).filter(item => item.name);
     }
     const response = await request({ ...options, categoryOnly: true, page: 1, limit: 1 });
     const body = String(await response.text()).replace(/^\\uFEFF/, '').trim();
