@@ -6,8 +6,15 @@ export function LoadingState({ text = '正在加载…', compact = false }) {
 export function EmptyState({ text = '暂无数据', icon: Icon = ImageOff }) {
   return <div className="empty state-view"><Icon size={22} /><span>{text}</span></div>;
 }
-export function ErrorState({ text = '加载失败', retry, actionText = '重新加载', secondaryAction, secondaryActionText = '切换源' }) {
-  return <div className="empty state-view error-state"><AlertCircle size={22} /><span>{text}</span><div className="error-actions">{retry && <button className="secondary" onClick={retry}>{actionText}</button>}{secondaryAction && <button className="secondary" onClick={secondaryAction}>{secondaryActionText}</button>}</div></div>;
+export function ErrorState({ text = '无法加载源', onClose }) {
+  return (
+    <div className="source-error-backdrop" role="dialog" aria-modal="true" aria-label={text}>
+      <div className="source-error-popup">
+        <span>{text}</span>
+        <button className="source-error-close" type="button" onClick={onClose} aria-label="关闭窗口" title="关闭窗口">×</button>
+      </div>
+    </div>
+  );
 }
 export function SmartImage({ src, alt = '', fallback = null, ...props }) {
   const [state, setState] = React.useState(src ? 'loading' : 'error');
