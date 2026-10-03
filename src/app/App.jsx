@@ -20,6 +20,14 @@ import { ErrorCode } from '../models/errors.js';
 export function App(){
  const session=useSessionState(); const persistent=usePersistentState(); const {tab,route,selected}=session;
  const [contentState,setContentState]=useState({status:'idle',movies:[],channels:[],error:null});
+ const applySourceResult=(result)=>{
+   const movies=contentService.getMovies(result.movies);
+   const failed=result.results.filter(item=>item.status==='rejected');
+   const selectedMovieSourceId=persistent.selectedSources?.movie ?? persistent.settings?.defaultMovieSource ?? null;
+   const selectedMovieFailed=Boolean(selectedMovieSourceId)&&failed.some(item=>item.sourceId===selectedMovieSourceId);
+   setContentState({status:selectedMovieFailed&&!movies.length?'error':'success',movies,channels:result.channels,error:failed.length?failed:null});
+   persistent.reload?.();
+ };
  const reloadSources=async(movieSourceIdOverride=undefined)=>{
    setContentState(state=>({...state,status:'loading',error:null}));
    try{
@@ -27,11 +35,7 @@ export function App(){
      ? movieSourceIdOverride
      : (persistent.selectedSources?.movie ?? persistent.settings?.defaultMovieSource ?? null);
    const result=await sourceManagementService.reload({ movieSourceId: selectedMovieSourceId });
-     const movies=contentService.getMovies(result.movies);
-     const failed=result.results.filter(item=>item.status==='rejected');
-     const selectedMovieFailed = Boolean(selectedMovieSourceId) && failed.some(item => item.sourceId === selectedMovieSourceId);
-     setContentState({status:selectedMovieFailed&&!movies.length?'error':'success',movies,channels:result.channels,error:failed.length?failed:null});
-     persistent.reload?.();
+     applySourceResult(result);
    }catch(error){
      setContentState({status:'error',movies:[],channels:[],error});
    }
@@ -81,15 +85,15 @@ export function App(){
      mark('不可用');
    }
  };
- const saveSources=async(next)=>{const validIds=new Set(next.map(source=>source.sourceId));const current=persistent.settings||{};const patch={};if(current.defaultMovieSource&&!validIds.has(current.defaultMovieSource))patch.defaultMovieSource=null;if(current.defaultLiveSource&&!validIds.has(current.defaultLiveSource))patch.defaultLiveSource=null;await sourceManagementService.save(next);if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();};
- const setSourceEnabled=async(id,enabled)=>{await sourceManagementService.setEnabled(id,enabled);const source=persistent.sources.find(item=>item.sourceId===id);const patch={};if(!enabled&&source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;if(!enabled&&source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();};
+ const saveSources=async(next)=>{const validIds=new Set(next.map(source=>source.sourceId));const current=persistent.settings||{};const patch={};if(current.defaultMovieSource&&!validIds.has(current.defaultMovieSource))patch.defaultMovieSource=null;if(current.defaultLiveSource&&!validIds.has(current.defaultLiveSource))patch.defaultLiveSource=null;const result=await sourceManagementService.save(next);if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();applySourceResult(result);};
+ const setSourceEnabled=async(id,enabled)=>{const result=await sourceManagementService.setEnabled(id,enabled);const source=persistent.sources.find(item=>item.sourceId===id);const patch={};if(!enabled&&source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;if(!enabled&&source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();applySourceResult(result);};
  const setSourceActive=async(id)=>{
    const source=persistent.sources.find(item=>item.sourceId===id);
    await sourceManagementService.setActive(id);
    persistent.reload?.();
    await reloadSources(source?.sourceType==='movie' ? id : undefined);
  };
- const removeSource=async(id)=>{const source=persistent.sources.find(item=>item.sourceId===id);await sourceManagementService.remove(id);const patch={};if(source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;if(source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();};
+ const removeSource=async(id)=>{const source=persistent.sources.find(item=>item.sourceId===id);const result=await sourceManagementService.remove(id);const patch={};if(source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;if(source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();applySourceResult(result);};
  const nav=(key)=>sessionStateStore.patch({tab:key,route:null,selected:null});
  const openSearchHistory=(keyword)=>{pageStateStore.patch('search',{query:keyword});sessionStateStore.patch({tab:'movies',route:'search',selected:null});};
  const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
