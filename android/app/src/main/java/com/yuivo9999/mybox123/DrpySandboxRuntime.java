@@ -7,6 +7,7 @@ import org.mozilla.javascript.ContextFactory;
 import org.mozilla.javascript.NativeObject;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
+import org.json.JSONObject;
 
 import java.io.IOException;
 
