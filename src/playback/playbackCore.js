@@ -94,6 +94,12 @@ export function createPlaybackCore(task,hooks={}) {
    decoderModes: input.playerHint?.decoderModes ?? playbackSettings.decoder ?? {},
    fallbackEnabled: input.playerHint?.fallbackEnabled ?? playbackSettings.fallbackEnabled,
    fallbackOrder: input.playerHint?.fallbackOrder ?? playbackSettings.fallbackOrder,
+   ijkProfiles: input.playerHint?.ijkProfiles ?? input.metadata?.tvboxIJKProfiles ?? {},
+   ijkProfile: input.playerHint?.ijkProfile ?? (
+    (input.playerHint?.decoder ?? playbackSettings.decoder?.ijk ?? 'auto') === 'software' ? '软解码' :
+    (input.playerHint?.decoder ?? playbackSettings.decoder?.ijk ?? 'auto') === 'hardware' ? '硬解码' :
+    undefined
+   ),
   };
   await Promise.resolve(player.load({ ...input, playerHint }));
   await Promise.resolve(player.prepare());
