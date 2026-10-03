@@ -671,7 +671,11 @@ public final class NativePlaybackBridge {
             try {
                 createCurrentEngine();
                 emit("reconnecting", errorObject("fallback:" + reason));
-                if (lastPositionMs > 0) seekMedia("{\"seconds\":" + (lastPositionMs / 1000L) + "}");
+                // A Live fallback should reconnect at the current live edge rather than
+                // seeking ExoPlayer to the old IJK timeline position. VOD keeps its position.
+                if (!livePlayback && lastPositionMs > 0) {
+                    seekMedia("{\"seconds\":" + (lastPositionMs / 1000L) + "}");
+                }
                 prepareMedia("{}");
                 return ok("fallbackEngine", selectedEngine);
             } catch (Throwable next) {
