@@ -1392,3 +1392,36 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
 .android-search-failed{padding:8px 6px;color:#8e96a0;font-size:10px}
 .android-search-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));border-top:1px solid rgba(255,255,255,.08);color:#858c95;font-size:10px}
 .theme-light .android-search-dialog{background:#fff;color:#20242a;border-color:rgba(0,0,0,.1)}.theme-light .android-search-header,.theme-light .android-search-footer{border-color:rgba(0,0,0,.08)}.theme-light .android-search-result-row{background:rgba(0,0,0,.035)}.theme-light .android-search-status{background:rgba(0,0,0,.035)}
+
+
+/* Live channel browsing: compact current status + fullscreen channel drawer */
+.live-current-info{min-width:0;display:flex;flex-direction:column;gap:3px}
+.live-current-info>b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.live-current-source{color:#667085;font-size:10px}
+.live-channel-section-title>div{min-width:0}
+.live-channel-section-title>div>small{display:block;color:#7d8798;font-size:10px;margin-top:3px}
+.sangtian-fullscreen-top-actions{display:flex;align-items:center;gap:7px}
+.sangtian-fullscreen-title{min-width:0;display:flex;flex-direction:column;gap:2px}
+.sangtian-fullscreen-title small{font-size:10px;color:rgba(255,255,255,.62);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sangtian-live-fullscreen-panel{position:absolute;z-index:20;top:max(58px,calc(env(safe-area-inset-top) + 48px));right:max(10px,env(safe-area-inset-right));bottom:max(74px,calc(env(safe-area-inset-bottom) + 58px));width:min(360px,calc(100% - 20px));display:flex;flex-direction:column;gap:8px;padding:11px;border:1px solid rgba(255,255,255,.18);border-radius:14px;background:rgba(12,14,19,.94);backdrop-filter:blur(18px);box-shadow:0 14px 40px rgba(0,0,0,.45);color:#fff}
+.sangtian-live-fullscreen-panel-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sangtian-live-fullscreen-panel-head>div{min-width:0;display:flex;flex-direction:column;gap:2px}
+.sangtian-live-fullscreen-panel-head b{font-size:14px}
+.sangtian-live-fullscreen-panel-head small{font-size:10px;color:rgba(255,255,255,.58)}
+.sangtian-live-fullscreen-panel-head button{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.08);color:#fff}
+.sangtian-live-fullscreen-search{height:34px;display:flex;align-items:center;gap:7px;padding:0 9px;border:1px solid rgba(255,255,255,.14);border-radius:9px;background:rgba(255,255,255,.06);color:rgba(255,255,255,.55)}
+.sangtian-live-fullscreen-search input{min-width:0;flex:1;border:0;outline:0;background:none;color:#fff;font-size:12px}
+.sangtian-live-fullscreen-search input::placeholder{color:rgba(255,255,255,.4)}
+.sangtian-live-fullscreen-groups{min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:10px;padding-right:2px}
+.sangtian-live-fullscreen-group-title{display:flex;align-items:center;gap:5px;color:rgba(255,255,255,.78);font-size:11px;margin-bottom:5px}
+.sangtian-live-fullscreen-group-title span{margin-left:auto;color:rgba(255,255,255,.45);font-size:10px}
+.sangtian-live-fullscreen-channel-list{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.sangtian-live-fullscreen-channel-list button{min-width:0;display:flex;align-items:center;gap:6px;padding:7px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:rgba(255,255,255,.045);color:#fff;text-align:left}
+.sangtian-live-fullscreen-channel-list button.active{border-color:rgba(213,165,90,.72);background:rgba(213,165,90,.15)}
+.sangtian-live-fullscreen-channel-logo{width:24px;height:24px;flex:0 0 24px;display:grid;place-items:center;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden}
+.sangtian-live-fullscreen-channel-logo img{width:100%;height:100%;object-fit:cover}
+.sangtian-live-fullscreen-channel-name{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+@media(max-width:600px){
+  .sangtian-live-fullscreen-panel{left:10px;right:10px;width:auto;bottom:max(68px,calc(env(safe-area-inset-bottom) + 52px))}
+  .sangtian-live-fullscreen-channel-list{grid-template-columns:1fr 1fr}
+}
