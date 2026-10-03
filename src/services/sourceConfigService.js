@@ -339,7 +339,7 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
           !api ? '缺少 api' :
             capability.kind === 'drpy-js' ? 'Drpy JS 源当前未适配执行器'
             : capability.kind === 'csp' ? 'CSP 源当前未适配执行器'
-            : capability.kind === 'jar' || capability.kind === 'http-vod-with-jar' ? '该源依赖 JAR 扩展，当前未适配 JAR 执行器'
+            : capability.kind === 'jar' || capability.kind === 'http-vod-with-jar' ? '该源依赖 JAR 扩展，当前进入 JAR 第三阶段：下载/校验/检查；尚未开放字节码执行'
             : capability.kind === 'ext' ? '该源依赖 ext 扩展配置，当前未适配'
             : '当前源不是标准可直接请求的 VOD HTTP 接口'
         ),
