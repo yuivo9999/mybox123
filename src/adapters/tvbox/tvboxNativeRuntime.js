@@ -41,7 +41,11 @@ export function createTVBoxNativeRuntime(globalObject = globalThis) {
   const bridge = globalObject?.TVBoxExtensionBridge;
 
   return {
-    isAvailable: () => Boolean(bridge && typeof bridge.execute === 'function'),
+    isAvailable: () => {
+      if (!bridge || typeof bridge.execute !== 'function') return false;
+      if (typeof bridge.getCapabilities !== 'function') return true;
+      try { return Boolean(parseBridgeResult(bridge.getCapabilities()).available); } catch { return false; }
+    },
     getCapabilities: () => {
       if (!bridge || typeof bridge.getCapabilities !== 'function') {
         return {
