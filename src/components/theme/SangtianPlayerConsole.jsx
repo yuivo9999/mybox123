@@ -169,6 +169,39 @@ export function SangtianPlayerWindow({
                      <button onClick={handleToggleFullscreen} aria-label="退出全屏"><Minimize2 size={18}/></button>
                    </div>
                  </div>
+                {isLive && showLiveChannelList && (
+                  <div className="sangtian-live-fullscreen-panel" onClick={event => event.stopPropagation()}>
+                    <div className="sangtian-live-fullscreen-panel-head">
+                      <div><b>频道列表</b><small>{channelGroups.reduce((sum, [, items]) => sum + items.length, 0)} 个频道 · 按组浏览</small></div>
+                      <button onClick={() => setShowLiveChannelList(false)} aria-label="关闭频道列表"><X size={17}/></button>
+                    </div>
+                    <div className="sangtian-live-fullscreen-search"><Search size={14}/><input value={liveChannelQuery} onChange={event => setLiveChannelQuery(event.target.value)} placeholder="搜索频道名称" aria-label="搜索频道名称" /></div>
+                    <div className="sangtian-live-fullscreen-groups">
+                      {channelGroups.map(([groupName, items]) => {
+                        const query = liveChannelQuery.trim().toLowerCase();
+                        const filtered = query ? items.filter(item => item.name?.toLowerCase().includes(query)) : items;
+                        if (!filtered.length) return null;
+                        return (
+                          <section key={groupName} className="sangtian-live-fullscreen-group">
+                            <div className="sangtian-live-fullscreen-group-title"><Radio size={13}/><b>{groupName}</b><span>{filtered.length}</span></div>
+                            <div className="sangtian-live-fullscreen-channel-list">
+                              {filtered.map(item => {
+                                const active = item.channelId === activeChannelId;
+                                return (
+                                  <button key={item.channelId} className={active ? 'active' : ''} onClick={() => { onSelectChannel?.(item); setShowLiveChannelList(false); }}>
+                                    <span className="sangtian-live-fullscreen-channel-logo">{item.logo ? <img src={item.logo} alt="" /> : <Radio size={14}/>}</span>
+                                    <span className="sangtian-live-fullscreen-channel-name">{item.name}</span>
+                                    {active ? <CheckCircle2 size={14}/> : <ChevronRight size={14}/>}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </section>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="sangtian-fullscreen-center"><button onClick={handlePlayPause} className="fullscreen-play-btn">{isPlaying ? '暂停' : '播放'}</button></div>
                 <div className="sangtian-fullscreen-bottombar">
                   {!isLive && (
