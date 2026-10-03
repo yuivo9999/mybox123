@@ -6,7 +6,7 @@ import org.mozilla.javascript.ContextFactory;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Minimal sandbox for evaluating a Drpy JavaScript definition.
@@ -40,11 +40,13 @@ public final class DrpySandboxRuntime {
 
             @Override
             protected void observeInstructionCount(Context cx, int instructionCount) {
-                throw new SecurityException("DRPY_SCRIPT_INSTRUCTION_LIMIT");
+                Integer count = (Integer) cx.getThreadLocal("tvboxDrpyInstructionCount");
+                int total = (count == null ? 0 : count) + instructionCount;
+                if (total > MAX_INSTRUCTIONS) throw new SecurityException("DRPY_SCRIPT_INSTRUCTION_LIMIT");
+                cx.putThreadLocal("tvboxDrpyInstructionCount", total);
             }
         };
 
-        AtomicBoolean closed = new AtomicBoolean(false);
         Context cx = factory.enterContext();
         try {
             cx.setLanguageVersion(Context.VERSION_ES6);
@@ -68,15 +70,14 @@ public final class DrpySandboxRuntime {
             );
 
             Object rule = ScriptableObject.getProperty(scope, "rule");
-            if (rule == Scriptable.NOT_FOUND) {
-                rule = result;
-            }
+            if (rule == Scriptable.NOT_FOUND) rule = result;
+            if (rule == Scriptable.NOT_FOUND || rule == null) return "";
 
-            return Context.toString(rule == Scriptable.NOT_FOUND ? "" : rule);
+            ScriptableObject.putProperty(scope, "__tvboxRule", rule);
+            Object json = cx.evaluateString(scope, "JSON.stringify(__tvboxRule)", "tvbox-drpy-json", 1, null);
+            return json == null ? "" : Context.toString(json);
         } finally {
-            if (closed.compareAndSet(false, true)) {
-                Context.exit();
-            }
+            Context.exit();
         }
     }
 
