@@ -72,6 +72,22 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   }, [enabledTv1Sources]);
 
   const allChannels = useMemo(() => [...channels, ...tv1Channels], [channels, tv1Channels]);
+
+  // 源启停/删除后，立即丢弃已经失效的频道选择与延迟流缓存。
+  // 不能只依赖页面卸载：Live 页面可能一直挂载，而 sources 会原地变化。
+  useEffect(() => {
+    const availableIds = new Set(allChannels.map(channel => channel.channelId));
+    setResolvedStreams(prev => {
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([channelId]) => availableIds.has(channelId)),
+      );
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+    if (selectedChannelId && !availableIds.has(selectedChannelId)) {
+      setSelectedChannelId('');
+      setActiveStreamIndex(0);
+    }
+  }, [allChannels, selectedChannelId]);
   const activeChannelBase = useMemo(
     () => allChannels.find(channel => channel.channelId === selectedChannelId) || null,
     [allChannels, selectedChannelId],
