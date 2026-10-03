@@ -222,7 +222,7 @@ function classifyTVBoxSite(site = {}) {
 }
 
 function isDirectMovieEndpoint(api) {
-  return /^https?:\\/\\//i.test(String(api || '').trim());
+  return /^https?:\/\//i.test(String(api || '').trim());
 }
 
 function parseTVBoxSources(parsed, { bundleId = null } = {}) {
@@ -296,7 +296,7 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
           sourceType: 'live',
           sourceRef,
           url: sourceRef,
-          liveMode: /\\.txt(?:[?#]|$)/i.test(sourceRef) ? 'tv1' : 'generic',
+          liveMode: /\.txt(?:[?#]|$)/i.test(sourceRef) ? 'tv1' : 'generic',
           enabled: true,
           status: '未测试',
           sourceCapability: 'direct-live',
