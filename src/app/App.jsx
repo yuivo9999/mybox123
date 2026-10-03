@@ -118,8 +118,9 @@ export function App(){
         }
 
         // 2. Handle sync states for content tabs
-        if (contentState.status === 'idle' || contentState.status === 'loading') {
-          return <main className="page"><LoadingState text="正在同步内容源…"/></main>;
+        const selectedMovieSourceId = persistent.selectedSources?.movie ?? persistent.settings?.defaultMovieSource ?? null;
+        if ((contentState.status === 'idle' || contentState.status === 'loading') && selectedMovieSourceId) {
+          return <main className="page"><LoadingState text="正在加载当前影视源…"/></main>;
         }
 
         if (contentState.status === 'error') {
