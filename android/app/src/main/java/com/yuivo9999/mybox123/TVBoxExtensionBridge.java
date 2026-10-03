@@ -33,9 +33,9 @@ public final class TVBoxExtensionBridge {
             result.put("contractVersion", CONTRACT_VERSION);
             result.put("available", true);
             result.put("supportedKinds", new JSONArray().put("drpy-js"));
-            result.put("supportedOperations", new JSONArray().put("load").put("request"));
+            result.put("supportedOperations", new JSONArray().put("load").put("request").put("search").put("detail").put("episodes").put("playUrl"));
             result.put("runtimeVersion", "drpy-sandbox-2");
-            result.put("reason", "DRPY_LOAD_AND_HTTP");
+            result.put("reason", "DRPY_SANDBOX_RULE_OPERATIONS");
             return result.toString();
         } catch (Exception e) {
             return "{\"available\":false,\"reason\":\"TVBOX_EXTENSION_CAPABILITY_ERROR\"}";
@@ -54,7 +54,7 @@ public final class TVBoxExtensionBridge {
 
             if (!OPERATIONS.contains(operation)) return error("TVBOX_EXTENSION_OPERATION_UNSUPPORTED", operation, kind);
             if (!KINDS.contains(kind)) return error("TVBOX_EXTENSION_KIND_UNSUPPORTED", operation, kind);
-            if (!"drpy-js".equals(kind) || !(operation.equals("load") || operation.equals("request"))) {
+            if (!"drpy-js".equals(kind)) {
                 return error("TVBOX_EXTENSION_OPERATION_UNSUPPORTED", operation, kind);
             }
 
@@ -71,22 +71,42 @@ public final class TVBoxExtensionBridge {
                 return result.toString();
             }
 
-            String url = payloadObject == null ? "" : payloadObject.optString("url", "");
-            String method = payloadObject == null ? "GET" : payloadObject.optString("method", "GET");
-            String body = payloadObject == null ? "" : payloadObject.optString("body", "");
-            String contentType = payloadObject == null
-                    ? "application/x-www-form-urlencoded; charset=UTF-8"
-                    : payloadObject.optString("contentType", "application/x-www-form-urlencoded; charset=UTF-8");
+            if ("request".equals(operation)) {
+                String url = payloadObject == null ? "" : payloadObject.optString("url", "");
+                String method = payloadObject == null ? "GET" : payloadObject.optString("method", "GET");
+                String body = payloadObject == null ? "" : payloadObject.optString("body", "");
+                String contentType = payloadObject == null
+                        ? "application/x-www-form-urlencoded; charset=UTF-8"
+                        : payloadObject.optString("contentType", "application/x-www-form-urlencoded; charset=UTF-8");
 
-            DrpyHttpRuntime.Response response = DrpyHttpRuntime.request(method, url, body, contentType);
+                DrpyHttpRuntime.Response response = DrpyHttpRuntime.request(method, url, body, contentType);
+                JSONObject result = new JSONObject();
+                result.put("ok", true);
+                result.put("operation", operation);
+                result.put("kind", kind);
+                result.put("contractVersion", CONTRACT_VERSION);
+                result.put("status", response.status);
+                result.put("contentType", response.contentType);
+                result.put("body", response.body);
+                return result.toString();
+            }
+
+            String script = payloadObject == null ? "" : payloadObject.optString("script", "");
+            String operationPayload = payloadObject == null ? "{}" : payloadObject.optJSONObject("params") != null
+                    ? payloadObject.optJSONObject("params").toString()
+                    : payloadObject.toString();
+            String resultJson = DrpySandboxRuntime.executeOperation(
+                    script,
+                    operation,
+                    operationPayload,
+                    DrpyHttpRuntime::request
+            );
             JSONObject result = new JSONObject();
             result.put("ok", true);
             result.put("operation", operation);
             result.put("kind", kind);
             result.put("contractVersion", CONTRACT_VERSION);
-            result.put("status", response.status);
-            result.put("contentType", response.contentType);
-            result.put("body", response.body);
+            result.put("result", resultJson == null ? JSONObject.NULL : new JSONObject(resultJson));
             return result.toString();
         } catch (SecurityException e) {
             return error(e.getMessage() == null ? "DRPY_SCRIPT_SECURITY_ERROR" : e.getMessage(), operation, kind);
