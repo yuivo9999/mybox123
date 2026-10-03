@@ -151,3 +151,65 @@ export async function syncMovieSources(sourceConfigs = [], selectedSourceId = nu
     }))],
   };
 }
+
+export async function searchMovieSources(sourceConfigs = [], keyword = '', options = {}) {
+  const query = String(keyword ?? '').trim();
+  if (!query) return { query: '', results: [], failed: [] };
+
+  const candidates = sourceConfigs.filter(source =>
+    source?.sourceType === 'movie'
+    && source?.enabled !== false
+  );
+  const concurrency = Math.max(1, Math.min(6, Number(options.concurrency) || 4));
+  const pageSize = Math.max(1, Math.min(20, Number(options.pageSize) || 12));
+  const timeoutMs = Math.max(1000, Number(options.timeoutMs) || 4500);
+  const results = [];
+  const failed = [];
+  let cursor = 0;
+
+  async function worker() {
+    while (cursor < candidates.length) {
+      const index = cursor++;
+      const source = candidates[index];
+      try {
+        const adapter = createSourceAdapter({
+          ...source,
+          sourceRef: source.sourceRef || source.url,
+        }, options);
+        if (typeof adapter.search !== 'function') throw new Error('MOVIE_SOURCE_SEARCH_UNSUPPORTED');
+
+        const response = await adapter.search(
+          { query, page: 1, pageSize },
+          { signal: options.signal, timeoutMs },
+        );
+        const items = Array.isArray(response?.items) ? response.items : [];
+        results.push({
+          sourceId: source.sourceId,
+          sourceName: source.name || source.sourceId,
+          status: 'fulfilled',
+          items,
+        });
+      } catch (error) {
+        failed.push({
+          sourceId: source.sourceId,
+          sourceName: source.name || source.sourceId,
+          status: 'rejected',
+          reason: errorService.classifySource(error, {
+            scope: 'movie-source-search',
+            sourceId: source.sourceId,
+          }),
+        });
+      }
+    }
+  }
+
+  await Promise.all(Array.from(
+    { length: Math.min(concurrency, candidates.length) },
+    worker,
+  ));
+
+  const order = new Map(candidates.map((source, index) => [source.sourceId, index]));
+  results.sort((a, b) => (order.get(a.sourceId) ?? 0) - (order.get(b.sourceId) ?? 0));
+
+  return { query, results, failed };
+}
