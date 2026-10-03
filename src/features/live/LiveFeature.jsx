@@ -6,6 +6,7 @@ import { requestManager } from '../../services/requestManager.js';
 import { usePageState, pageStateStore } from '../../state/pageStateStore.js';
 import { SmartImage, EmptyState, LoadingState, ErrorState } from '../../components/StateViews.jsx';
 import { SangtianPlayerWindow } from '../../components/theme/SangtianPlayerConsole.jsx';
+import { Tv1LiveFeature } from './Tv1LiveFeature.jsx';
 
 const ALL_CATEGORY = '全部';
 
@@ -18,13 +19,14 @@ export function createLiveFeature({ channels = [] } = {}) {
   }
 }
 
-export function LiveFeature({ channels = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite }) {
+export function LiveFeature({ channels = [], sources = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite }) {
   const feature = useMemo(() => createLiveFeature({ channels }), [channels]);
   const page = usePageState();
   const videoRef = useRef(null);
 
   const [selectedChannelId, setSelectedChannelId] = useState(channels[0]?.channelId || '');
   const [activeStreamIndex, setActiveStreamIndex] = useState(0);
+  const [viewMode, setViewMode] = useState('generic');
 
   useEffect(() => {
     if (!selectedChannelId && channels.length > 0) {
@@ -87,7 +89,10 @@ export function LiveFeature({ channels = [], favorites = [], onChannel, onPlay, 
   const categories = useMemo(() => feature.getCategories(), [feature]);
   const visible = useMemo(() => feature.list({ category }), [feature, category]);
 
-  if (!channels.length) return <Page><Header title="直播" /><EmptyState text="暂无 Live 频道" /></Page>;
+  if (viewMode === 'tv1') return <Tv1LiveFeature sources={sources} favorites={favorites} onPlay={onPlay} toggleFavorite={toggleFavorite} onBack={() => setViewMode('generic')} />;
+
+  if (!channels.length) return <Page><Header title="直播" />
+      <div className="actions"><button className="secondary" onClick={() => setViewMode('tv1')}>TV1 专用直播</button></div><EmptyState text="暂无 Live 频道" /></Page>;
 
   return (
     <Page>
