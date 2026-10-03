@@ -19,7 +19,7 @@ import org.json.JSONObject;
 
 /** Host-side protocol client for the isolated CatVod boundary. */
 public final class TVBoxJarIsolatedClient implements AutoCloseable {
-    private static final long DEFAULT_TIMEOUT_MS = 8_000L;
+    private static final long DEFAULT_TIMEOUT_MS = 25_000L;
     private final Context context;
     private final TVBoxJarHostProxy hostProxy;
     private final HandlerThread callbackThread = new HandlerThread("tvbox-jar-isolated-callback");
