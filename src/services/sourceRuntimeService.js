@@ -41,9 +41,20 @@ export async function testSource(source, options = {}) {
   return { ok: false, sourceId: source.sourceId, status: 'unsupported', checkedAt: Date.now() };
 }
 
-export async function syncAllSources({ movieSourceId = null } = {}) {
+export async function syncAllSources({ movieSourceId = null, includeMovie = true, includeLive = true } = {}) {
   let sources = sourceRepository.getAll().filter(source => source.enabled !== false);
-  const movieResult = await sourceRegistryService.syncMovieSources(sources, movieSourceId);
+  const movieResult = includeMovie
+    ? await sourceRegistryService.syncMovieSources(sources, movieSourceId)
+    : { movies: [], results: [] };
+
+  if (!includeLive) {
+    return {
+      sources,
+      movies: movieResult.movies,
+      channels: [],
+      results: movieResult.results,
+    };
+  }
 
   sourceRegistryService.clear();
   // 停用/删除/重新导入 Live 源后，不允许旧频道、旧播放地址或旧 EPG
