@@ -1206,3 +1206,15 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
   .batch-source-bottom{flex-wrap:wrap}
   .batch-source-bottom b{width:100%;margin-right:0}
 }
+
+
+/* Compact source-load error popup: informational only, with no retry/source/navigation actions. */
+.source-error-backdrop{position:fixed;inset:0;display:grid;place-items:center;padding:18px;background:rgba(0,0,0,.28);z-index:40;pointer-events:auto}
+.source-error-popup{position:relative;width:min(280px,calc(100vw - 48px));min-height:72px;padding:20px 48px 20px 20px;border:1px solid #303744;border-radius:16px;background:#11141b;color:#f5f7fb;box-shadow:0 14px 40px rgba(0,0,0,.28);display:flex;align-items:center;font-size:15px;font-weight:700;line-height:1.4}
+.source-error-close{position:absolute;top:8px;right:8px;width:32px;height:32px;border-radius:9px;color:#8f98aa;display:grid;place-items:center;font-size:25px;font-weight:400;line-height:1}
+.source-error-close:hover,.source-error-close:focus-visible{background:rgba(255,255,255,.07);color:#fff;outline:none}
+.theme-light .source-error-popup{background:#fff;border-color:#d9dee7;color:#151820;box-shadow:0 14px 40px rgba(31,41,55,.18)}
+.theme-light .source-error-close{color:#667085}
+.theme-sangtian .source-error-popup{background:#fcf9f2;border-color:#d4c5a9;color:#261f18;box-shadow:0 14px 40px rgba(73,55,34,.2)}
+.theme-sangtian .source-error-close{color:#7b6a57}
+.theme-sangtian .source-error-close:hover,.theme-sangtian .source-error-close:focus-visible{background:rgba(83,61,38,.08);color:#261f18}
