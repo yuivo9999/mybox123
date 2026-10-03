@@ -92,14 +92,42 @@ export function App(){
    }
  };
  const saveSources=async(next)=>{const validIds=new Set(next.map(source=>source.sourceId));const current=persistent.settings||{};const patch={};if(current.defaultMovieSource&&!validIds.has(current.defaultMovieSource))patch.defaultMovieSource=null;if(current.defaultLiveSource&&!validIds.has(current.defaultLiveSource))patch.defaultLiveSource=null;const result=await sourceManagementService.save(next);if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();applySourceResult(result);};
- const setSourceEnabled=async(id,enabled)=>{const result=await sourceManagementService.setEnabled(id,enabled);const source=persistent.sources.find(item=>item.sourceId===id);const patch={};if(!enabled&&source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;if(!enabled&&source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();applySourceResult(result);};
+ const setSourceEnabled=async(id,enabled)=>{
+   const source=persistent.sources.find(item=>item.sourceId===id);
+   const result=await sourceManagementService.setEnabled(id,enabled);
+   const patch={};
+   if(!enabled&&source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;
+   if(!enabled&&source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;
+   if(!enabled&&source?.sourceType==='live'&&route==='live-play'){
+     const invalid=selected?.candidates?.length
+       ? selected.candidates.every(candidate=>candidate.sourceId===id)
+       : selected?.metadata?.sourceId===id;
+     if(invalid) sessionStateStore.patch({route:'live-channel',selected:null});
+   }
+   if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();
+   applySourceResult(result);
+ };
  const setSourceActive=async(id)=>{
    const source=persistent.sources.find(item=>item.sourceId===id);
    await sourceManagementService.setActive(id);
    persistent.reload?.();
    await reloadSources(source?.sourceType==='movie' ? id : undefined);
  };
- const removeSource=async(id)=>{const source=persistent.sources.find(item=>item.sourceId===id);const result=await sourceManagementService.remove(id);const patch={};if(source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;if(source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();applySourceResult(result);};
+ const removeSource=async(id)=>{
+   const source=persistent.sources.find(item=>item.sourceId===id);
+   const result=await sourceManagementService.remove(id);
+   const patch={};
+   if(source?.sourceType==='movie'&&persistent.settings?.defaultMovieSource===id)patch.defaultMovieSource=null;
+   if(source?.sourceType==='live'&&persistent.settings?.defaultLiveSource===id)patch.defaultLiveSource=null;
+   if(source?.sourceType==='live'&&route==='live-play'){
+     const invalid=selected?.candidates?.length
+       ? selected.candidates.every(candidate=>candidate.sourceId===id)
+       : selected?.metadata?.sourceId===id;
+     if(invalid) sessionStateStore.patch({route:'live-channel',selected:null});
+   }
+   if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();
+   applySourceResult(result);
+ };
  const nav=(key)=>sessionStateStore.patch({tab:key,route:null,selected:null});
  const openSearchHistory=(keyword)=>{pageStateStore.patch('search',{query:keyword});sessionStateStore.patch({tab:'movies',route:'search',selected:null});};
  const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
