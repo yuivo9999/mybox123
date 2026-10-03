@@ -13,11 +13,13 @@ function call(method,payload={}) {
 export function createNativePlayerAdapter(hooks={}) {
  let state=PlayerState.IDLE,input=null,released=false,capabilities=Object.freeze({
   [PlayerCapability.SEEK]:true,[PlayerCapability.VOLUME]:true,[PlayerCapability.PAUSE]:true,
-  [PlayerCapability.AUTOPLAY]:true,[PlayerCapability.CUSTOM_HEADERS]:true,[PlayerCapability.RTMP]:true,[PlayerCapability.RTSP]:true,[PlayerCapability.COOKIES]:true,
-  [PlayerCapability.AUDIO_TRACKS]:true,[PlayerCapability.SUBTITLE_TRACKS]:true,
-  [PlayerCapability.TRACK_SELECTION]:true,[PlayerCapability.QUALITY_SELECTION]:true,
+  [PlayerCapability.AUTOPLAY]:true,[PlayerCapability.CUSTOM_HEADERS]:true,[PlayerCapability.COOKIES]:true,
+  [PlayerCapability.RTMP]:true,[PlayerCapability.RTSP]:true,[PlayerCapability.HLS]:true,
+  [PlayerCapability.DASH]:true,[PlayerCapability.MP4]:true,[PlayerCapability.TS]:true,[PlayerCapability.FLV]:true,
+  [PlayerCapability.AUDIO_TRACKS]:false,[PlayerCapability.SUBTITLE_TRACKS]:false,
+  [PlayerCapability.TRACK_SELECTION]:false,[PlayerCapability.QUALITY_SELECTION]:false,
   [PlayerCapability.LIVE_RECONNECT]:true,
- });
+ });;
  const emit=(event,data={})=>{if(event==='playing')state=PlayerState.PLAYING;if(event==='paused')state=PlayerState.PAUSED;if(event==='bufferingStart')state=PlayerState.BUFFERING;if(event==='reconnecting')state=PlayerState.RECONNECTING;if(event==='stopped')state=PlayerState.STOPPED;if(event==='released')state=PlayerState.RELEASED;hooks.onEvent?.({event,...data});};
  const eventHandler=(payload)=>{try{const value=typeof payload==='string'?JSON.parse(payload):payload;if(value?.event)emit(value.event,value.data??value);}catch{}};
  const previousEventHandler=typeof window!=='undefined'?window.TVBoxWebView?.onPlayerEvent:null;
