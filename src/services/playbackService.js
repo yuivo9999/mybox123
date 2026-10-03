@@ -17,7 +17,9 @@ function isSupportedVODCandidate(candidate) {
   const capability = String(candidate?.metadata?.sourceCapability || '').trim();
   const adapterType = String(candidate?.metadata?.adapterType || '').trim();
   if (!capability && !adapterType) return true;
-  return capability === 'direct-http-vod' && adapterType === 'http-vod';
+  return (capability === 'direct-http-vod' && adapterType === 'http-vod')
+    || capability === 'tvbox-jar'
+    || capability === 'tvbox-http-vod-with-jar';
 }
 
 export const playbackService = {
