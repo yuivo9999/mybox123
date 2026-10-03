@@ -18,6 +18,7 @@ export function SangtianPlayerWindow({
   terminalTag = 'BASH',
   children,
   videoContainerRef,
+  isLive = false,
 }) {
   const [showTerminal, setShowTerminal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -26,7 +27,7 @@ export function SangtianPlayerWindow({
   const [aspectMode, setAspectMode] = useState('original');
   const [videoAspectRatio, setVideoAspectRatio] = useState(null);
 
-  const streamUrl = resolvedInput?.url || candidate?.url || candidate?.metadata?.url || 'https://live.tvbox.stream/stream.m3u8';
+  const streamUrl = resolvedInput?.url || candidate?.mediaUrl || candidate?.url || candidate?.metadata?.url || '';
 
   const aspectOptions = [
     { id: 'original', label: '原始', title: '原始比例（保持视频源比例）' },
@@ -116,7 +117,7 @@ export function SangtianPlayerWindow({
             title="切换终端参数/视频画面"
           >
             {showTerminal ? <Play size={13} /> : <Download size={13} />}
-            <span>{showTerminal ? '画面' : '下载'}</span>
+            <span>{showTerminal ? '画面' : '信息'}</span>
           </button>
 
           <button
@@ -174,26 +175,13 @@ export function SangtianPlayerWindow({
         )}
         {showTerminal ? (
           <div className="sangtian-terminal-panel">
-            <pre className="terminal-code">
-{`--base 4k.json
---base=4k.json
+            <pre className="terminal-code">{`播放信息
 
---source tv1.txt
---source=tv1.txt
-
---output 4k_tv1_embedded.json
---output=4k_tv1_embedded.json
-
---lock-timeout 15
---lock-timeout=15
-
-# [TVBOX LIVE RUNTIME]
---stream-candidate: ${candidate?.candidateId || candidate?.label || 'default-candidate-01'}
---protocol: ${resolvedInput?.protocol || candidate?.protocol || 'HLS/M3U8'}
---source-id: ${candidate?.sourceId || 'source_4k_hub'}
---playback-status: ${status || 'playing'}
---resolved-stream: ${streamUrl}`}
-            </pre>
+模式：${isLive ? 'Live 直连' : '影视解析'}
+协议：${resolvedInput?.protocol || candidate?.protocol || '未知'}
+源：${candidate?.sourceId || '—'}
+状态：${status || 'idle'}
+播放地址：${streamUrl || '等待地址…'}`}</pre>
             <div className="terminal-footer">
               <button className="terminal-back-btn" onClick={() => setShowTerminal(false)}>
                 <Play size={13} />
@@ -207,7 +195,7 @@ export function SangtianPlayerWindow({
             {!resolvedInput && candidate && status !== 'error' && (
               <div className="sangtian-video-overlay">
                 <div className="sangtian-loading-spinner" />
-                <span>正在解析“桑田山河”高品质流…</span>
+                <span>{isLive ? '正在连接直播直链…' : '正在解析视频播放地址…'}</span>
               </div>
             )}
             {status === 'error' && (
@@ -238,6 +226,7 @@ export function SangtianFloatingBar({
   onChangeRate,
   currentCandidateLabel = '蓝光4K · 线路1',
   onOpenSourceModal,
+  isLive = false,
 }) {
   const rates = [0.75, 1.0, 1.25, 1.5, 2.0];
 
@@ -275,7 +264,7 @@ export function SangtianFloatingBar({
       <button
         className="sangtian-model-pill"
         onClick={onOpenSourceModal}
-        title="点击切换线路与解析源"
+        title={isLive ? "点击切换直播线路" : "点击切换线路与解析源"}
       >
         <Sparkles size={14} className="sparkle-gold" />
         <span className="model-pill-text">{currentCandidateLabel}</span>
@@ -303,6 +292,7 @@ export function SangtianConsoleCard({
   onSelectRelated,
   onReplay,
   onTogglePip,
+  playerStatus = 'idle',
 }) {
   const [activeTab, setActiveTab] = useState('episodes'); // 'episodes' | 'info' | 'sources'
   const [smartDecode, setSmartDecode] = useState(true);
@@ -320,11 +310,9 @@ export function SangtianConsoleCard({
   };
 
   const handlePingSource = () => {
-    setPingStatus('测试中…');
-    setTimeout(() => {
-      setPingStatus('✓ 线路连通正常 (28ms)');
-      setTimeout(() => setPingStatus(''), 3000);
-    }, 600);
+    const label = playerStatus === 'playing' ? '✓ 当前播放正常' : playerStatus === 'buffering' ? '⏳ 当前正在缓冲' : playerStatus === 'reconnecting' ? '↻ 正在自动重连' : playerStatus === 'error' ? '× 当前播放失败' : '• 当前链路未就绪';
+    setPingStatus(label);
+    setTimeout(() => setPingStatus(''), 2600);
   };
 
   return (
@@ -332,45 +320,13 @@ export function SangtianConsoleCard({
       {/* Sub-header Bar: Toggles & View Switches - Borrowed from bottom chat sub-bar */}
       <div className="sangtian-console-subbar">
         <div className="console-toggles">
-          <div className="console-toggle-item">
-            <span className="toggle-label">
-              <Sparkles size={12} className="sparkle-gold" />
-              <span>思考模式</span>
-            </span>
-            <div className="toggle-switch-group">
-              <button
-                className={`switch-badge ${!smartDecode ? 'active' : ''}`}
-                onClick={() => setSmartDecode(false)}
-              >
-                OFF
-              </button>
-              <button
-                className={`switch-badge ${smartDecode ? 'active' : ''}`}
-                onClick={() => setSmartDecode(true)}
-              >
-                ON
-              </button>
-            </div>
+          <div className="console-live-status">
+            <span className="live-pill">{isLive ? 'LIVE 直连' : 'VOD 播放'}</span>
+            <span>{playerStatus === 'playing' ? '播放中' : playerStatus === 'buffering' ? '缓冲中' : playerStatus === 'reconnecting' ? '自动重连中' : playerStatus === 'error' ? '播放失败' : '连接中'}</span>
           </div>
-
           <div className="console-toggle-item">
-            <span className="toggle-label">
-              <span>Agent</span>
-            </span>
-            <div className="toggle-switch-group">
-              <button
-                className={`switch-badge ${!autoNext ? 'active' : ''}`}
-                onClick={() => setAutoNext(false)}
-              >
-                OFF
-              </button>
-              <button
-                className={`switch-badge ${autoNext ? 'active' : ''}`}
-                onClick={() => setAutoNext(true)}
-              >
-                ON
-              </button>
-            </div>
+            <span className="toggle-label"><Sparkles size={12} className="sparkle-gold" /><span>{isLive ? '直播链路' : '播放模式'}</span></span>
+            <span className="switch-badge active">{isLive ? '直连' : (smartDecode ? '智能' : '标准')}</span>
           </div>
         </div>
 
@@ -456,7 +412,7 @@ export function SangtianConsoleCard({
           <div className="console-sources-section">
             <div className="console-section-header">
               <span className="section-eyebrow">SOURCES · 换源与线路</span>
-              <h4>视频源解析矩阵</h4>
+              <h4>{isLive ? '直播线路' : '视频源解析矩阵'}</h4>
             </div>
 
             {sources.length > 0 && (
@@ -478,7 +434,7 @@ export function SangtianConsoleCard({
 
             {candidates.length > 0 && (
               <div className="console-source-group">
-                <span className="group-label">备用线路选择：</span>
+                <span className="group-label">{isLive ? '直播线路选择：' : '备用线路选择：'}</span>
                 <div className="chips">
                   {candidates.map(c => (
                     <button
@@ -549,7 +505,7 @@ export function SangtianConsoleCard({
           <button
             className="action-icon-btn"
             onClick={handlePingSource}
-            title="检测网络连通性"
+            title="查看当前播放状态"
           >
             <Globe size={18} />
           </button>
