@@ -81,8 +81,8 @@ function MovieSourceSelector({sources=[],selectedSourceId,onChange}){
    </button>
    {open&&<div className="source-selector-popover" role="dialog" aria-label="选择影视源">
      <div className="source-selector-popover-head"><div><b>选择影视源</b><small>临时勾选，点击“选择”后才会生效</small></div><button className="icon-button" type="button" aria-label="关闭" onClick={close}><X size={17}/></button></div>
-     <div className="source-selector-list" data-horizontal-scroll="true">
-       {sources.map(source=>{const checked=draftSourceId===source.sourceId;return <button className={'source-selector-item'+(checked?' selected':'')} type="button" key={source.sourceId} onClick={()=>setDraftSourceId(source.sourceId)} aria-pressed={checked}>
+     <div className="source-selector-list" role="radiogroup" aria-label="影视源列表">
+       {sources.map(source=>{const checked=draftSourceId===source.sourceId;return <button className={'source-selector-item'+(checked?' selected':'')} type="button" key={source.sourceId} role="radio" aria-checked={checked} onClick={()=>setDraftSourceId(source.sourceId)}>
          <span className="source-selector-name" title={source.name}>{source.name}</span>
          <span className={'source-selector-radio'+(checked?' checked':'')} aria-hidden="true">{checked&&<span/>}</span>
        </button>})}
