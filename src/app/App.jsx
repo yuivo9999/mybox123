@@ -283,7 +283,7 @@ export function AppRoot(){
    }else if(route==='detail'||route==='search'){
      sessionStateStore.patch({tab:'movies',route:null,selected:null});
    }else if(route==='live-play'){
-     sessionStateStore.patch({tab:'live',route:'live-channel',selected:selected?.channelId?{...selected}:null});
+     sessionStateStore.patch({tab:'live',route:null,selected:null});
    }else if(route==='live-channel'){
      sessionStateStore.patch({tab:'live',route:null,selected:null});
    }else if(route==='appearance'){
@@ -292,7 +292,7 @@ export function AppRoot(){
      sessionStateStore.patch({tab:'me',route:null,selected:null});
    }
  };
- return <ErrorBoundary onReset={recoverFromPageError}><App/></ErrorBoundary>;
+ return <ErrorBoundary route={route} onReset={recoverFromPageError}><App/></ErrorBoundary>;
 }
 
 function FirstLaunch({onLater,onSources}){return <div className="app-shell"><div className="screen"><main className="page first-launch"><div className="profile"><div className="avatar">T</div><div><span className="eyebrow">TVBOX REACT</span><h1>欢迎使用</h1><span>当前还没有配置内容源</span></div></div><div className="actions"><button className="primary" onClick={onSources}>去添加源</button><button className="secondary" onClick={onLater}>稍后设置</button></div></main></div></div>}
