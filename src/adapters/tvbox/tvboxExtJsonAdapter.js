@@ -18,6 +18,8 @@ export function createTVBoxExtJsonAdapter(config = {}, transport = null) {
     if (!body) throw new Error('TVBOX_EXT_JSON_EMPTY');
     if (body.length > MAX_EXT_JSON_CHARS) throw new Error('TVBOX_EXT_JSON_TOO_LARGE');
     let parsed; try { parsed = JSON.parse(body); } catch { throw new Error('TVBOX_EXT_JSON_INVALID'); }
+    const hasVodArray = Array.isArray(parsed) || ['movies','vod','list','data','result'].some(key => Array.isArray(parsed?.[key]));
+    if (!hasVodArray) throw new Error('TVBOX_EXT_JSON_NOT_VOD_DATA');
     const raw = parseTVBoxResult(parsed);
     return raw.map((item, index) => normalizeMovie({ sourceId, item, index, sourceMetadata: { sourceCapability: definition.sourceCapability, adapterType: definition.adapterType, tvboxAdapterKind: 'ext', headers: config.headers, userAgent: config.userAgent, referer: config.referer, cookies: config.cookies } }));
   };
