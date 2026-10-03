@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, startTransition } from 'react';
-import Hls from 'hls.js';
 import { ChevronLeft, Heart, Play, Radio } from 'lucide-react';
 import { liveService } from '../../services/liveService.js';
+import { playbackService } from '../../services/playbackService.js';
 import { requestManager } from '../../services/requestManager.js';
 import { tv1LiveService } from '../../services/tv1LiveService.js';
 import { usePageState, pageStateStore } from '../../state/pageStateStore.js';
@@ -99,6 +99,29 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   }, [activeChannelBase, resolvedStreams]);
 
   const activeStream = activeChannel?.streams?.[activeStreamIndex] || activeChannel?.streams?.[0] || null;
+  const livePlaybackRequest = useMemo(() => {
+    if (!activeChannel?.streams?.length) return null;
+    return playbackService.createLiveRequest({ channel: activeChannel });
+  }, [activeChannel]);
+  const [playbackCandidate, setPlaybackCandidate] = useState(null);
+  const [playbackStatus, setPlaybackStatus] = useState('idle');
+  const [playbackError, setPlaybackError] = useState('');
+  const playbackController = useMemo(() => livePlaybackRequest
+    ? playbackService.createController(livePlaybackRequest, {
+        onStateChange: setPlaybackStatus,
+        onCandidateChange: next => {
+          setPlaybackCandidate(next);
+          if (next) {
+            setPlaybackError('');
+            const index = livePlaybackRequest.candidates.findIndex(item => item.candidateId === next.candidateId);
+            if (index >= 0) setActiveStreamIndex(index);
+          }
+        },
+        onPlayerError: ({ error }) => setPlaybackError(error?.message || '播放器加载失败'),
+        onParserError: ({ code }) => setPlaybackError('解析失败：' + code),
+        onExhausted: () => setPlaybackStatus('error'),
+      })
+    : null, [livePlaybackRequest]);
 
   const loadTv1Streams = async channel => {
     const sourceRef = channel?.sourceRefs?.find(ref => enabledTv1Sources.some(source => source.sourceId === ref.sourceId));
@@ -141,6 +164,8 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   const selectChannel = channel => {
     setSelectedChannelId(channel.channelId);
     setActiveStreamIndex(0);
+    setPlaybackCandidate(null);
+    setPlaybackError('');
     if (channel.deferredRef) {
       const tv1Source = channel.sourceRefs?.some(ref => enabledTv1Sources.some(source => source.sourceId === ref.sourceId));
       void (tv1Source ? loadTv1Streams(channel) : loadDeferredStreams(channel));
@@ -148,35 +173,26 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   };
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (!activeStream?.url) {
-      video.pause?.();
-      video.removeAttribute('src');
-      video.load?.();
-      return;
+    if (!playbackController) {
+      setPlaybackCandidate(null);
+      setPlaybackStatus('idle');
+      setPlaybackError('');
+      return undefined;
     }
-
-    const url = activeStream.url;
-    let hls = null;
-    if (Hls.isSupported() && (activeStream.protocol === 'hls' || /\.m3u8(?:[?#]|$)/i.test(url))) {
-      hls = new Hls({ enableWorker: true, lowLatencyMode: true });
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MEDIA_ATTACHED, () => hls.loadSource(url));
-      hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+    const player = playbackController.attachPlayer(videoRef.current);
+    const initial = playbackController.start();
+    setPlaybackCandidate(initial);
+    if (initial) {
+      playbackController.resolveAndLoad(initial).catch(error => setPlaybackError(error?.message || '播放初始化失败'));
     } else {
-      video.src = url;
-      video.play().catch(() => {});
+      setPlaybackStatus('error');
+      setPlaybackError('没有可用的播放候选');
     }
     return () => {
-      if (hls) {
-        try { hls.destroy(); } catch {}
-      } else {
-        video.removeAttribute('src');
-        video.load?.();
-      }
+      void player;
+      playbackController.leave();
     };
-  }, [activeStream?.url]);
+  }, [playbackController]);
 
   useEffect(() => {
     const top = Number(page.live.scrollTop) || 0;
@@ -204,13 +220,14 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
 
       <SangtianPlayerWindow
         videoRef={videoRef}
-        status={activeStream ? 'playing' : 'idle'}
+        status={playbackStatus}
         candidate={activeStream ? {
-          label: activeStream.label || '默认线路',
-          url: activeStream.url,
-          protocol: activeStream.protocol || 'HLS/M3U8',
-          sourceId: activeStream.sourceId,
+          label: playbackCandidate?.label || activeStream.label || '默认线路',
+          url: playbackCandidate?.mediaUrl || activeStream.url,
+          protocol: playbackCandidate?.protocol || activeStream.protocol || 'HLS/M3U8',
+          sourceId: playbackCandidate?.sourceId || activeStream.sourceId,
         } : { label: '请选择频道', protocol: 'LIVE' }}
+        error={playbackError}
         terminalTag={activeChannel ? 'LIVE · ' + activeChannel.name : 'LIVE · 等待频道'}
       >
         <video ref={videoRef} controls playsInline className="sangtian-video-element" />
@@ -225,7 +242,11 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
           </div>
           <div className="live-current-actions">
             {activeChannel.streams?.length > 1 && activeChannel.streams.map((stream, index) => (
-              <button key={stream.streamId || index} className={activeStreamIndex === index ? 'active' : ''} onClick={() => setActiveStreamIndex(index)}>
+              <button key={stream.streamId || index} className={activeStreamIndex === index ? 'active' : ''} onClick={() => {
+                setActiveStreamIndex(index);
+                const candidate = livePlaybackRequest?.candidates?.[index];
+                if (candidate && playbackController) playbackController.switchCandidate(candidate.candidateId);
+              }}>
                 {stream.label || '线路 ' + (index + 1)}
               </button>
             ))}
