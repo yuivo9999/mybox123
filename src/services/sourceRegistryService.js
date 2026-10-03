@@ -50,7 +50,7 @@ export const sourceRegistryService = {
 
   async registerAll(sources) {
     this.clear();
-    for (const source of sources.filter(item => item.sourceType === 'live' && item.enabled !== false && (item.sourceRef || item.url))) {
+    for (const source of sources.filter(item => item.sourceType === 'live' && item.liveMode !== 'tv1' && item.enabled !== false && (item.sourceRef || item.url))) {
       this.registerLiveSource(source);
     }
     return { movie: true, live: true };
