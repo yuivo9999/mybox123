@@ -90,6 +90,7 @@ export function createPlaybackCore(task,hooks={}) {
    ...(input.playerHint ?? {}),
    engine: input.playerHint?.engine ?? defaultEngine,
    decoder: input.playerHint?.decoder ?? playbackSettings.decoder?.[defaultEngine] ?? 'auto',
+   decoderModes: input.playerHint?.decoderModes ?? playbackSettings.decoder ?? {},
    fallbackEnabled: input.playerHint?.fallbackEnabled ?? playbackSettings.fallbackEnabled,
    fallbackOrder: input.playerHint?.fallbackOrder ?? playbackSettings.fallbackOrder,
   };
