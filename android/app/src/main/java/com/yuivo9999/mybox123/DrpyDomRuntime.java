@@ -42,10 +42,14 @@ public final class DrpyDomRuntime {
         JSONArray result = new JSONArray();
         for (Element element : elements) {
             JSONObject item = new JSONObject();
-            item.put("__drpyDom", true);
-            item.put("html", element.outerHtml());
-            item.put("baseUrl", baseUrl == null ? value.baseUrl : baseUrl);
-            result.put(item);
+            try {
+                item.put("__drpyDom", true);
+                item.put("html", element.outerHtml());
+                item.put("baseUrl", baseUrl == null ? value.baseUrl : baseUrl);
+                result.put(item);
+            } catch (Exception e) {
+                throw new IllegalStateException("DRPY_DOM_RESULT_ERROR", e);
+            }
         }
         return result.toString();
     }
