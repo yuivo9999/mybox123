@@ -4,6 +4,7 @@ import android.webkit.JavascriptInterface;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.json.JSONTokener;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -106,7 +107,7 @@ public final class TVBoxExtensionBridge {
             result.put("operation", operation);
             result.put("kind", kind);
             result.put("contractVersion", CONTRACT_VERSION);
-            result.put("result", resultJson == null ? JSONObject.NULL : new JSONObject(resultJson));
+            result.put("result", resultJson == null ? JSONObject.NULL : new JSONTokener(resultJson).nextValue());
             return result.toString();
         } catch (SecurityException e) {
             return error(e.getMessage() == null ? "DRPY_SCRIPT_SECURITY_ERROR" : e.getMessage(), operation, kind);
