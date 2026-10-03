@@ -67,7 +67,9 @@ function MovieSourceSelector({sources=[],selectedSourceId,onChange}){
 }
 
 function MovieCatalog({movies,state,setState,onMovie,onSearch,recordSearch}){
- const home=useMemo(()=>movieService.getHome({movies}),[movies]); const categories=['全部',...home.categories.filter(x=>x!=='全部')];
+ const home=useMemo(()=>movieService.getHome({movies}),[movies]); const categories=['全部','电影','电视剧','综艺'];
+ const selectedType=state.category==='电影'?'movie':state.category==='电视剧'?'tv':state.category==='综艺'?'variety':null;
+ const subcategories=selectedType?(home.taxonomy?.[selectedType]??[]):[];
  const result=useMemo(()=>state.query.trim()?movieService.search({movies,keyword:state.query}):movieService.list({movies,...state}).items,[movies,state]);
  const listMeta=movieService.list({movies,...state}); const apply=(patch)=>setState({...patch,page:1});
  const filters=home.filters??{}; const values=(key)=>['全部',...(filters[key]??[])];
