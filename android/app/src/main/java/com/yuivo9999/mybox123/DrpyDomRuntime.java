@@ -80,6 +80,8 @@ public final class DrpyDomRuntime {
         Element first = elements.first();
         if ("Text".equalsIgnoreCase(option)) return first.text();
         if ("Html".equalsIgnoreCase(option)) return first.html();
+        if ("OuterHtml".equalsIgnoreCase(option)) return first.outerHtml();
+        if ("Value".equalsIgnoreCase(option)) return first.val();
 
         if (option != null && !option.isEmpty()) {
             String value = first.attr(option);
@@ -136,12 +138,12 @@ public final class DrpyDomRuntime {
     private static boolean isOption(String value) {
         if ("Text".equalsIgnoreCase(value) || "Html".equalsIgnoreCase(value)) return true;
         if (value == null || value.isEmpty()) return false;
-        return isAttributeName(value);
+        return isAttributeName(value) || "OuterHtml".equalsIgnoreCase(value) || "Value".equalsIgnoreCase(value);
     }
 
     private static boolean isAttributeName(String value) {
         String lower = value.toLowerCase();
-        return lower.equals("href") || lower.equals("src") || lower.equals("url")
+        return lower.equals("href") || lower.equals("src") || lower.equals("url") || lower.equals("value")
                 || lower.equals("title") || lower.equals("alt") || lower.equals("class")
                 || lower.equals("id") || lower.equals("style") || lower.equals("data-src")
                 || lower.endsWith("-url") || lower.contains("poster");
