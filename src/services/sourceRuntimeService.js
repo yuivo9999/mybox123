@@ -8,6 +8,16 @@ import { tv1LiveService } from './tv1LiveService.js';
 export async function testSource(source, options = {}) {
   if (!source?.sourceId) throw new Error('SOURCE_ID_REQUIRED');
 
+  if (source.sourceCapability === 'tvbox-extension' || source.adapterType === 'tvbox-extension') {
+    return {
+      ok: false,
+      sourceId: source.sourceId,
+      status: 'unsupported',
+      reason: source.tvboxUnsupportedReason || 'TVBox 扩展源当前未适配',
+      checkedAt: Date.now(),
+    };
+  }
+
   if (source.sourceType === 'movie') {
     return testMovieSource(source, options);
   }
