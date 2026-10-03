@@ -64,6 +64,8 @@ function mergeContentInto(current, item) {
   current.categoryIds = [...new Set([...(current.categoryIds ?? []), ...(item.categoryIds ?? [])])];
   current.categoryLabels = [...new Set([...(current.categoryLabels ?? []), ...(item.categoryLabels ?? [])])];
   current.sourceCategories = [...new Set([...(current.sourceCategories ?? []), item.sourceCategory].filter(Boolean))];
+  current.sourceCategoryIds = [...new Set([...(current.sourceCategoryIds ?? []), item.sourceCategoryId].filter(value => value !== undefined && value !== null && value !== ''))];
+  current.sourceCategoryNames = [...new Set([...(current.sourceCategoryNames ?? []), item.sourceCategoryName].filter(Boolean))];
   current.sourceTypes = [...new Set([...(current.sourceTypes ?? []), item.sourceType].filter(Boolean))];
   current.episodes = mergeEpisodes(current.episodes ?? [], item.episodes ?? []);
 
@@ -116,6 +118,8 @@ export function mergeContents(items = []) {
         categoryIds: [...new Set(item.categoryIds ?? [])],
         categoryLabels: [...new Set(item.categoryLabels ?? [])],
         sourceCategories: item.sourceCategory ? [item.sourceCategory] : [],
+        sourceCategoryIds: item.sourceCategoryId != null && item.sourceCategoryId !== '' ? [item.sourceCategoryId] : [],
+        sourceCategoryNames: item.sourceCategoryName ? [item.sourceCategoryName] : [],
         sourceTypes: item.sourceType ? [item.sourceType] : [],
         episodes: mergeEpisodes([], item.episodes ?? []),
         availableSourceCount: Math.max(1, new Set(sourceRelations.map(ref => ref.sourceId).filter(Boolean)).size),
