@@ -110,6 +110,16 @@ public final class TVBoxExtensionBridge {
                 result.put("status", response.status);
                 result.put("contentType", response.contentType);
                 result.put("body", response.body);
+                JSONObject responseHeaders = new JSONObject();
+                if (response.headers != null) {
+                    for (java.util.Map.Entry<String, java.util.List<String>> entry : response.headers.entrySet()) {
+                        if (entry.getKey() == null) continue;
+                        java.util.List<String> values = entry.getValue();
+                        responseHeaders.put(entry.getKey(), values == null ? "" : String.join(", ", values));
+                    }
+                }
+                result.put("headers", responseHeaders);
+                result.put("statusCode", response.status);
                 return result.toString();
             }
 
