@@ -29,6 +29,8 @@ public final class TVBoxJarBridge {
     private static final int CONNECT_TIMEOUT_MS = 8_000;
     private static final int READ_TIMEOUT_MS = 12_000;
     private static final int MAX_JAR_BYTES = 20 * 1024 * 1024;
+    private static final int MAX_PAYLOAD_CHARS = 256 * 1024;
+    private static final int MAX_RESULT_CHARS = 5 * 1024 * 1024;
 
     private final Context context;
     private final TVBoxJarExecutor executor;
@@ -44,7 +46,7 @@ public final class TVBoxJarBridge {
             JSONObject result = new JSONObject();
             result.put("contractVersion", "1");
             result.put("available", true);
-            result.put("stage", 3);
+            result.put("stage", 4);
             result.put("supportedKinds", new org.json.JSONArray().put("jar"));
             result.put("supportedOperations", new org.json.JSONArray().put("prepare").put("inspect").put("home").put("category").put("detail").put("search").put("play"));
             result.put("executionEnabled", true);
@@ -59,6 +61,7 @@ public final class TVBoxJarBridge {
     public String execute(String payload) {
         try {
             JSONObject input = new JSONObject(payload == null ? "{}" : payload);
+            if (payload != null && payload.length() > MAX_PAYLOAD_CHARS) return error("TVBOX_JAR_PAYLOAD_TOO_LARGE");
             String operation = input.optString("operation", "");
             JSONObject data = input.optJSONObject("payload");
             if ("prepare".equals(operation)) return prepare(data);
@@ -68,7 +71,7 @@ public final class TVBoxJarBridge {
             return error("TVBOX_JAR_OPERATION_UNSUPPORTED");
         } catch (SecurityException e) {
             return error(e.getMessage() == null ? "TVBOX_JAR_SECURITY_ERROR" : e.getMessage());
-        } catch (Exception e) {
+        } catch (Throwable e) {
             return error(e.getMessage() == null ? "TVBOX_JAR_ERROR" : e.getMessage());
         }
     }
@@ -107,7 +110,9 @@ public final class TVBoxJarBridge {
         String path = data.optString("path", "");
         if (path.isEmpty()) throw new IllegalArgumentException("TVBOX_JAR_PATH_REQUIRED");
         String className = data.optString("className", "");
-        return executor.invoke(new File(path), className, operation, data);
+        String result = executor.invoke(new File(path), className, operation, data);
+        if (result != null && result.length() > MAX_RESULT_CHARS) throw new SecurityException("TVBOX_JAR_RESULT_TOO_LARGE");
+        return result;
     }
 
     private String inspect(JSONObject data) throws Exception {
