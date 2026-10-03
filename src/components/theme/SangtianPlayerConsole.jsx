@@ -200,8 +200,8 @@ export function SangtianPlayerWindow({
             )}
             {status === 'error' && (
               <div className="sangtian-video-error">
-                <b>播放解析失败</b>
-                <span>{error || '当前播放链路没有可用候选。'}</span>
+                <b>{isLive ? '直播直连失败' : '播放解析失败'}</b>
+                <span>{error || (isLive ? '当前直播直链暂时无法连接。' : '当前播放链路没有可用候选。')}</span>
                 <div className="sangtian-error-btns">
                   <button className="sangtian-btn-red" onClick={onRetry}>
                     重新播放
@@ -335,21 +335,21 @@ export function SangtianConsoleCard({
           <button
             className={`console-tab-btn ${activeTab === 'info' ? 'active' : ''}`}
             onClick={() => setActiveTab('info')}
-            title="剧集信息与简介"
+            title={isLive ? "直播信息" : "剧集信息与简介"}
           >
             <FileText size={15} />
           </button>
           <button
             className={`console-tab-btn ${activeTab === 'episodes' ? 'active' : ''}`}
             onClick={() => setActiveTab('episodes')}
-            title="选集播放"
+            title={isLive ? "频道线路" : "选集播放"}
           >
             <LayoutGrid size={15} />
           </button>
           <button
             className={`console-tab-btn ${activeTab === 'sources' ? 'active' : ''}`}
             onClick={() => setActiveTab('sources')}
-            title="来源与线路设置"
+            title={isLive ? "直播线路设置" : "来源与线路设置"}
           >
             <SlidersHorizontal size={15} />
           </button>
@@ -362,7 +362,7 @@ export function SangtianConsoleCard({
         {activeTab === 'episodes' && (
           <div className="console-episodes-section">
             <div className="console-section-header">
-              <span className="section-eyebrow">EPISODES · 选集列表</span>
+              <span className="section-eyebrow">{isLive ? "LIVE · 频道流" : "EPISODES · 选集列表"}</span>
               <h4>{title}</h4>
             </div>
 
@@ -391,7 +391,7 @@ export function SangtianConsoleCard({
         {activeTab === 'info' && (
           <div className="console-info-section">
             <div className="console-section-header">
-              <span className="section-eyebrow">OVERVIEW · 详细资料</span>
+              <span className="section-eyebrow">{isLive ? "LIVE · 当前直播" : "OVERVIEW · 详细资料"}</span>
               <h4>{title}</h4>
             </div>
             {subtitle && <p className="console-subtitle">{subtitle}</p>}
