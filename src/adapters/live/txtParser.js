@@ -175,74 +175,15 @@ export function parseTXTLiveLineStreams(line) {
   else rawUrls = value.match(/^[^\s]+\s+(.+)$/)?.[1]?.trim() || '';
   if (!rawUrls) return [];
 
+  const separator = String.fromCharCode(36);
   return rawUrls.split('#').map((candidate, index) => {
     let streamUrl = candidate.trim();
     if (!streamUrl) return null;
     let label = '线路 ' + (index + 1);
-    if (streamUrl.includes('(text) {
-  if (!text || typeof text !== 'string') return false;
-  if (/#genre#/i.test(text)) return true;
-  
-  const sampleLines = text.split(/\r?\n/).slice(0, 30).filter(Boolean);
-  let matchCount = 0;
-  for (const line of sampleLines) {
-    if (/[^,，\r\n]+[,，]\s*(?:https?|rtmp|rtsp):\/\//i.test(line)) {
-      matchCount++;
-    } else if (/^[^\s]+\s+(?:https?|rtmp|rtsp):\/\//i.test(line)) {
-      matchCount++;
-    }
-  }
-  return matchCount >= 2;
-}
-)) {
-      const parts = streamUrl.split('(text) {
-  if (!text || typeof text !== 'string') return false;
-  if (/#genre#/i.test(text)) return true;
-  
-  const sampleLines = text.split(/\r?\n/).slice(0, 30).filter(Boolean);
-  let matchCount = 0;
-  for (const line of sampleLines) {
-    if (/[^,，\r\n]+[,，]\s*(?:https?|rtmp|rtsp):\/\//i.test(line)) {
-      matchCount++;
-    } else if (/^[^\s]+\s+(?:https?|rtmp|rtsp):\/\//i.test(line)) {
-      matchCount++;
-    }
-  }
-  return matchCount >= 2;
-}
-);
+    if (streamUrl.includes(separator)) {
+      const parts = streamUrl.split(separator);
       streamUrl = parts.shift()?.trim() || '';
-      if (parts.join('(text) {
-  if (!text || typeof text !== 'string') return false;
-  if (/#genre#/i.test(text)) return true;
-  
-  const sampleLines = text.split(/\r?\n/).slice(0, 30).filter(Boolean);
-  let matchCount = 0;
-  for (const line of sampleLines) {
-    if (/[^,，\r\n]+[,，]\s*(?:https?|rtmp|rtsp):\/\//i.test(line)) {
-      matchCount++;
-    } else if (/^[^\s]+\s+(?:https?|rtmp|rtsp):\/\//i.test(line)) {
-      matchCount++;
-    }
-  }
-  return matchCount >= 2;
-}
-).trim()) label = parts.join('(text) {
-  if (!text || typeof text !== 'string') return false;
-  if (/#genre#/i.test(text)) return true;
-  
-  const sampleLines = text.split(/\r?\n/).slice(0, 30).filter(Boolean);
-  let matchCount = 0;
-  for (const line of sampleLines) {
-    if (/[^,，\r\n]+[,，]\s*(?:https?|rtmp|rtsp):\/\//i.test(line)) {
-      matchCount++;
-    } else if (/^[^\s]+\s+(?:https?|rtmp|rtsp):\/\//i.test(line)) {
-      matchCount++;
-    }
-  }
-  return matchCount >= 2;
-}
-).trim();
+      if (parts.join(separator).trim()) label = parts.join(separator).trim();
     }
     return streamUrl ? { url: streamUrl, label, quality: '', resolution: '' } : null;
   }).filter(Boolean);
