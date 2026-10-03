@@ -5,7 +5,7 @@ export const directParser = {
   priority: 100,
   matches(candidate) {
     const protocol = String(candidate?.protocol ?? inferMediaProtocol(candidate?.mediaUrl ?? candidate?.url)).toLowerCase();
-    return (!candidate?.parserHint || candidate.parserHint === 'direct')
+    return (!candidate?.parserHint || candidate.parserHint === 'direct' || typeof candidate.parserHint === 'object')
       && protocol !== 'hls'
       && protocol !== 'dash';
   },
