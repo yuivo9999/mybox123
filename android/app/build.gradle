@@ -58,6 +58,11 @@ dependencies {
     // IJK fork with a published full Android artifact. This avoids the retired
     // Bintray/JCenter-only Bilibili coordinates while retaining the IJK API.
     implementation "io.github.flutterplayer:fijkplayer-full:0.1.18"
+
+    // Sandboxed JavaScript runtime for TVBox Drpy extensions. Network/file
+    // capabilities are not exposed directly to scripts; they are provided by
+    // the controlled runtime adapter.
+    implementation "org.mozilla:rhino:1.7.15"
 }
 
 apply from: 'capacitor.build.gradle'
