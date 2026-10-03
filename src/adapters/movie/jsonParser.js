@@ -39,8 +39,10 @@ function asEpisodes(item) {
     return raw.split(/\s*[|,]\s*/).filter(Boolean).map(title => ({ title }));
   }
   const routes = splitRoutes(item?.vod_play_url);
-  if (routes.length) const routeLabels = splitRoutes(item?.vod_play_from);
-  return routes.flatMap((route, index) => parseRouteEpisodes(route, index, routeLabels[index] || ''));
+  if (routes.length) {
+    const routeLabels = splitRoutes(item?.vod_play_from);
+    return routes.flatMap((route, index) => parseRouteEpisodes(route, index, routeLabels[index] || ''));
+  }
   return [];
 }
 
