@@ -83,6 +83,12 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
   );
 
   const getCapabilities = () => effectiveRuntime?.getCapabilities?.() || { available: false, supportedKinds: [] };
+  const isKindSupported = () => {
+    const capabilities = getCapabilities();
+    return Boolean(capabilities?.available) && (
+      !Array.isArray(capabilities.supportedKinds) || capabilities.supportedKinds.includes(kind)
+    );
+  };
   const getDefinition = () => ({ ...definition, status: isRuntimeAvailable() ? 'runtime' : 'unsupported' });
   const getStatus = () => ({ status: isRuntimeAvailable() ? 'runtime' : 'unsupported', error: isRuntimeAvailable() ? null : unavailable('status') });
 
@@ -116,7 +122,8 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
     isRuntimeAvailable: () => Boolean(
       effectiveRuntime &&
       typeof effectiveRuntime.execute === 'function' &&
-      (typeof effectiveRuntime.isAvailable !== 'function' || effectiveRuntime.isAvailable())
+      (typeof effectiveRuntime.isAvailable !== 'function' || effectiveRuntime.isAvailable()) &&
+      isKindSupported()
     ),
     healthCheck,
     execute,
