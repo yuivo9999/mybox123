@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Copy, Download, Maximize2, Minimize2, RotateCw, Tv, Sparkles, Terminal, Paperclip,
-  Image as ImageIcon, Globe, Play, Clock3, ArrowUp, ChevronDown,
+  Play, Clock3, ArrowUp, ChevronDown,
   FileText, LayoutGrid, SlidersHorizontal, Check, RefreshCw, Ratio
 } from 'lucide-react';
 
@@ -87,7 +87,7 @@ export function SangtianPlayerWindow({
 
   const handleCycleAspect = () => setAspectMode(prev => aspectOptions[(aspectOptions.findIndex(item => item.id === prev) + 1) % aspectOptions.length].id);
   const handleCopyLink = () => {
-    if (navigator?.clipboard?.writeText && streamUrl) navigator.clipboard.writeText(streamUrl).catch(() => {});
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText && streamUrl) navigator.clipboard.writeText(streamUrl).catch(() => {});
     setCopied(true); window.setTimeout(() => setCopied(false), 1800);
   };
   const handleToggleFullscreen = async () => {
@@ -119,7 +119,6 @@ export function SangtianPlayerWindow({
     if (video.paused) video.play().catch(() => {}); else video.pause();
   };
   const fullscreen = isSystemFullscreen || isWebFullscreen;
-  const progressPct = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
   const bufferPct = duration > 0 ? Math.min(100, (bufferedSeconds / duration) * 100) : 0;
   const loadSpeed = bufferRate > 0 ? `${bufferRate.toFixed(1)} 秒/秒` : '—';
 
