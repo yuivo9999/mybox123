@@ -13,6 +13,7 @@ export function createLiveAdapter(config, transport = null) {
   let lastError = null;
   let lastAttemptAt = null;
   let lastSuccessfulAt = null;
+  let detectedFormat = config.format || null;
   let capabilities = normalizeLiveCapabilities({
     ...defaultLiveCapabilities,
     ...(config.capabilities ?? {}),
@@ -33,6 +34,7 @@ export function createLiveAdapter(config, transport = null) {
       if (!response.ok) throw new Error(`HTTP_${response.status}`);
       const body = await response.text();
       const format = detectFormat(config.format, response.headers?.get?.('content-type') || '', body);
+      detectedFormat = format;
       if (format === 'xml' && config.capabilities?.epg === undefined) capabilities = normalizeLiveCapabilities({ ...capabilities, epg: true, currentProgram: true, upcomingProgram: true });
       const raw = format === 'm3u'
         ? parseM3U(body)
@@ -82,6 +84,7 @@ export function createLiveAdapter(config, transport = null) {
       lastSuccessfulAt,
       stale: Boolean(lastSuccessfulSnapshot.length && lastError),
       lastError,
+      detectedFormat,
     }),
     healthCheck: async (options = {}) => {
       try {
