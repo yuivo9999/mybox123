@@ -7,7 +7,7 @@ import { sourceConfigService } from '../services/sourceConfigService.js';
 function Main({tab,movies,channels,favorites,history,sources,searches,progress,settings,onTab,onMovie,onLive,onLiveChannel,onSearchHistory,toggleFavorite,onClearData,onClearHistory,onSaveSources,onClearSearches,onRemoveSearch,onClearCache,onSourceEnabled,onSourceActive,onTestSource,onRemoveSource,onUpdateSettings}){
  const [favoriteSection,setFavoriteSection]=useState('movies');
  const [confirm,setConfirm]=useState(null); const [sourceForm,setSourceForm]=useState(null);
- if(tab==='live') return <LiveFeature channels={channels} favorites={favorites} onChannel={onLiveChannel} onPlay={onLive} onTab={onTab} toggleFavorite={toggleFavorite}/>;
+ if(tab==='live') return <LiveFeature channels={channels} sources={sources} favorites={favorites} onChannel={onLiveChannel} onPlay={onLive} onTab={onTab} toggleFavorite={toggleFavorite}/>;
  if(tab==='favorites'){
   const favoriteContentRecords=favorites.filter(i=>i.targetType==='content');
   const favMovies=favoriteContentRecords.map(record=>movies.find(m=>m.contentId===record.targetId)||{contentId:record.targetId,title:'暂时无法找到来源',year:'',category:'',poster:'',unresolved:true});
@@ -53,6 +53,7 @@ const SourceForm=({value,onCancel,onSave})=>{
   const [name,setName]=useState(value.name);
   const [url,setUrl]=useState(value.url||'');
   const [sourceType,setSourceType]=useState(value.sourceType);
+  const [liveMode,setLiveMode]=useState(value.liveMode||'generic');
   const [localFileSources,setLocalFileSources]=useState(null);
   const [fileStatus,setFileStatus]=useState('');
   const handleFile=async(e)=>{
@@ -86,7 +87,7 @@ const SourceForm=({value,onCancel,onSave})=>{
       finalType = 'live';
     }
     const finalName = name.trim() || (finalType === 'live' ? '自定义直播源' : '自定义影视源');
-    onSave({name: finalName, url: finalUrl, sourceType: finalType});
+    onSave({name: finalName, url: finalUrl, sourceType: finalType, ...(finalType === 'live' ? { liveMode } : {})});
   };
   return <div className="modal-backdrop"><div className="modal">
     <b>添加内容源</b>
@@ -101,6 +102,7 @@ const SourceForm=({value,onCancel,onSave})=>{
         setUrl(val);
         if (val.includes('#genre#') || val.startsWith('#EXTM3U')) {
           setSourceType('live');
+          if (val.includes('#genre#')) setLiveMode('tv1');
         }
       }} placeholder="源地址 URL 或直接粘贴文本数据"/>
       <label className="secondary" style={{padding:'10px 14px',borderRadius:10,border:'1px solid #303744',background:'#171b23',cursor:'pointer',display:'grid',placeItems:'center'}} title="选择本地文件">
@@ -112,6 +114,7 @@ const SourceForm=({value,onCancel,onSave})=>{
       <option value="movie">影视源</option>
       <option value="live">Live 源</option>
     </select>
+    {sourceType==='live' && <select value={liveMode} onChange={e=>setLiveMode(e.target.value)} disabled={Boolean(localFileSources?.length)}><option value="generic">通用 Live 兼容入口</option><option value="tv1">TV1 专用直播（#genre# TXT）</option></select>}
     <div style={{fontSize:11,color:'#8f9aaa',minHeight:16}}>{fileStatus}</div>
     <div className="actions">
       <button className="secondary" onClick={onCancel}>取消</button>
