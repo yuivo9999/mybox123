@@ -32,7 +32,10 @@ public class MainActivity extends BridgeActivity {
             playbackBridge = null;
         }
         tvBoxExtensionBridge = null;
-        tvBoxJarBridge = null;
+        if (tvBoxJarBridge != null) {
+            tvBoxJarBridge.release();
+            tvBoxJarBridge = null;
+        }
         super.onDestroy();
     }
 }
