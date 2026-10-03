@@ -94,6 +94,7 @@ export function createPlaybackCore(task,hooks={}) {
    decoderModes: input.playerHint?.decoderModes ?? playbackSettings.decoder ?? {},
    fallbackEnabled: input.playerHint?.fallbackEnabled ?? playbackSettings.fallbackEnabled,
    fallbackOrder: input.playerHint?.fallbackOrder ?? playbackSettings.fallbackOrder,
+   live: task.request.kind === PlaybackKind.LIVE,
    ijkProfiles: input.playerHint?.ijkProfiles ?? input.metadata?.tvboxIJKProfiles ?? {},
    ijkProfile: input.playerHint?.ijkProfile ?? (
     (input.playerHint?.decoder ?? playbackSettings.decoder?.ijk ?? 'auto') === 'software' ? '软解码' :
