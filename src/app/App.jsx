@@ -69,12 +69,12 @@ export function App(){
    if(movie.contentId) persistent.touchFavorite?.('content', movie.contentId);
    sessionStateStore.patch({selected:movie,route:'detail',tab:'movies'});
  };
- const playMovie=(movie,episodeIndex=0,sourceId=null)=>{
+ const playMovie=(movie,episodeIndex=0,sourceId=null,returnRoute='detail')=>{
    if(!movie)return;
    const episode=movie.episodes?.[episodeIndex]??movie.episodes?.[0]; if(!episode)return;
    const progress=persistent.progress.find((item)=>item.contentId===movie.contentId&&item.episodeId===episode.episodeId);
    const preferredSource=sourceId||persistent.selectedSources?.movie||persistent.settings?.defaultMovieSource||null;
-   const request=playbackService.createVODRequest({content:movie,episode,episodeIndex,preferredSource,metadata:{title:movie.title,poster:movie.poster,episodeTitle:episode.title??'',sourceId:preferredSource,startPositionSeconds:persistent.settings?.autoplayResume?(progress?.completed?0:(progress?.positionSeconds??0)):0}});
+   const request=playbackService.createVODRequest({content:movie,episode,episodeIndex,preferredSource,metadata:{title:movie.title,poster:movie.poster,episodeTitle:episode.title??'',sourceId:preferredSource,returnRoute,startPositionSeconds:persistent.settings?.autoplayResume?(progress?.completed?0:(progress?.positionSeconds??0)):0}});
    if(preferredSource){const sourceCandidates=request.candidates.filter(candidate=>candidate.sourceId===preferredSource);if(sourceCandidates.length)request.candidates=sourceCandidates;sourceManagementService.touchUsage(preferredSource);}
    sessionStateStore.patch({selected:request,route:'movie-play',tab:'movies'}); persistent.recordMoviePlay(movie,episodeIndex,sourceId);
  };
@@ -158,7 +158,7 @@ export function App(){
    }
 
    if (route === 'movie-play') {
-     sessionStateStore.patch({route:'detail'});
+     sessionStateStore.patch({route:selected?.metadata?.returnRoute||'detail',selected:(selected?.metadata?.returnRoute==='movies'||selected?.metadata?.returnRoute==='search')?null:selected});
    } else if (route === 'detail') {
      sessionStateStore.patch({route:null,selected:null});
    } else if (route === 'live-play') {
@@ -224,7 +224,7 @@ export function App(){
 
         // 3. Show normal content features
         return movieActive 
-          ? <MovieFeature route={route} tab={tab} selected={selected} movies={contentState.movies} channels={contentState.channels} history={persistent.history} progress={persistent.progress} selectedSources={persistent.selectedSources} sources={persistent.sources} onSelectMovieSource={setSourceActive} favorites={persistent.favorites} onMovie={openMovie} onPlay={playMovie} onTab={nav} onBack={()=>sessionStateStore.patch({route:route==='movie-play'?'detail':null,selected:route==='movie-play'?selected:null})} onLive={playLive} recordSearch={persistent.recordSearch} toggleFavorite={persistent.toggleFavorite}/>
+          ? <MovieFeature route={route} tab={tab} selected={selected} movies={contentState.movies} channels={contentState.channels} history={persistent.history} progress={persistent.progress} selectedSources={persistent.selectedSources} sources={persistent.sources} onSelectMovieSource={setSourceActive} favorites={persistent.favorites} onMovie={openMovie} onPlay={playMovie} onTab={nav} onBack={()=>sessionStateStore.patch({route:route==='movie-play'?(selected?.metadata?.returnRoute||'detail'):null,selected:route==='movie-play'&&selected?.metadata?.returnRoute==='detail'?selected:null})} onLive={playLive} recordSearch={persistent.recordSearch} toggleFavorite={persistent.toggleFavorite}/>
           : route === 'live-channel' ? <LiveChannelPanel channel={selected} channels={contentState.channels} favorites={persistent.favorites} onBack={()=>sessionStateStore.patch({route:null,selected:null,tab:'live'})} onPlay={playLive} onChannel={openLiveChannel} toggleFavorite={persistent.toggleFavorite}/>
           : route === 'live-play' ? <PlaybackPage request={selected} kind="live" channels={contentState.channels} favorites={persistent.favorites} onChannel={openLiveChannel} onPlay={playLive} toggleFavorite={persistent.toggleFavorite} onTab={nav} onBack={()=>sessionStateStore.patch({route:'live-channel',selected:contentState.channels.find(c=>c.channelId===selected?.channelId)??null})}/>
           : <MainPage tab={tab} movies={contentState.movies} channels={contentState.channels} favorites={persistent.favorites} history={persistent.history} progress={persistent.progress} settings={persistent.settings} sources={persistent.sources} searches={persistent.searches} onTab={nav} onMovie={openMovie} onLive={playLive} onLiveChannel={openLiveChannel} onSearchHistory={openSearchHistory} toggleFavorite={persistent.toggleFavorite} onClearData={persistent.clearUserData} onClearHistory={persistent.clearHistory} onClearSearches={persistent.clearSearches} onRemoveSearch={persistent.removeSearch} onClearCache={persistent.clearCache} onSourceEnabled={setSourceEnabled} onSourceActive={setSourceActive} onUpdateSettings={persistent.updateSettings} onTestSource={testSource} onSaveSources={saveSources} onRemoveSource={removeSource}/>;
