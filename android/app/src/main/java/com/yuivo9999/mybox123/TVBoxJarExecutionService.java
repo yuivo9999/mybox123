@@ -2,10 +2,9 @@ package com.yuivo9999.mybox123;
 
 import android.app.Service;
 import android.content.Intent;
-import android.os.Binder;
-import android.os.IBinder;
 import android.os.Handler;
-import android.os.Looper;
+import android.os.HandlerThread;
+import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
 
@@ -14,9 +13,8 @@ import org.json.JSONObject;
 /**
  * Isolated-process protocol boundary for future CatVod Spider execution.
  *
- * No host-private paths, Binder callbacks, or network capabilities are exposed
- * to untrusted JAR code here. Execution remains disabled until explicit host
- * file/network proxying is implemented.
+ * Execution remains disabled until the Spider itself is hosted in this process
+ * and all required file/network operations are routed through the host proxy.
  */
 public final class TVBoxJarExecutionService extends Service {
     public static final String ACTION = "com.yuivo9999.mybox123.TVBOX_JAR_EXECUTE";
@@ -34,46 +32,72 @@ public final class TVBoxJarExecutionService extends Service {
     public static final String KEY_REQUEST_ID = "requestId";
     public static final String KEY_PAYLOAD = "payload";
 
-    private final Messenger messenger = new Messenger(new IncomingHandler(Looper.getMainLooper()));
+    private HandlerThread handlerThread;
+    private Messenger messenger;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        handlerThread = new HandlerThread("tvbox-jar-isolated-service");
+        handlerThread.start();
+        messenger = new Messenger(new IncomingHandler(handlerThread.getLooper()));
+    }
 
     @Override
     public IBinder onBind(Intent intent) {
         return messenger.getBinder();
     }
 
+    @Override
+    public void onDestroy() {
+        if (handlerThread != null) handlerThread.quitSafely();
+        handlerThread = null;
+        messenger = null;
+        super.onDestroy();
+    }
+
     private final class IncomingHandler extends Handler {
-        IncomingHandler(Looper looper) { super(looper); }
+        IncomingHandler(android.os.Looper looper) { super(looper); }
 
         @Override public void handleMessage(Message message) {
-            String result = capabilities();
             if (message.what == MSG_PING || message.what == MSG_CAPABILITIES) {
-                reply(message, result);
+                reply(message, capabilities(), MSG_RESULT);
                 return;
             }
             if (message.what == MSG_EXECUTE) {
-                reply(message, error("TVBOX_JAR_ISOLATED_EXECUTION_REQUIRES_PROXY"));
+                reply(message, error("TVBOX_JAR_ISOLATED_EXECUTION_NOT_ENABLED"), MSG_RESULT);
                 return;
             }
+            // These messages are reserved for the isolated Spider runtime to
+            // request host-side resources. The current process does not execute
+            // a Spider yet, so receiving them directly is rejected.
             if (message.what == MSG_NETWORK_REQUEST) {
-                reply(message, error("TVBOX_JAR_NETWORK_PROXY_NOT_IMPLEMENTED"));
+                reply(message, error("TVBOX_JAR_NETWORK_PROXY_REQUEST_UNEXPECTED"), MSG_NETWORK_RESULT);
                 return;
             }
             if (message.what == MSG_FILE_READ) {
-                reply(message, error("TVBOX_JAR_FILE_PROXY_NOT_IMPLEMENTED"));
+                reply(message, error("TVBOX_JAR_FILE_PROXY_REQUEST_UNEXPECTED"), MSG_FILE_RESULT);
+                return;
+            }
+            if (message.what == MSG_NETWORK_RESULT || message.what == MSG_FILE_RESULT) {
+                // Result messages are consumed by the requesting isolated
+                // runtime in the future. They are deliberately not interpreted
+                // as executable commands by this protocol boundary.
                 return;
             }
             super.handleMessage(message);
         }
     }
 
-    private void reply(Message request, String payload) {
+    private void reply(Message request, String payload, int what) {
         if (request.replyTo == null) return;
         String safePayload = payload == null ? "" : payload;
         if (safePayload.length() > MAX_MESSAGE_CHARS) safePayload = error("TVBOX_JAR_PROTOCOL_PAYLOAD_TOO_LARGE");
-        Message response = Message.obtain(null, MSG_RESULT);
-        response.setData(new android.os.Bundle());
-        response.getData().putString(KEY_REQUEST_ID, request.getData().getString(KEY_REQUEST_ID, ""));
-        response.getData().putString(KEY_PAYLOAD, safePayload);
+        Message response = Message.obtain(null, what);
+        android.os.Bundle data = new android.os.Bundle();
+        data.putString(KEY_REQUEST_ID, request.getData().getString(KEY_REQUEST_ID, ""));
+        data.putString(KEY_PAYLOAD, safePayload);
+        response.setData(data);
         try { request.replyTo.send(response); } catch (Exception ignored) { }
     }
 
@@ -99,7 +123,10 @@ public final class TVBoxJarExecutionService extends Service {
     }
 
     private String error(String code) {
-        try { return new JSONObject().put("ok", false).put("code", code).put("protocolVersion", PROTOCOL_VERSION).toString(); }
-        catch (Exception ignored) { return "{\"ok\":false,\"code\":\"TVBOX_JAR_ISOLATED_ERROR\"}"; }
+        try {
+            return new JSONObject().put("ok", false).put("code", code).put("protocolVersion", PROTOCOL_VERSION).toString();
+        } catch (Exception ignored) {
+            return "{\"ok\":false,\"code\":\"TVBOX_JAR_ISOLATED_ERROR\"}";
+        }
     }
 }
