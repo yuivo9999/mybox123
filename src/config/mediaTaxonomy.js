@@ -83,7 +83,6 @@ export function classifyMedia({ type = '', category = '', region = '', title = '
     if (hasAny(raw, ['动画电影', '动画片', 'animation', '动漫电影'])) add('animation');
     if (hasAny(raw, ['喜剧', 'comedy'])) add('comedy');
     if (hasAny(raw, ['战争', 'war'])) add('war');
-    if (!ids.length) add('drama');
   } else if (mediaType === MEDIA_TYPE.TV) {
     if (hasAny(raw, ['国产', '中国大陆', '中国内地', '大陆剧', 'china'])) add('china');
     else if (hasAny(raw, ['日本', '日剧', 'japan'])) add('japan');
