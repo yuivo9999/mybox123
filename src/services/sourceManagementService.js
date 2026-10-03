@@ -8,6 +8,10 @@ export const sourceManagementService = {
     const selected = userDataService.getSnapshot().selectedSources;
     return syncAllSources({ ...options, movieSourceId: options.movieSourceId ?? selected.movie ?? null });
   },
+  async reloadMovieSource(sourceId = null) {
+    const selected = sourceId ?? userDataService.getSnapshot().selectedSources.movie ?? null;
+    return syncAllSources({ movieSourceId: selected, includeMovie: true, includeLive: false });
+  },
   async save(sources) {
     sourceRepository.saveAll(sources);
     return this.reload();
