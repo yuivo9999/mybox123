@@ -122,9 +122,21 @@ export async function syncMovieSources(sourceConfigs = [], selectedSourceId = nu
   const settled = await Promise.all(movieRegistry.list().map(async adapter => {
     try {
       // 第一阶段只取得分类索引；第二阶段只请求当前分类第一页。
-      const categories = typeof adapter.getCategories === 'function'
-        ? await adapter.getCategories({ signal: options.signal, timeoutMs: options.timeoutMs ?? 5000 })
-        : [];
+      const categoryKey = createCacheKey({
+        namespace: CacheNamespace.SOURCE,
+        sourceId: adapter.sourceId,
+        contentId: 'categories',
+        params: { type: 'movie-categories' },
+      });
+      const cachedCategories = cacheStorage.get(CacheNamespace.SOURCE, categoryKey, { allowStale: true });
+      const categories = cachedCategories.hit
+        ? cachedCategories.value
+        : (typeof adapter.getCategories === 'function'
+          ? await adapter.getCategories({ signal: options.signal, timeoutMs: options.timeoutMs ?? 5000 })
+          : []);
+      if (!cachedCategories.hit && Array.isArray(categories) && categories.length) {
+        cacheStorage.set(CacheNamespace.SOURCE, categoryKey, categories);
+      }
       const normalizedCategories = (Array.isArray(categories) ? categories : [])
         .map((item, index) => ({
           id: String(item?.id ?? item?.type_id ?? '').trim(),
