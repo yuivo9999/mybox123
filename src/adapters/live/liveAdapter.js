@@ -5,9 +5,38 @@ import { parseTXTLive, isTXTGenreFormat } from './txtParser.js';
 import { normalizeLiveChannel } from './normalizeLive.js';
 import { defaultLiveCapabilities, normalizeLiveCapabilities } from './liveCapabilities.js';
 import { requestAdapter } from '../../services/requestAdapter.js';
+import { createTVBoxExtensionAdapter } from '../tvbox/tvboxExtensionAdapter.js';
 
 export function createLiveAdapter(config, transport = null) {
   const sourceId = config.sourceId;
+
+  // TVBox Live Provider（CSP/Drpy/JAR/ext）不是直接 URL。
+  // 必须经过独立扩展运行时解析，严禁送入普通 HTTP Live Adapter。
+  if (config.adapterType === 'tvbox-live-extension' || config.sourceCapability === 'tvbox-live-provider') {
+    const extensionAdapter = createTVBoxExtensionAdapter({
+      ...config,
+      sourceType: 'live',
+      adapterType: 'tvbox-live-extension',
+      sourceCapability: 'tvbox-live-provider',
+    }, config.tvboxRuntime ?? null);
+
+    return {
+      sourceId,
+      capabilities: {},
+      getChannels: (options = {}) => extensionAdapter.load({}, options),
+      getCategories: async () => [],
+      getStreams: (channelRef, options = {}) => extensionAdapter.execute('streams', { channelRef }, options),
+      getEPG: (channelRef, range = {}, options = {}) => extensionAdapter.execute('epg', { channelRef, range }, options),
+      getSnapshotState: () => ({
+        lastAttemptAt: null,
+        lastSuccessfulAt: null,
+        stale: false,
+        lastError: extensionAdapter.isRuntimeAvailable() ? null : 'TVBOX_EXTENSION_RUNTIME_UNAVAILABLE',
+        detectedFormat: null,
+      }),
+      healthCheck: extensionAdapter.healthCheck,
+    };
+  }
   let snapshot = [];
   let lastSuccessfulSnapshot = [];
   let lastError = null;
