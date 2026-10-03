@@ -15,7 +15,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.json.JSONObject;
 
-/** Host-side protocol client for the isolated CatVod boundary. Execution stays disabled until proxy handlers are implemented. */
+/** Host-side protocol client for the isolated CatVod boundary. */
 public final class TVBoxJarIsolatedClient implements AutoCloseable {
     private static final long DEFAULT_TIMEOUT_MS = 8_000L;
     private final Context context;
@@ -44,7 +44,7 @@ public final class TVBoxJarIsolatedClient implements AutoCloseable {
                                 ? hostProxy.network(object)
                                 : hostProxy.readFile(object);
                     } catch (Exception error) {
-                        result = "{\\"ok\\":false,\\"code\\":\\"TVBOX_JAR_PROXY_REQUEST_INVALID\\"}";
+                        result = errorPayload("TVBOX_JAR_PROXY_REQUEST_INVALID");
                     }
                     if (message.replyTo != null) {
                         Message response = Message.obtain(null,
@@ -68,6 +68,14 @@ public final class TVBoxJarIsolatedClient implements AutoCloseable {
         incoming = new Messenger(callbackHandler);
     }
 
+    private static String errorPayload(String code) {
+        try {
+            return new JSONObject().put("ok", false).put("code", code).toString();
+        } catch (Exception ignored) {
+            return "{\"ok\":false,\"code\":\"TVBOX_JAR_PROXY_REQUEST_INVALID\"}";
+        }
+    }
+
     public synchronized void connect() throws InterruptedException {
         if (bound && remote != null) return;
         CountDownLatch latch = new CountDownLatch(1);
@@ -76,11 +84,17 @@ public final class TVBoxJarIsolatedClient implements AutoCloseable {
             @Override public void onServiceConnected(ComponentName name, android.os.IBinder service) { synchronized (TVBoxJarIsolatedClient.this) { remote = new Messenger(service); bound = true; } latch.countDown(); }
             @Override public void onServiceDisconnected(ComponentName name) { synchronized (TVBoxJarIsolatedClient.this) { remote = null; bound = false; } }
         };
-        context.bindService(intent, connection, Context.BIND_AUTO_CREATE);
+        if (!context.bindService(intent, connection, Context.BIND_AUTO_CREATE)) {
+            connection = null;
+            throw new IllegalStateException("TVBOX_JAR_ISOLATED_BIND_FAILED");
+        }
         if (!latch.await(DEFAULT_TIMEOUT_MS, TimeUnit.MILLISECONDS)) throw new IllegalStateException("TVBOX_JAR_ISOLATED_CONNECT_TIMEOUT");
     }
 
-    public String capabilities() throws Exception { return request(TVBoxJarExecutionService.MSG_CAPABILITIES, "{}"); }
+    public String capabilities() throws Exception {
+        connect();
+        return request(TVBoxJarExecutionService.MSG_CAPABILITIES, "{}");
+    }
 
     public synchronized String request(int what, String payload) throws Exception {
         if (!bound || remote == null) throw new IllegalStateException("TVBOX_JAR_ISOLATED_NOT_CONNECTED");
@@ -89,7 +103,8 @@ public final class TVBoxJarIsolatedClient implements AutoCloseable {
         Bundle data = new Bundle();
         data.putString(TVBoxJarExecutionService.KEY_REQUEST_ID, requestId);
         data.putString(TVBoxJarExecutionService.KEY_PAYLOAD, payload == null ? "" : payload);
-        message.setData(data); message.replyTo = incoming;
+        message.setData(data);
+        message.replyTo = incoming;
         remote.send(message);
         long deadline = System.currentTimeMillis() + DEFAULT_TIMEOUT_MS;
         synchronized (responses) {
@@ -103,11 +118,12 @@ public final class TVBoxJarIsolatedClient implements AutoCloseable {
     }
 
     @Override public synchronized void close() {
-        if (!bound) return;
-        try { if (connection != null) context.unbindService(connection); } catch (Exception ignored) { }
+        if (bound) {
+            try { if (connection != null) context.unbindService(connection); } catch (Exception ignored) { }
+        }
         connection = null;
-        remote = null; bound = false;
+        remote = null;
+        bound = false;
         callbackThread.quitSafely();
     }
-
 }
