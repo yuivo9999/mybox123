@@ -17,6 +17,41 @@ export function createLiveFeature({ channels = [] } = {}) {
   };
 }
 
+
+export async function resolveLiveChannelStreams(channel, { sources = [], signal } = {}) {
+  if (!channel) return [];
+  if (Array.isArray(channel.streams) && channel.streams.length) return channel.streams;
+  if (!channel.deferredRef) return [];
+
+  const tv1Source = channel.sourceRefs?.find(ref =>
+    sources.some(source =>
+      source.sourceId === ref.sourceId
+      && source.sourceType === 'live'
+      && source.liveMode === 'tv1'
+      && source.enabled !== false
+    )
+  );
+  const source = tv1Source
+    ? sources.find(item => item.sourceId === tv1Source.sourceId)
+    : null;
+
+  if (source) {
+    return requestManager.run(
+      'tv1-streams:' + source.sourceId + ':' + channel.channelId,
+      requestSignal => tv1LiveService.getStreams(source, channel, {
+        signal: signal || requestSignal,
+      }),
+    );
+  }
+
+  return requestManager.run(
+    'live-deferred-streams:' + channel.channelId,
+    requestSignal => liveService.getStreams(channel, {
+      signal: signal || requestSignal,
+    }),
+  );
+}
+
 export function LiveFeature({ channels = [], sources = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite }) {
   const page = usePageState();
   const videoRef = useRef(null);
@@ -126,36 +161,13 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
       })
     : null, [livePlaybackRequest]);
 
-  const loadTv1Streams = async channel => {
-    const sourceRef = channel?.sourceRefs?.find(ref => enabledTv1Sources.some(source => source.sourceId === ref.sourceId));
-    const source = sourceRef ? enabledTv1Sources.find(item => item.sourceId === sourceRef.sourceId) : null;
-    if (!source || !channel?.deferredRef) return;
-    if (resolvedStreams[channel.channelId]) return;
-
+  const loadChannelStreams = async channel => {
+    if (!channel?.deferredRef || resolvedStreams[channel.channelId]) return;
     setStreamLoading(true);
     setSelectedChannelId(channel.channelId);
     setActiveStreamIndex(0);
     try {
-      const streams = await requestManager.run(
-        'tv1-streams:' + source.sourceId + ':' + channel.channelId,
-        signal => tv1LiveService.getStreams(source, channel, { signal }),
-      );
-      setResolvedStreams(prev => ({ ...prev, [channel.channelId]: streams }));
-    } catch (error) {
-      if (error?.name !== 'AbortError') setTv1Error(error);
-    } finally {
-      setStreamLoading(false);
-    }
-  };
-
-  const loadDeferredStreams = async channel => {
-    if (!channel?.deferredRef || resolvedStreams[channel.channelId]) return;
-    setStreamLoading(true);
-    try {
-      const streams = await requestManager.run(
-        'live-deferred-streams:' + channel.channelId,
-        signal => liveService.getStreams(channel, { signal }),
-      );
+      const streams = await resolveLiveChannelStreams(channel, { sources: enabledTv1Sources });
       setResolvedStreams(prev => ({ ...prev, [channel.channelId]: streams }));
     } catch (error) {
       if (error?.name !== 'AbortError') setTv1Error(error);
@@ -172,7 +184,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     setPlaybackError('');
     if (channel.deferredRef) {
       const tv1Source = channel.sourceRefs?.some(ref => enabledTv1Sources.some(source => source.sourceId === ref.sourceId));
-      void (tv1Source ? loadTv1Streams(channel) : loadDeferredStreams(channel));
+      void loadChannelStreams(channel);
     }
   };
 
@@ -369,10 +381,51 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   );
 }
 
-export function LiveChannelPanel({ channel, channels = [], favorites = [], onBack, onPlay, onChannel, toggleFavorite }) {
+export function LiveChannelPanel({
+  channel,
+  channels = [],
+  sources = [],
+  favorites = [],
+  onBack,
+  onPlay,
+  onChannel,
+  toggleFavorite,
+}) {
   const feature = useMemo(() => createLiveFeature({ channels }), [channels]);
   const [epg, setEpg] = useState(channel?.epg ?? []);
   const [epgLoading, setEpgLoading] = useState(false);
+  const [resolvedChannel, setResolvedChannel] = useState(channel);
+  const [streamLoading, setStreamLoading] = useState(false);
+  const [streamError, setStreamError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    setResolvedChannel(channel);
+    setStreamError('');
+    if (!channel?.deferredRef || channel?.streams?.length) {
+      setStreamLoading(false);
+      return () => { active = false; };
+    }
+
+    setStreamLoading(true);
+    void resolveLiveChannelStreams(channel, { sources })
+      .then(streams => {
+        if (!active) return;
+        setResolvedChannel(prev => prev?.channelId === channel.channelId
+          ? { ...prev, streams }
+          : prev);
+      })
+      .catch(error => {
+        if (active && error?.name !== 'AbortError') {
+          setStreamError(error?.message || '播放地址读取失败');
+        }
+      })
+      .finally(() => {
+        if (active) setStreamLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [channel, sources]);
 
   useEffect(() => {
     let active = true;
@@ -386,19 +439,27 @@ export function LiveChannelPanel({ channel, channels = [], favorites = [], onBac
     const now = Date.now();
     const range = {
       startAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
-      endAt: new Date(now + 4 * 60 * 60 * 1000).toISOString()
+      endAt: new Date(now + 4 * 60 * 60 * 1000).toISOString(),
     };
     feature.getEPG(channel, range).then(items => {
-      if (active && items.length) setEpg(items)
-    }).catch(() => { }).finally(() => {
-      if (active) setEpgLoading(false)
+      if (active && items.length) setEpg(items);
+    }).catch(() => {}).finally(() => {
+      if (active) setEpgLoading(false);
     });
-    return () => { active = false }
+    return () => { active = false; };
   }, [channel, feature]);
 
   if (!channel) return <EmptyState text="频道不存在" />;
+  const displayChannel = resolvedChannel?.channelId === channel.channelId ? resolvedChannel : channel;
+  const streams = Array.isArray(displayChannel.streams) ? displayChannel.streams : [];
   const favorite = favorites.some(i => i.targetType === 'channel' && i.targetId === channel.channelId);
   const related = channels.filter(i => i.channelId !== channel.channelId && i.category === channel.category);
+  const canPlay = streams.length > 0 && !streamLoading;
+
+  const playResolved = (streamId = null) => {
+    if (!canPlay) return;
+    onPlay(displayChannel, streamId);
+  };
 
   return (
     <Page>
@@ -408,11 +469,16 @@ export function LiveChannelPanel({ channel, channels = [], favorites = [], onBac
           <SmartImage src={channel.logo} alt={channel.name} fallback={<Radio size={34} />} />
         </div>
         <div>
-          <span className="eyebrow">{channel.category} · {channel.sourceRefs.length} 个来源</span>
+          <span className="eyebrow">{channel.category} · {channel.sourceRefs?.length ?? 0} 个来源</span>
           <h1>{channel.name}</h1>
-          <p>● 正在直播 · {channel.streams.length} 条线路可用，频道身份与线路身份保持独立。</p>
+          <p>
+            ● 正在直播 · {streamLoading ? '正在读取播放地址…' : streams.length + ' 条线路可用'}，频道身份与线路身份保持独立。
+          </p>
+          {streamError && <div className="info-card"><Radio size={18} /><div><b>线路读取失败</b><span>{streamError}</span></div></div>}
           <div className="actions">
-            <button className="primary" onClick={() => onPlay(channel)}><Play size={16} />播放</button>
+            <button className="primary" disabled={!canPlay} onClick={() => playResolved()}>
+              <Play size={16} />{streamLoading ? '读取线路…' : '播放'}
+            </button>
             <button className={favorite ? 'secondary active-fav' : 'secondary'} onClick={() => toggleFavorite('channel', channel.channelId)}>
               <Heart size={16} fill={favorite ? 'currentColor' : 'none'} />
               {favorite ? '已收藏' : '收藏'}
@@ -421,15 +487,19 @@ export function LiveChannelPanel({ channel, channels = [], favorites = [], onBac
         </div>
       </div>
       <SectionTitle title="播放线路" />
-      <div className="channel-list">
-        {channel.streams.map(stream => (
-          <button className="menu live-stream" key={stream.streamId} onClick={() => onPlay(channel, stream.streamId)}>
-            <Radio size={18} />
-            <span>{stream.label}<small>{stream.protocol} · {stream.sourceId}</small></span>
-            <ChevronLeft className="flip" size={17} />
-          </button>
-        ))}
-      </div>
+      {streamLoading && <LoadingState compact text="正在按需读取频道播放地址…" />}
+      {!streamLoading && !streams.length && <div className="empty compact"><span>{streamError || '暂无可用播放线路'}</span></div>}
+      {!!streams.length && (
+        <div className="channel-list">
+          {streams.map(stream => (
+            <button className="menu live-stream" key={stream.streamId} onClick={() => playResolved(stream.streamId)}>
+              <Radio size={18} />
+              <span>{stream.label || '默认线路'}<small>{stream.protocol || 'LIVE'} · {stream.sourceId || '—'}</small></span>
+              <ChevronLeft className="flip" size={17} />
+            </button>
+          ))}
+        </div>
+      )}
       {channel.capabilities?.epg !== false && (
         <>
           <SectionTitle title="节目单" />
@@ -463,7 +533,7 @@ export function LiveChannelPanel({ channel, channels = [], favorites = [], onBac
             {related.map(item => (
               <button className="menu" key={item.channelId} onClick={() => onChannel(item)}>
                 <Radio size={18} />
-                <span>{item.name}<small>{item.streams.length} 条线路</small></span>
+                <span>{item.name}<small>{Array.isArray(item.streams) && item.streams.length ? item.streams.length + ' 条线路' : item.deferredRef ? '地址按需读取' : '暂无线路'}</small></span>
                 <ChevronLeft className="flip" size={17} />
               </button>
             ))}
@@ -473,7 +543,6 @@ export function LiveChannelPanel({ channel, channels = [], favorites = [], onBac
     </Page>
   );
 }
-
 const Page = ({ children }) => <main className="page">{children}</main>;
 const Header = ({ title }) => <header><div><span className="eyebrow">TVBOX REACT · LIVE</span><h2>{title}</h2></div></header>;
 const SectionTitle = ({ title }) => <div className="section-title"><h3>{title}</h3></div>;
