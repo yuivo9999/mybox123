@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   Copy, Maximize2, Minimize2, RotateCw, Sparkles, Terminal, Paperclip,
-  Play, ArrowUp, ChevronDown,
+  Play, ArrowUp, ChevronDown, Rewind, FastForward,
   FileText, LayoutGrid, SlidersHorizontal, Check, RefreshCw, Ratio
 } from 'lucide-react';
 
@@ -117,6 +117,14 @@ export function SangtianPlayerWindow({
     if (!video) return;
     if (video.paused) video.play().catch(() => {}); else video.pause();
   };
+  const handleSkip = seconds => {
+    if (isLive) return;
+    const video = videoRef?.current;
+    if (!video || !Number.isFinite(video.duration)) return;
+    const nextTime = Math.max(0, Math.min(video.duration, (Number(video.currentTime) || 0) + seconds));
+    video.currentTime = nextTime;
+    setCurrentTime(nextTime);
+  };
   const fullscreen = isSystemFullscreen;
   const renderedChildren = isLive
     ? React.Children.map(children, child => React.isValidElement(child) ? React.cloneElement(child, { controls: !fullscreen }) : child)
@@ -160,7 +168,17 @@ export function SangtianPlayerWindow({
               <div className={`sangtian-fullscreen-controls ${isLandscape ? 'landscape' : 'portrait'} ${showFullscreenBar ? 'visible' : ''}`}
                    onClick={()=>setShowFullscreenBar(true)}>
                 <div className="sangtian-fullscreen-topbar"><span>{request?.metadata?.title || candidate?.label || '正在播放'}</span><button onClick={handleToggleFullscreen}><Minimize2 size={18}/></button></div>
-                <div className="sangtian-fullscreen-center"><button onClick={handlePlayPause} className="fullscreen-play-btn">{isPlaying ? '暂停' : '播放'}</button></div>
+                <div className="sangtian-fullscreen-center">
+                  {!isLive ? (
+                    <div className="fullscreen-skip-row">
+                      <button type="button" onClick={() => handleSkip(-10)} aria-label="后退10秒"><Rewind size={18}/><span>10秒</span></button>
+                      <button type="button" onClick={handlePlayPause} className="fullscreen-play-btn">{isPlaying ? '暂停' : '播放'}</button>
+                      <button type="button" onClick={() => handleSkip(10)} aria-label="前进10秒"><FastForward size={18}/><span>10秒</span></button>
+                    </div>
+                  ) : (
+                    <button type="button" onClick={handlePlayPause} className="fullscreen-play-btn">{isPlaying ? '暂停' : '播放'}</button>
+                  )}
+                </div>
                 <div className="sangtian-fullscreen-bottombar">
                   {!isLive && (
                     <>
