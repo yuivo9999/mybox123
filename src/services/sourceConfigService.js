@@ -239,6 +239,7 @@ function parseTVBoxSources(parsed) {
           sourceType: 'live',
           sourceRef,
           url: sourceRef,
+          liveMode: /\.txt(?:[?#]|$)/i.test(sourceRef) ? 'tv1' : 'generic',
           enabled: true,
           status: '未测试',
           createdAt: Date.now(),
