@@ -29,6 +29,19 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
 
   const inspect = async (payload = {}) => execute('inspect', payload);
 
+  const invoke = async (operation, payload = {}) => execute(operation, {
+    ...payload,
+    path: payload.path || '',
+    className: payload.className || '',
+    ext: payload.ext ?? definition.tvboxDefinition?.ext ?? '',
+  });
+
+  const home = (payload = {}) => invoke('home', payload);
+  const category = (payload = {}) => invoke('category', payload);
+  const detail = (payload = {}) => invoke('detail', payload);
+  const search = (payload = {}) => invoke('search', payload);
+  const play = (payload = {}) => invoke('play', payload);
+
   return {
     sourceId,
     definition,
@@ -36,6 +49,12 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
     getCapabilities: () => effectiveRuntime?.getCapabilities?.() || { available: false },
     prepare,
     inspect,
+    invoke,
+    home,
+    category,
+    detail,
+    search,
+    play,
     execute,
   };
 }
