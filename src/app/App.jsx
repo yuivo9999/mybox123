@@ -175,7 +175,8 @@ export function App(){
 
    // 全屏/播放器状态优先退出全屏，不触发页面切换。
    if (typeof document !== 'undefined' && document.fullscreenElement) {
-     void document.exitFullscreen?.().catch?.(() => {});
+     const exitFullscreen = document.exitFullscreen?.();
+     exitFullscreen?.catch?.(() => {});
      return;
    }
 
@@ -192,6 +193,15 @@ export function App(){
        sessionStateStore.patch({route:null,selected:null});
      }
      return;
+   }
+
+   // 管理页同样属于应用导航栈：右滑回到所属的上一级页面。
+   if (direction === 'right') {
+     const parentTab = getParentForRoute({tab, route:null, selected});
+     if (parentTab) {
+       nav(parentTab);
+       return;
+     }
    }
 
    // 顶层五页统一为 Android 横向分页：左滑下一页，右滑上一页。
