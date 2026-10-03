@@ -20,7 +20,7 @@ function filterEPG(programs = [], range = {}) {
 }
 
 function sourceCacheKey(sourceId) {
-  return createCacheKey({ namespace: CacheNamespace.LIVE_SOURCE, sourceId, contentId: 'live-channels', params: { type: 'channels' } });
+  return createCacheKey({ namespace: CacheNamespace.LIVE_SOURCE, sourceId, contentId: 'live-channels', params: { type: 'channels' }, version: 2 });
 }
 
 function liveChannelCacheKey(channelRef) {
