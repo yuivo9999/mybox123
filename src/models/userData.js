@@ -15,11 +15,11 @@ export function createSearchId(keyword) {
 }
 
 export const defaultPlaybackSettings = () => ({
-  moviePlayer: 'exo',
-  livePlayer: 'exo',
+  moviePlayer: 'ijk',
+  livePlayer: 'ijk',
   fallbackEnabled: true,
-  fallbackOrder: ['exo', 'ijk', 'native'],
-  decoder: { exo: 'auto', ijk: 'auto', native: 'system' },
+  fallbackOrder: ['ijk', 'exo', 'native'],
+  decoder: { exo: 'auto', ijk: 'hardware', native: 'system' },
 });
 
 export const defaultSettings = () => ({
@@ -42,13 +42,13 @@ export const normalizePlaybackSettings = (value = {}) => {
   return {
     ...defaultPlaybackSettings(),
     ...input,
-    moviePlayer: ['exo', 'ijk', 'native'].includes(input.moviePlayer) ? input.moviePlayer : 'exo',
-    livePlayer: ['exo', 'ijk', 'native'].includes(input.livePlayer) ? input.livePlayer : 'exo',
+    moviePlayer: ['exo', 'ijk', 'native'].includes(input.moviePlayer) ? input.moviePlayer : 'ijk',
+    livePlayer: ['exo', 'ijk', 'native'].includes(input.livePlayer) ? input.livePlayer : 'ijk',
     fallbackEnabled: input.fallbackEnabled !== false,
     fallbackOrder,
     decoder: {
       exo: ['auto', 'hardware', 'software'].includes(decoder.exo) ? decoder.exo : 'auto',
-      ijk: ['auto', 'hardware', 'software'].includes(decoder.ijk) ? decoder.ijk : 'auto',
+      ijk: ['auto', 'hardware', 'software'].includes(decoder.ijk) ? decoder.ijk : 'hardware',
       native: 'system',
     },
   };
