@@ -78,7 +78,7 @@ export function parseTXTLiveMetadata(text) {
   const cleanText = String(text).replace(/^\uFEFF/, '');
   const lines = cleanText.split(/\r?\n/);
   let currentCategory = '默认频道';
-  const seen = new Set();
+  const channelsMap = new Map();
   const channels = [];
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
@@ -95,26 +95,35 @@ export function parseTXTLiveMetadata(text) {
 
     const commaIndex = line.search(/[,，]/);
     const name = commaIndex !== -1 ? line.slice(0, commaIndex).trim() : line.match(/^([^\s]+)\s+/)?.[1]?.trim() || '';
+    const rawUrls = commaIndex !== -1 ? line.slice(commaIndex + 1).trim() : line.match(/^[^\s]+\s+(.+)$/)?.[1]?.trim() || '';
     if (!name) continue;
 
+    const urlCountInLine = Math.max(1, rawUrls ? rawUrls.split('#').filter(Boolean).length : 1);
     const key = currentCategory + ':::' + name;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    channels.push({
-      sourceItemId: 'txt-' + (channels.length + 1) + '-' + name,
-      canonicalId: name,
-      channelKey: name,
-      name,
-      logo: '',
-      categoryId: currentCategory,
-      category: currentCategory,
-      sourceOrder: channels.length,
-      streams: [],
-      epg: [],
-      currentProgram: null,
-      upcomingProgram: null,
-      deferredRef: { lineIndex },
-    });
+    let existing = channelsMap.get(key);
+    if (existing) {
+      existing.deferredRef.lineIndices.push(lineIndex);
+      existing.estimatedStreamCount = (existing.estimatedStreamCount || 1) + urlCountInLine;
+    } else {
+      const channel = {
+        sourceItemId: 'txt-' + (channels.length + 1) + '-' + name,
+        canonicalId: name,
+        channelKey: name,
+        name,
+        logo: '',
+        categoryId: currentCategory,
+        category: currentCategory,
+        sourceOrder: channels.length,
+        streams: [],
+        epg: [],
+        currentProgram: null,
+        upcomingProgram: null,
+        deferredRef: { lineIndex, lineIndices: [lineIndex] },
+        estimatedStreamCount: urlCountInLine,
+      };
+      channelsMap.set(key, channel);
+      channels.push(channel);
+    }
   }
   return channels;
 }
@@ -124,7 +133,7 @@ export async function parseTXTLiveMetadataStream(text, onChannel) {
   const cleanText = String(text).replace(/^\uFEFF/, '');
   const lines = cleanText.split(/\r?\n/);
   let currentCategory = '默认频道';
-  const seen = new Set();
+  const channelsMap = new Map();
   const channels = [];
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
@@ -142,29 +151,36 @@ export async function parseTXTLiveMetadataStream(text, onChannel) {
 
     const commaIndex = line.search(/[,，]/);
     const name = commaIndex !== -1 ? line.slice(0, commaIndex).trim() : line.match(/^([^\s]+)\s+/)?.[1]?.trim() || '';
+    const rawUrls = commaIndex !== -1 ? line.slice(commaIndex + 1).trim() : line.match(/^[^\s]+\s+(.+)$/)?.[1]?.trim() || '';
     if (!name) continue;
 
+    const urlCountInLine = Math.max(1, rawUrls ? rawUrls.split('#').filter(Boolean).length : 1);
     const key = currentCategory + ':::' + name;
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    const channel = {
-      sourceItemId: 'txt-' + (channels.length + 1) + '-' + name,
-      canonicalId: name,
-      channelKey: name,
-      name,
-      logo: '',
-      categoryId: currentCategory,
-      category: currentCategory,
-      sourceOrder: channels.length,
-      streams: [],
-      epg: [],
-      currentProgram: null,
-      upcomingProgram: null,
-      deferredRef: { lineIndex },
-    };
-    channels.push(channel);
-    if (typeof onChannel === 'function') await onChannel(channel);
+    let existing = channelsMap.get(key);
+    if (existing) {
+      existing.deferredRef.lineIndices.push(lineIndex);
+      existing.estimatedStreamCount = (existing.estimatedStreamCount || 1) + urlCountInLine;
+    } else {
+      const channel = {
+        sourceItemId: 'txt-' + (channels.length + 1) + '-' + name,
+        canonicalId: name,
+        channelKey: name,
+        name,
+        logo: '',
+        categoryId: currentCategory,
+        category: currentCategory,
+        sourceOrder: channels.length,
+        streams: [],
+        epg: [],
+        currentProgram: null,
+        upcomingProgram: null,
+        deferredRef: { lineIndex, lineIndices: [lineIndex] },
+        estimatedStreamCount: urlCountInLine,
+      };
+      channelsMap.set(key, channel);
+      channels.push(channel);
+      if (typeof onChannel === 'function') await onChannel(channel);
+    }
 
     if (lineIndex > 0 && lineIndex % 1500 === 0) {
       await new Promise(resolve => setTimeout(resolve, 0));

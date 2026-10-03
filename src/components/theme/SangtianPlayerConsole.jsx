@@ -3,11 +3,11 @@ import {
   Copy, Maximize2, Minimize2, RotateCw, Sparkles, Terminal, Paperclip,
   Play, Pause, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, Rewind, FastForward,
   FileText, LayoutGrid, SlidersHorizontal, Check, RefreshCw, Ratio,
-  Lock, Unlock, ListVideo
+  Lock, Unlock, ListVideo, Square
 } from 'lucide-react';
 
 export function SangtianPlayerWindow({
-  videoRef, status, error, resolvedInput, candidate, request, onRetry, onSwitchCandidate,
+  videoRef, status, error, resolvedInput, candidate, request, onRetry, onSwitchCandidate, onStop,
   onFullscreen, terminalTag = 'BASH', children, videoContainerRef, isLive = false,
   playbackRate = 1.0, onChangePlaybackRate,
   channels = [], activeChannel = null, activeStreamIndex = 0, onSelectChannel, onSwitchStreamIndex,
@@ -17,6 +17,7 @@ export function SangtianPlayerWindow({
   episodes = [], currentEpisodeIndex = 0, onSelectEpisode,
   onPreviousEpisode, onNextEpisode,
   candidates = [], onSelectCandidate, onOpenSourceModal,
+  onTimeMetricsChange,
 }) {
   const [showTerminal, setShowTerminal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -36,6 +37,11 @@ export function SangtianPlayerWindow({
   const [showRightSidebar, setShowRightSidebar] = useState(false);
   const [showEpisodeSidebar, setShowEpisodeSidebar] = useState(false);
   const [episodePage, setEpisodePage] = useState(0);
+  const [isStoppedManually, setIsStoppedManually] = useState(false);
+
+  useEffect(() => {
+    setIsStoppedManually(false);
+  }, [candidate?.candidateId, candidate?.url, resolvedInput?.url]);
 
   const lastBufferRef = useRef({ time: 0, buffered: 0 });
   const controlsTimeoutRef = useRef(null);
@@ -65,8 +71,10 @@ export function SangtianPlayerWindow({
     const video = videoRef?.current;
     if (!video) return;
     const cur = Number(video.currentTime) || 0;
+    const dur = Number(video.duration) || 0;
     setCurrentTime(cur);
-    setDuration(Number(video.duration) || 0);
+    setDuration(dur);
+    onTimeMetricsChange?.(cur, dur);
     let forwardBuffer = 0;
     try {
       if (video.buffered?.length) {
@@ -84,15 +92,34 @@ export function SangtianPlayerWindow({
   };
 
   useEffect(() => {
-    const video = videoRef?.current;
-    if (!video) return undefined;
-    const events = ['timeupdate','progress','loadedmetadata','durationchange','playing','pause','waiting','canplay','seeking','seeked'];
-    const update = () => { syncMediaMetrics(); setIsPlaying(!video.paused && !video.ended); };
-    events.forEach(event => video.addEventListener(event, update));
-    const timer = window.setInterval(update, 500);
+    let boundVideo = null;
+    const events = ['timeupdate', 'progress', 'loadedmetadata', 'durationchange', 'playing', 'pause', 'waiting', 'canplay', 'seeking', 'seeked'];
+    const update = () => {
+      const video = videoRef?.current;
+      if (video) {
+        syncMediaMetrics();
+        const activePlaying = !video.paused && !video.ended && (video.currentTime > 0 || video.readyState >= 2);
+        setIsPlaying(activePlaying);
+        if (video !== boundVideo) {
+          if (boundVideo) {
+            events.forEach(event => boundVideo.removeEventListener(event, update));
+          }
+          boundVideo = video;
+          events.forEach(event => video.addEventListener(event, update));
+        }
+      }
+    };
+
+    const timer = window.setInterval(update, 250);
     update();
-    return () => { events.forEach(event => video.removeEventListener(event, update)); window.clearInterval(timer); };
-  }, [videoRef]);
+
+    return () => {
+      window.clearInterval(timer);
+      if (boundVideo) {
+        events.forEach(event => boundVideo.removeEventListener(event, update));
+      }
+    };
+  }, [videoRef, candidate, resolvedInput, status]);
 
   useEffect(() => {
     const connection = typeof navigator !== 'undefined'
@@ -295,6 +322,17 @@ export function SangtianPlayerWindow({
         <div className="sangtian-window-bar">
           <div className="sangtian-window-tag"><span>{terminalTag}</span></div>
           <div className="sangtian-window-actions">
+            <button
+              className="sangtian-window-btn"
+              onClick={() => {
+                setIsStoppedManually(true);
+                onStop?.();
+              }}
+              title="停止播放"
+            >
+              <Square size={13}/>
+              <span>停止</span>
+            </button>
             <button className="sangtian-window-btn" onClick={handleCopyLink} title="复制播放链接">
               {copied ? <Check size={13}/> : <Copy size={13}/>}
               <span>{copied ? '已复制' : '复制'}</span>
@@ -338,18 +376,68 @@ export function SangtianPlayerWindow({
         ) : (
           <>
             {renderedChildren}
-            {!resolvedInput && candidate && status !== 'error' && (
-              <div className="sangtian-video-overlay">
-                <div className="sangtian-loading-spinner"/>
-                <span>{isLive ? '正在连接直播直链…' : '正在解析视频播放地址…'}</span>
-              </div>
-            )}
-            {resolvedInput && status !== 'error' && !isPlaying && (
-              <div className="sangtian-video-overlay compact">
-                <div className="sangtian-loading-spinner"/>
-                <span>正在缓冲…</span>
-              </div>
-            )}
+            {(() => {
+              const isStopped = isStoppedManually || status === 'stopped';
+              if (isStopped) {
+                return (
+                  <div className="sangtian-video-overlay stopped">
+                    <div
+                      className="sangtian-stopped-play-btn"
+                      onClick={() => {
+                        setIsStoppedManually(false);
+                        if (onRetry) onRetry();
+                        else if (videoRef?.current) videoRef.current.play?.();
+                      }}
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: '50%',
+                        background: 'rgba(213, 165, 90, 0.95)',
+                        display: 'grid',
+                        placeItems: 'center',
+                        color: '#1a1816',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                        marginBottom: 8,
+                      }}
+                    >
+                      <Play size={24} style={{ marginLeft: 3 }} />
+                    </div>
+                    <span style={{ fontSize: 13, color: '#ecd9ba', fontWeight: 500 }}>已停止播放</span>
+                    {onRetry && (
+                      <button
+                        type="button"
+                        className="sangtian-btn-sand"
+                        onClick={() => {
+                          setIsStoppedManually(false);
+                          onRetry();
+                        }}
+                        style={{ marginTop: 10, padding: '4px 12px', fontSize: 12, borderRadius: 6 }}
+                      >
+                        重新连接播放
+                      </button>
+                    )}
+                  </div>
+                );
+              }
+              if (!resolvedInput && candidate && status !== 'error') {
+                return (
+                  <div className="sangtian-video-overlay">
+                    <div className="sangtian-loading-spinner"/>
+                    <span>{isLive ? '正在连接直播直链…' : '正在解析视频播放地址…'}</span>
+                  </div>
+                );
+              }
+              if (resolvedInput && status !== 'error' && (status === 'loading' || status === 'preparing') && !isPlaying && currentTime === 0) {
+                return (
+                  <div className="sangtian-video-overlay compact" style={{ pointerEvents: 'none' }}>
+                    <div className="sangtian-loading-spinner"/>
+                    <span>正在缓冲…</span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
             {status === 'error' && (
               <div className="sangtian-video-error">
                 <b>{isLive ? '直播直连失败' : '播放解析失败'}</b>
@@ -567,7 +655,7 @@ export function SangtianPlayerWindow({
                         <div className="settings-group">
                           <label>备用播放线路 ({candidates.length})</label>
                           <div className="settings-btn-grid vertical">
-                            {candidates.map((c) => (
+                            {candidates.map((c, idx) => (
                               <button
                                 key={c.candidateId}
                                 className={`setting-btn ${candidate?.candidateId === c.candidateId ? 'active' : ''}`}
@@ -576,7 +664,7 @@ export function SangtianPlayerWindow({
                                   setShowRightSidebar(false);
                                 }}
                               >
-                                {c.metadata?.label || c.label || c.protocol || '线路'}
+                                {c.metadata?.label || c.label || (c.index != null ? `线路 ${c.index + 1}` : `线路 ${idx + 1}`)}
                               </button>
                             ))}
                           </div>
@@ -730,8 +818,8 @@ export function SangtianPlayerWindow({
 export function SangtianFloatingBar({
   playbackRate = 1.0,
   onChangeRate,
-  currentCandidateLabel = '蓝光4K · 线路1',
-  onOpenSourceModal,
+  currentTime = 0,
+  duration = 0,
   isLive = false,
 }) {
   const rates = [0.75, 1.0, 1.25, 1.5, 2.0];
@@ -747,35 +835,46 @@ export function SangtianFloatingBar({
     }
   };
 
+  const formatTime = value => {
+    if (!Number.isFinite(value)) return '00:00';
+    const total = Math.max(0, Math.floor(value));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    return `${h ? h + ':' : ''}${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const timeString = `${formatTime(currentTime)} / ${formatTime(duration)}`;
+
   return (
     <div className="sangtian-floating-bar">
-      <div className="sangtian-zoom-controls">
-        <button
-          className="sangtian-zoom-btn"
-          onClick={() => handleCycleSpeed('up')}
-          title="加速播放"
-        >
-          +
-        </button>
-        <span className="sangtian-speed-label">{playbackRate}x</span>
-        <button
-          className="sangtian-zoom-btn"
-          onClick={() => handleCycleSpeed('down')}
-          title="减速播放"
-        >
-          -
-        </button>
-      </div>
+      {!isLive && (
+        <div className="sangtian-zoom-controls">
+          <button
+            className="sangtian-zoom-btn"
+            onClick={() => handleCycleSpeed('down')}
+            title="减速播放"
+          >
+            -
+          </button>
+          <span className="sangtian-speed-label">{playbackRate}x</span>
+          <button
+            className="sangtian-zoom-btn"
+            onClick={() => handleCycleSpeed('up')}
+            title="加速播放"
+          >
+            +
+          </button>
+        </div>
+      )}
 
-      <button
+      <div
         className="sangtian-model-pill"
-        onClick={onOpenSourceModal}
-        title={isLive ? "点击切换直播线路" : "点击切换线路与解析源"}
+        style={{ cursor: 'default', userSelect: 'none' }}
       >
         <Sparkles size={14} className="sparkle-gold" />
-        <span className="model-pill-text">{currentCandidateLabel}</span>
-        <ChevronDown size={14} className="chevron-down" />
-      </button>
+        <span className="model-pill-text">{timeString}</span>
+      </div>
     </div>
   );
 }
@@ -800,9 +899,14 @@ export function SangtianConsoleCard({
   onTogglePip,
   playerStatus = 'idle',
   isLive = false,
+  activeItemId,
+  onBack,
+  onFav,
+  isFav = false,
 }) {
   const [activeTab, setActiveTab] = useState('episodes'); // 'episodes' | 'info' | 'sources'
   const [copiedLink, setCopiedLink] = useState(false);
+  const [selectedLiveCat, setSelectedLiveCat] = useState('全部');
 
   const handleCopyStream = () => {
     if (navigator?.clipboard?.writeText && streamUrl) {
@@ -812,22 +916,60 @@ export function SangtianConsoleCard({
     setTimeout(() => setCopiedLink(false), 2200);
   };
 
+  const liveCategories = React.useMemo(() => {
+    if (!isLive || !relatedItems.length) return ['全部'];
+    const cats = new Set();
+    relatedItems.forEach(item => {
+      if (item.category) cats.add(item.category);
+    });
+    return ['全部', ...Array.from(cats)];
+  }, [isLive, relatedItems]);
+
+  const filteredLiveChannels = React.useMemo(() => {
+    if (!isLive) return [];
+    if (selectedLiveCat === '全部') return relatedItems;
+    return relatedItems.filter(item => (item.category || '未分类') === selectedLiveCat);
+  }, [isLive, selectedLiveCat, relatedItems]);
+
   return (
     <div className="sangtian-console-card">
-      {/* Sub-header Bar: Toggles & View Switches - Borrowed from bottom chat sub-bar */}
+      {/* Sub-header Bar: Toggles & View Switches */}
       <div className="sangtian-console-subbar">
         <div className="console-toggles">
           <div className="console-live-status">
             <span className="live-pill">{isLive ? 'LIVE 直连' : 'VOD 播放'}</span>
             <span>{playerStatus === 'playing' ? '播放中' : playerStatus === 'buffering' ? '缓冲中' : playerStatus === 'reconnecting' ? '自动重连中' : playerStatus === 'error' ? '播放失败' : '连接中'}</span>
           </div>
-          <div className="console-toggle-item">
-            <span className="toggle-label"><Sparkles size={12} className="sparkle-gold" /><span>{isLive ? '直播链路' : '播放模式'}</span></span>
-            <span className="switch-badge active">{isLive ? '直连' : '解析'}</span>
-          </div>
         </div>
 
         <div className="console-tab-switches">
+          {onBack && (
+            <button
+              className="console-tab-btn back-button"
+              onClick={onBack}
+              title="返回"
+              style={{ marginRight: '4px' }}
+            >
+              <ChevronLeft size={16} />
+            </button>
+          )}
+          {onFav && (
+            <button
+              className={`console-tab-btn fav-button ${isFav ? 'active-fav' : ''}`}
+              onClick={onFav}
+              title={isFav ? "取消收藏" : "加入收藏"}
+              style={{ marginRight: '6px', color: isFav ? '#e11d48' : 'inherit' }}
+            >
+              <Heart size={14} fill={isFav ? '#e11d48' : 'none'} />
+            </button>
+          )}
+          <button
+            className={`console-tab-btn ${activeTab === 'episodes' ? 'active' : ''}`}
+            onClick={() => setActiveTab('episodes')}
+            title={isLive ? "频道选择" : "选集播放"}
+          >
+            <LayoutGrid size={15} />
+          </button>
           <button
             className={`console-tab-btn ${activeTab === 'info' ? 'active' : ''}`}
             onClick={() => setActiveTab('info')}
@@ -835,34 +977,88 @@ export function SangtianConsoleCard({
           >
             <FileText size={15} />
           </button>
-          <button
-            className={`console-tab-btn ${activeTab === 'episodes' ? 'active' : ''}`}
-            onClick={() => setActiveTab('episodes')}
-            title={isLive ? "频道线路" : "选集播放"}
-          >
-            <LayoutGrid size={15} />
-          </button>
-          <button
-            className={`console-tab-btn ${activeTab === 'sources' ? 'active' : ''}`}
-            onClick={() => setActiveTab('sources')}
-            title={isLive ? "直播线路设置" : "来源与线路设置"}
-          >
-            <SlidersHorizontal size={15} />
-          </button>
         </div>
       </div>
 
       {/* Main Interactive Content */}
       <div className="sangtian-console-body">
-        {/* Tab 1: Episodes (选集) */}
+        {/* Tab 1: Episodes (选集) OR Channels Grid for Live */}
         {activeTab === 'episodes' && (
           <div className="console-episodes-section">
             <div className="console-section-header">
-              <span className="section-eyebrow">{isLive ? "LIVE · 频道流" : "EPISODES · 选集列表"}</span>
+              <span className="section-eyebrow">
+                {isLive ? (filteredLiveChannels.length > 0 ? "LIVE CHANNELS · 频道切换" : "LIVE DIRECT · 当前直播") : "EPISODES · 选集列表"}
+              </span>
               <h4>{title}</h4>
             </div>
 
-            {episodes.length > 0 ? (
+            {isLive ? (
+              <div className="sangtian-channel-selector-wrapper">
+                {/* Category Filter Pills */}
+                {liveCategories.length > 1 && (
+                  <div className="sangtian-console-category-scroll">
+                    {liveCategories.map(cat => (
+                      <button
+                        key={cat}
+                        type="button"
+                        className={`console-category-pill ${selectedLiveCat === cat ? 'active' : ''}`}
+                        onClick={() => setSelectedLiveCat(cat)}
+                      >
+                        <span>{cat}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Quick Line Candidates Bar if lines exist */}
+                {candidates.length > 0 && (
+                  <div className="console-quick-lines-bar">
+                    <span className="quick-lines-label">当前线路:</span>
+                    <div className="quick-lines-chips">
+                      {candidates.map((c, index) => {
+                        const isCurrentLine = c.candidateId === currentCandidateId;
+                        const lineName = c.metadata?.label || c.label || (c.index != null ? `线路 ${c.index + 1}` : `线路 ${index + 1}`);
+                        return (
+                          <button
+                            key={c.candidateId}
+                            type="button"
+                            className={`quick-line-pill ${isCurrentLine ? 'active' : ''}`}
+                            onClick={() => onSelectCandidate?.(c.candidateId)}
+                          >
+                            {lineName}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Channels Grid */}
+                <div className="sangtian-channel-selection-grid">
+                  {filteredLiveChannels.map((item) => {
+                    const isCurrent = item.channelId === activeItemId;
+                    return (
+                      <button
+                        key={item.channelId}
+                        type="button"
+                        className={`sangtian-channel-btn ${isCurrent ? 'active' : ''}`}
+                        onClick={() => onSelectRelated?.(item)}
+                      >
+                        <div className="channel-logo-mini">
+                          {item.logo ? <img src={item.logo} alt="" /> : <Radio size={14} />}
+                        </div>
+                        <div className="channel-info-mini">
+                          <span className="channel-name-mini">{item.name}</span>
+                          <span className="channel-sub-mini">
+                            {isCurrent ? '● 正在播放' : (item.category || '直播频道')}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : episodes.length > 0 ? (
               <div className="sangtian-episode-grid">
                 {episodes.map((ep, idx) => {
                   const isCurrent = ep.episodeId === currentEpisodeId || idx === 0 && !currentEpisodeId;
@@ -878,7 +1074,7 @@ export function SangtianConsoleCard({
                 })}
               </div>
             ) : (
-              <div className="sangtian-empty-text">当前频道为单一直播流或独幕剧集</div>
+              <div className="sangtian-empty-text">当前内容暂无更多选集可供切换</div>
             )}
           </div>
         )}
@@ -904,63 +1100,8 @@ export function SangtianConsoleCard({
           </div>
         )}
 
-        {/* Tab 3: Sources & Lines (线路与解析源) */}
-        {activeTab === 'sources' && (
-          <div className="console-sources-section">
-            <div className="console-section-header">
-              <span className="section-eyebrow">{isLive ? 'LIVE · 直播线路' : 'SOURCES · 换源与线路'}</span>
-              <h4>{isLive ? '直播线路' : '视频源解析矩阵'}</h4>
-            </div>
-
-            {sources.length > 0 && (
-              <div className="console-source-group">
-                <span className="group-label">{isLive ? '当前直播源：' : '可用内容源：'}</span>
-                <div className="chips">
-                  {sources.map(s => (
-                    <button
-                      key={s}
-                      className={currentSource === s ? 'active' : ''}
-                      onClick={() => onSelectSource?.(s)}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {candidates.length > 0 && (
-              <div className="console-source-group">
-                <span className="group-label">{isLive ? '直播线路选择：' : '备用线路选择：'}</span>
-                <div className="chips">
-                  {candidates.map(c => (
-                    <button
-                      key={c.candidateId}
-                      className={currentCandidateId === c.candidateId ? 'active' : ''}
-                      onClick={() => onSelectCandidate?.(c.candidateId)}
-                    >
-                      {c.metadata?.label || c.label || c.protocol}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Quick URL snippet if in episodes tab */}
-        {activeTab === 'episodes' && streamUrl && (
-          <div className="sangtian-quick-copy-bar" onClick={handleCopyStream}>
-            <Paperclip size={13} className="text-stone-500" />
-            <span className="copy-bar-text">
-              {copiedLink ? '✓ 播放串流地址已成功复制到剪贴板！' : `点击快速复制播放地址: ${streamUrl.slice(0, 36)}...`}
-            </span>
-            <span className="copy-action-pill">{copiedLink ? '已复制' : '复制'}</span>
-          </div>
-        )}
-
-        {/* Related Recommendations (相关推荐) */}
-        {relatedItems.length > 0 && (
+        {/* Related Recommendations (相关推荐) - Hidden for live because channels are in the main tab */}
+        {!isLive && relatedItems.length > 0 && (
           <div className="console-related-section">
             <div className="console-section-header">
               <span className="section-eyebrow">RECOMMENDED · 相关推荐</span>
@@ -981,31 +1122,6 @@ export function SangtianConsoleCard({
           </div>
         )}
       </div>
-
-      {/* Console Bottom Action Bar - Matching icons and the prominent red arrow button */}
-      <div className="sangtian-console-bottom">
-        <div className="console-action-icons">
-          <button
-            className="action-icon-btn"
-            onClick={onTogglePip}
-            title="画中画模式"
-          >
-            <Play size={18} />
-          </button>
-
-        </div>
-
-
-        <button
-          className="sangtian-submit-btn"
-          onClick={onReplay}
-          title="立即起播 / 重载起播"
-          aria-label="起播"
-        >
-          <ArrowUp size={22} strokeWidth={2.6} />
-        </button>
-      </div>
-
     </div>
   );
 }

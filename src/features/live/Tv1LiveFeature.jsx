@@ -92,7 +92,20 @@ export function Tv1LiveFeature({ sources = [], favorites = [], onPlay, toggleFav
         <button className="secondary" onClick={load}><RefreshCw size={15}/>刷新</button>
       </div>
       {activeChannel && <>
-        <SangtianPlayerWindow videoRef={videoRef} status={activeStream ? 'playing' : 'idle'} isLive candidate={{ label: activeStream?.label || '默认线路', url: activeStream?.url, protocol: activeStream?.protocol || 'HLS/M3U8', sourceId: activeSource?.sourceId }} terminalTag={`TV1 · ${activeChannel.name}`}>
+        <SangtianPlayerWindow 
+          videoRef={videoRef} 
+          status={activeStream ? 'playing' : 'idle'} 
+          isLive 
+          candidate={{ label: activeStream?.label || '默认线路', url: activeStream?.url, protocol: activeStream?.protocol || 'HLS/M3U8', sourceId: activeSource?.sourceId }} 
+          terminalTag={`TV1 · ${activeChannel.name}`}
+          onStop={() => {
+            if (videoRef.current) {
+              videoRef.current.pause();
+              videoRef.current.removeAttribute('src');
+              videoRef.current.load();
+            }
+          }}
+        >
           <video ref={videoRef} controls playsInline className="sangtian-video-element"/>
         </SangtianPlayerWindow>
         <div className="live-current-bar">

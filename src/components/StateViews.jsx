@@ -16,9 +16,18 @@ export function ErrorState({ text = '无法加载源', onClose }) {
     </div>
   );
 }
-export function SmartImage({ src, alt = '', fallback = null, ...props }) {
+export function SmartImage({ src, alt = '', fallback = null, priority = false, ...props }) {
   const [state, setState] = React.useState(src ? 'loading' : 'error');
   React.useEffect(() => setState(src ? 'loading' : 'error'), [src]);
   if (state === 'error') return fallback ?? <div className="image-placeholder" aria-label={alt}><ImageOff size={20} /></div>;
-  return <img {...props} src={src} alt={alt} onLoad={() => setState('loaded')} onError={() => setState('error')} />;
+  return (
+    <img
+      loading={priority ? 'eager' : 'lazy'}
+      {...props}
+      src={src}
+      alt={alt}
+      onLoad={() => setState('loaded')}
+      onError={() => setState('error')}
+    />
+  );
 }

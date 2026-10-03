@@ -37,8 +37,24 @@ function PlaybackView({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sourceModalOpen, setSourceModalOpen] = useState(false);
   const [decoderEngine, setDecoderEngine] = useState('exo');
+  const [playbackTime, setPlaybackTime] = useState(0);
+  const [totalDuration, setTotalDuration] = useState(0);
 
   const videoRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+    const interval = setInterval(() => {
+      if (videoRef.current && active) {
+        setPlaybackTime(videoRef.current.currentTime || 0);
+        setTotalDuration(videoRef.current.duration || 0);
+      }
+    }, 250);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
   const playerWindowBodyRef = useRef(null);
   const progressRef = useRef({ currentTime: 0, duration: null, persistedAt: 0 });
 
@@ -90,6 +106,10 @@ function PlaybackView({
       if (!isLive && event.event === 'progress') {
         const currentTime = event.currentTime ?? 0;
         const duration = event.duration ?? null;
+        setPlaybackTime(currentTime);
+        if (duration && Number.isFinite(duration) && duration > 0) {
+          setTotalDuration(duration);
+        }
         progressRef.current = { ...progressRef.current, currentTime, duration };
         if (request?.contentId && request?.episodeId && currentTime - progressRef.current.persistedAt >= 15) {
           recordProgress(request.contentId, request.episodeId, currentTime, duration, false);
@@ -200,6 +220,27 @@ function PlaybackView({
     }
   };
 
+  const handleStop = () => {
+    try {
+      controller.stop();
+    } catch (e) {
+      console.error("Stop controller failed:", e);
+    }
+    setResolvedInput(null);
+    try {
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.src = "";
+        videoRef.current.removeAttribute('src');
+        try {
+          videoRef.current.load();
+        } catch {}
+      }
+    } catch (e) {
+      console.error("Pause video failed:", e);
+    }
+  };
+
   const handleChangePlaybackRate = rate => {
     setPlaybackRate(rate);
     if (videoRef.current) videoRef.current.playbackRate = rate;
@@ -210,25 +251,50 @@ function PlaybackView({
   };
 
   const candidates = request?.candidates ?? [];
-  const relatedChannels = isLive ? channels.filter(c => c.channelId !== channel?.channelId) : [];
+  const relatedChannels = isLive ? channels : [];
   const relatedMovies = !isLive && movie ? movieService.getRelated({ movies, movie }) : [];
   const activeStreamUrl = resolvedInput?.url || candidate?.mediaUrl || candidate?.url || candidate?.metadata?.url || '';
 
-  const candidateLabel = candidate?.metadata?.label || candidate?.label || source || '默认线路';
+  const candidateLabel = candidate?.metadata?.label || candidate?.label || (candidate?.index != null ? `线路 ${candidate.index + 1}` : null) || '线路 1';
+
+  // Parse channel name digits for topbar
+  const parsedChannelInfo = useMemo(() => {
+    if (!isLive) return { cleanName: '直播', number: null };
+    const rawName = request?.metadata?.title ?? channel?.name ?? 'LIVE 直播';
+    const digitMatch = rawName.match(/\d+/);
+    if (digitMatch) {
+      const number = digitMatch[0];
+      const cleanName = rawName.replace(new RegExp(`-?\\s*${number}`), '').trim();
+      return { cleanName, number };
+    }
+    return { cleanName: rawName, number: null };
+  }, [isLive, request, channel]);
+
+  // Check if favorited
+  const isFavorited = useMemo(() => {
+    const targetType = isLive ? 'channel' : 'content';
+    const targetId = isLive ? request?.channelId : request?.contentId;
+    return favorites.some(item => item.targetType === targetType && item.targetId === targetId);
+  }, [favorites, isLive, request]);
 
   return (
     <div className="player-page theme-sangtian-layout">
       {/* 1. Rich Top Bar Controls */}
       <SangtianTopBar
         onHamburger={() => setDrawerOpen(true)}
-        onPreview={() => {
+        onPreview={isLive ? undefined : () => {
           const next = candidates.find(item => item.candidateId !== candidate?.candidateId && !controller.failedCandidateIds?.includes(item.candidateId));
           if (next) switchCandidate(next.candidateId);
         }}
-        previewText={isLive ? "切换线路" : "切换源"}
-        workspaceText={isLive ? "直播线路" : `集数 ${episodeIndex + 1}`}
-        badgeRed={String(candidates.length)}
-        badgeYellow={isLive ? "直连" : "解析"}
+        previewText={isLive ? null : "切换源"}
+        workspaceText={isLive ? parsedChannelInfo.cleanName : `集数 ${episodeIndex + 1}`}
+        badgeRed={isLive ? parsedChannelInfo.number : String(candidates.length)}
+        badgeYellow={isLive ? (isFavorited ? "已收藏" : "收藏") : "解析"}
+        yellowHeart={isLive}
+        isYellowActive={isFavorited}
+        onYellowClick={isLive ? () => {
+          if (request?.channelId) toggleFavorite?.('channel', request.channelId);
+        } : undefined}
         onWorkspace={() => setSourceModalOpen(true)}
         currentTheme={settings?.theme || 'sangtian'}
         onSelectTheme={handleSelectTheme}
@@ -253,32 +319,7 @@ function PlaybackView({
         onSelectTheme={handleSelectTheme}
       />
 
-      {/* 2. Context Navigation Bar */}
-      <section className="movie-playback-context" aria-label="播放导航详情">
-        <div className="movie-playback-context-main">
-          <button className="movie-playback-back" type="button" onClick={onBack} aria-label="返回详情"><ChevronLeft size={18} /></button>
-          <div className="movie-playback-title">
-            <b>{isLive ? (channel?.name || 'LIVE 直播') : (movie?.title || request?.metadata?.title || '正在播放')}</b>
-            <span>{isLive ? (channel?.category || '网络直播') : (currentEpisode?.title || `第 ${episodeIndex + 1} 集`)} · {candidateLabel}</span>
-          </div>
-          <button className="movie-playback-fav" type="button" onClick={() => {
-            const targetType = isLive ? 'channel' : 'content';
-            const targetId = isLive ? request?.channelId : request?.contentId;
-            if (targetId) toggleFavorite?.(targetType, targetId);
-          }} aria-label="收藏">
-            <Heart size={17} fill={favorites.some(item => item.targetId === (isLive ? request?.channelId : request?.contentId)) ? 'currentColor' : 'none'} />
-          </button>
-        </div>
-        {!isLive && (
-          <div className="movie-playback-context-actions">
-            <button type="button" disabled={episodeIndex <= 0} onClick={() => onEpisode?.(movie, episodeIndex - 1, source, request?.metadata?.returnRoute || 'detail')}><ChevronLeft size={15} />上一集</button>
-            <button type="button" onClick={() => setSourceModalOpen(true)}><ListVideo size={15} />选集/换源</button>
-            <button type="button" disabled={episodeIndex >= episodes.length - 1} onClick={() => onEpisode?.(movie, episodeIndex + 1, source, request?.metadata?.returnRoute || 'detail')}>下一集<ChevronRight size={15} /></button>
-          </div>
-        )}
-      </section>
-
-      {/* 3. Fully Featured Video Playback Window */}
+      {/* 1. Fully Featured Video Playback Window */}
       <SangtianPlayerWindow
         videoRef={videoRef}
         videoContainerRef={playerWindowBodyRef}
@@ -288,6 +329,7 @@ function PlaybackView({
         candidate={candidate}
         request={request}
         onRetry={handleRetry}
+        onStop={handleStop}
         onSwitchCandidate={() => {
           const next = candidates.find(item => item.candidateId !== candidate?.candidateId && !controller.failedCandidateIds?.includes(item.candidateId));
           if (next) switchCandidate(next.candidateId);
@@ -301,12 +343,28 @@ function PlaybackView({
         activeStreamIndex={isLive ? (request?.candidates?.findIndex(item => item.candidateId === candidate?.candidateId) ?? 0) : 0}
         onSelectChannel={onChannel}
         onSwitchStreamIndex={isLive ? switchCandidate : undefined}
+        title={isLive ? (request?.metadata?.title ?? channel?.name ?? 'LIVE 直播') : (movie?.title || request?.metadata?.title)}
+        episodeLabel={isLive ? '' : (currentEpisode?.title || `第 ${episodeIndex + 1} 集`)}
+        sourceLabel={candidateLabel}
+        episodes={episodes}
+        currentEpisodeIndex={episodeIndex}
+        onSelectEpisode={idx => onEpisode?.(movie, idx, source, request?.metadata?.returnRoute || 'detail')}
+        onPreviousEpisode={episodeIndex > 0 ? () => onEpisode?.(movie, episodeIndex - 1, source, request?.metadata?.returnRoute || 'detail') : undefined}
+        onNextEpisode={episodeIndex < episodes.length - 1 ? () => onEpisode?.(movie, episodeIndex + 1, source, request?.metadata?.returnRoute || 'detail') : undefined}
+        candidates={candidates}
+        onSelectCandidate={switchCandidate}
+        onOpenSourceModal={() => setSourceModalOpen(true)}
         decoderEngine={decoderEngine}
         onChangeDecoderEngine={setDecoderEngine}
+        onTimeMetricsChange={(cur, dur) => {
+          setPlaybackTime(cur);
+          if (dur > 0 && Number.isFinite(dur)) {
+            setTotalDuration(dur);
+          }
+        }}
       >
         <video
           ref={videoRef}
-          controls
           playsInline
           preload="metadata"
           poster={request?.metadata?.poster || movie?.poster}
@@ -314,20 +372,22 @@ function PlaybackView({
         />
       </SangtianPlayerWindow>
 
-      {/* 4. Floating Control Bar */}
-      <SangtianFloatingBar
-        playbackRate={playbackRate}
-        isLive={isLive}
-        onChangeRate={handleChangePlaybackRate}
-        currentCandidateLabel={`✦ ${candidateLabel}`}
-        onOpenSourceModal={() => setSourceModalOpen(true)}
-      />
+      {/* 4. Floating Control Bar (VOD Only) */}
+      {!isLive && (
+        <SangtianFloatingBar
+          playbackRate={playbackRate}
+          isLive={isLive}
+          onChangeRate={handleChangePlaybackRate}
+          currentTime={playbackTime}
+          duration={totalDuration}
+        />
+      )}
 
       {/* 5. Rich Console Console Card */}
       <SangtianConsoleCard
         title={isLive ? (request?.metadata?.title ?? channel?.name ?? 'LIVE 直播') : (request?.metadata?.title || movie?.title || '精彩视频')}
         subtitle={isLive ? `● 正在直播 · ${request?.metadata?.category ?? channel?.category ?? '通用频道'}` : `${movie?.year || '2026'} · ${movie?.category || '高清影音'} · 第 ${episodeIndex + 1} 集`}
-        description={isLive ? (currentProgram ? `当前节目：${currentProgram.title || '未命名'} (${currentProgram.startAt || ''}–${currentProgram.endAt || ''})${nextProgram ? ` | 下一节目：${nextProgram.title || ''}` : ''}` : '使用源提供的直播直链播放，若播放失败请使用中间底部来源选择切换备用线路。') : (movie?.description || '暂无内容简介。')}
+        description={isLive ? (currentProgram ? `当前节目：${currentProgram.title || '未命名'} (${currentProgram.startAt || ''}–${currentProgram.endAt || ''})${nextProgram ? ` | 下一节目：${nextProgram.title || ''}` : ''}` : '') : (movie?.description || '暂无内容简介。')}
         episodes={isLive ? [] : episodes}
         currentEpisodeId={isLive ? null : request?.episodeId}
         onSelectEpisode={idx => {
@@ -338,6 +398,7 @@ function PlaybackView({
         onSelectCandidate={switchCandidate}
         streamUrl={activeStreamUrl}
         relatedItems={isLive ? relatedChannels : relatedMovies}
+        activeItemId={isLive ? request?.channelId : null}
         onSelectRelated={next => {
           if (isLive) {
             if (next) onPlay?.(next);
@@ -348,6 +409,11 @@ function PlaybackView({
         onReplay={handleRetry}
         playerStatus={status}
         isLive={isLive}
+        onBack={onBack}
+        onFav={isLive ? undefined : () => {
+          if (request?.contentId) toggleFavorite?.('content', request.contentId);
+        }}
+        isFav={isLive ? false : favorites.some(item => item.targetId === request?.contentId)}
         onTogglePip={() => {
           if (videoRef.current && document.pictureInPictureEnabled) {
             if (document.pictureInPictureElement) {
@@ -358,6 +424,47 @@ function PlaybackView({
           }
         }}
       />
+
+      {/* 6. Context Navigation Bar for Movies */}
+      {!isLive && (
+        <section className="movie-playback-context" aria-label="播放导航详情" style={{ marginTop: 12 }}>
+          <div className="movie-playback-context-main" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', padding: '16px 0' }}>
+            <div className="movie-playback-title" style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              width: '100%',
+              margin: '0 auto',
+            }}>
+              <b style={{
+                fontSize: '22px',
+                letterSpacing: '0.2em',
+                textShadow: '3px 3px 6px rgba(0, 0, 0, 0.45)',
+                fontWeight: 'bold',
+                marginBottom: '6px',
+                color: 'var(--color-text-primary, #ecd9ba)'
+              }}>
+                {movie?.title || request?.metadata?.title || '正在播放'}
+              </b>
+              <span style={{
+                fontSize: '13px',
+                letterSpacing: '0.08em',
+                opacity: 0.85,
+                color: 'var(--color-text-muted, #b39b7d)'
+              }}>
+                {(currentEpisode?.title || `第 ${episodeIndex + 1} 集`)} · {candidateLabel}
+              </span>
+            </div>
+          </div>
+          <div className="movie-playback-context-actions">
+            <button type="button" disabled={episodeIndex <= 0} onClick={() => onEpisode?.(movie, episodeIndex - 1, source, request?.metadata?.returnRoute || 'detail')}><ChevronLeft size={15} />上一集</button>
+            <button type="button" onClick={() => setSourceModalOpen(true)}><ListVideo size={15} />选集/换源</button>
+            <button type="button" disabled={episodeIndex >= episodes.length - 1} onClick={() => onEpisode?.(movie, episodeIndex + 1, source, request?.metadata?.returnRoute || 'detail')}>下一集<ChevronRight size={15} /></button>
+          </div>
+        </section>
+      )}
 
       {/* Unified Source Selection Drawer / Modal */}
       {sourceModalOpen && (
@@ -386,13 +493,13 @@ function PlaybackView({
             <div>
               <h5>线路 / 播放源</h5>
               <div className="chips" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                {candidates.map(item => (
+                {candidates.map((item, idx) => (
                   <button
                     key={item.candidateId}
                     className={candidate?.candidateId === item.candidateId ? 'active' : ''}
                     onClick={() => { switchCandidate(item.candidateId); setSourceModalOpen(false); }}
                   >
-                    {item.metadata?.label ?? item.label ?? item.protocol}
+                    {item.metadata?.label || item.label || (item.index != null ? `线路 ${item.index + 1}` : `线路 ${idx + 1}`)}
                   </button>
                 ))}
               </div>

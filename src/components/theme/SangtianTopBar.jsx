@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, MoreVertical, Play, Folder, Check, Copy, Palette, Settings, RotateCcw } from 'lucide-react';
+import { Menu, MoreVertical, Play, Folder, Check, Copy, Palette, Settings, RotateCcw, Heart } from 'lucide-react';
 
 export function SangtianTopBar({
   onHamburger,
@@ -14,6 +14,9 @@ export function SangtianTopBar({
   onCopyLink,
   onReload,
   onOpenSettings,
+  yellowHeart = false,
+  isYellowActive = false,
+  onYellowClick,
 }) {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [copiedToast, setCopiedToast] = useState(false);
@@ -41,14 +44,16 @@ export function SangtianTopBar({
       </div>
 
       <div className="sangtian-topbar-center">
-        <button
-          className="sangtian-pill-btn preview-pill"
-          onClick={onPreview}
-          title="点击快速换源或预览"
-        >
-          <Play size={13} fill="#54c46f" color="#54c46f" className="play-triangle" />
-          <span>{previewText}</span>
-        </button>
+        {previewText && (
+          <button
+            className="sangtian-pill-btn preview-pill"
+            onClick={onPreview}
+            title="点击快速换源或预览"
+          >
+            <Play size={13} fill="#54c46f" color="#54c46f" className="play-triangle" />
+            <span>{previewText}</span>
+          </button>
+        )}
 
         <button
           className="sangtian-pill-btn workspace-pill"
@@ -58,7 +63,28 @@ export function SangtianTopBar({
           <Folder size={14} className="folder-icon" />
           <span>{workspaceText}</span>
           {badgeRed && <span className="sangtian-badge-red">{badgeRed}</span>}
-          {badgeYellow && <span className="sangtian-badge-yellow">{badgeYellow}</span>}
+          {badgeYellow && (
+            <span
+              className={`sangtian-badge-yellow ${yellowHeart ? 'clickable-fav' : ''}`}
+              onClick={(e) => {
+                if (onYellowClick) {
+                  e.stopPropagation();
+                  onYellowClick();
+                }
+              }}
+              style={yellowHeart ? { display: 'inline-flex', alignItems: 'center', gap: '3px', cursor: 'pointer' } : {}}
+            >
+              <span>{badgeYellow}</span>
+              {yellowHeart && (
+                <Heart
+                  size={11}
+                  fill={isYellowActive ? '#e11d48' : 'none'}
+                  color={isYellowActive ? '#e11d48' : 'currentColor'}
+                  style={{ transition: 'all 0.2s' }}
+                />
+              )}
+            </span>
+          )}
         </button>
       </div>
 

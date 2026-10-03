@@ -396,6 +396,14 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
           const candidate = livePlaybackRequest?.candidates?.[idx];
           if (candidate && playbackController) playbackController.switchCandidate(candidate.candidateId);
         }}
+        onStop={() => {
+          playbackController?.stop();
+          if (videoRef.current) {
+            videoRef.current.pause();
+            videoRef.current.removeAttribute('src');
+            videoRef.current.load();
+          }
+        }}
         decoderEngine={decoderEngine}
         onChangeDecoderEngine={setDecoderEngine}
         isImmersive={isImmersive}
@@ -404,29 +412,56 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
 
       {activeChannel && (
         <div className="live-current-bar">
-          <div className="live-current-info">
-            <span className="live-pill">● 正在直播</span>
-            <b>{activeChannel.name}</b>
-            <small>
-              {activeChannel.category} · {activeStream?.label || (streamLoading ? '正在读取地址…' : '等待播放')}
-              {currentEPG ? ` · 节目：${currentEPG.title || currentEPG.name}` : ''}
-            </small>
+          <div className="live-current-main">
+            <div className="live-current-info">
+              <span className="live-pill">● 正在直播</span>
+              <span className="live-channel-name">{activeChannel.name}</span>
+              <span className="live-channel-meta">
+                {activeChannel.category} · {activeStream?.label || (streamLoading ? '正在读取地址…' : '等待播放')}
+                {currentEPG ? ` · 节目：${currentEPG.title || currentEPG.name}` : ''}
+              </span>
+            </div>
+
+            {activeChannel.streams?.length > 1 && (
+              <div className="live-stream-switcher">
+                <span className="switcher-label">线路:</span>
+                <div className="switcher-pills">
+                  {activeChannel.streams.map((stream, index) => (
+                    <button
+                      key={stream.streamId || index}
+                      type="button"
+                      className={`switcher-pill ${activeStreamIndex === index ? 'active' : ''}`}
+                      onClick={() => {
+                        setActiveStreamIndex(index);
+                        const candidate = livePlaybackRequest?.candidates?.[index];
+                        if (candidate && playbackController) playbackController.switchCandidate(candidate.candidateId);
+                      }}
+                    >
+                      {stream.label || '线路 ' + (index + 1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+
           <div className="live-current-actions">
-            {activeChannel.streams?.length > 1 && activeChannel.streams.map((stream, index) => (
-              <button key={stream.streamId || index} className={activeStreamIndex === index ? 'active' : ''} onClick={() => {
-                setActiveStreamIndex(index);
-                const candidate = livePlaybackRequest?.candidates?.[index];
-                if (candidate && playbackController) playbackController.switchCandidate(candidate.candidateId);
-              }}>
-                {stream.label || '线路 ' + (index + 1)}
-              </button>
-            ))}
-            <button className="secondary icon-button" onClick={() => toggleFavorite('channel', activeChannel.channelId)}>
+            <button
+              type="button"
+              className="secondary icon-button live-fav-btn"
+              onClick={() => toggleFavorite('channel', activeChannel.channelId)}
+              title="收藏频道"
+            >
               <Heart size={16} fill={favorites.some(i => i.targetType === 'channel' && i.targetId === activeChannel.channelId) ? 'currentColor' : 'none'} />
             </button>
-            <button className="primary" onClick={() => setIsImmersive(true)} disabled={!activeStream}>
-              <Play size={13} /> 沉浸竖屏
+            <button
+              type="button"
+              className="primary live-play-btn"
+              onClick={() => onPlay?.(activeChannel, activeStream?.streamId)}
+              disabled={!activeChannel}
+            >
+              <Play size={14} />
+              <span>沉浸播放</span>
             </button>
           </div>
         </div>
@@ -479,7 +514,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
                 const favorite = favorites.some(i => i.targetType === 'channel' && i.targetId === channel.channelId);
                 const isLazy = Boolean(channel.deferredRef);
                 const isResolving = streamLoading && selectedChannelId === channel.channelId && isLazy;
-                const streamCount = resolvedStreams[channel.channelId]?.length ?? channel.streams?.length ?? 0;
+                const streamCount = resolvedStreams[channel.channelId]?.length ?? channel.streams?.length ?? channel.estimatedStreamCount ?? channel.deferredRef?.lineIndices?.length ?? 0;
 
                 return (
                   <div
@@ -506,6 +541,14 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
                       onClick={e => { e.stopPropagation(); toggleFavorite('channel', channel.channelId); }}
                     >
                       <Heart size={16} fill={favorite ? 'currentColor' : 'none'} />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`沉浸播放 ${channel.name}`}
+                      className="card-play-btn secondary icon-button"
+                      onClick={e => { e.stopPropagation(); selectChannel(channel); onPlay?.(channel); }}
+                    >
+                      <Play size={16} />
                     </button>
                   </div>
                 );
@@ -588,7 +631,14 @@ export function LiveChannelPanel({
     return () => { active = false; };
   }, [channel, feature]);
 
-  if (!channel) return <EmptyState text="频道不存在" />;
+  if (!channel) {
+    return (
+      <Page>
+        <button className="back" onClick={onBack}><ChevronLeft />返回直播列表</button>
+        <EmptyState text="频道不存在或已被移除" />
+      </Page>
+    );
+  }
   const displayChannel = resolvedChannel?.channelId === channel.channelId ? resolvedChannel : channel;
   const streams = Array.isArray(displayChannel.streams) ? displayChannel.streams : [];
   const favorite = favorites.some(i => i.targetType === 'channel' && i.targetId === channel.channelId);

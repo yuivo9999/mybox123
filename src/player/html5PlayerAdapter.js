@@ -10,6 +10,9 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
   const cleanupHls = () => {
     if (hlsInstance) {
       try {
+        hlsInstance.detachMedia();
+      } catch {}
+      try {
         hlsInstance.destroy();
       } catch {}
       hlsInstance = null;
@@ -26,8 +29,8 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
   const onTimeUpdate=()=>emit('progress',{currentTime:video.currentTime,duration:video.duration});
   const onEnded=()=>{state=PlayerState.COMPLETED;emit('completed');};
   const onError=()=>{state=PlayerState.ERROR;emit('error',{nativeError:video.error});};
-  const bind=()=>{for(const [e,h] of [['loadstart',onLoadStart],['waiting',onWaiting],['canplay',onCanPlay],['playing',onPlaying],['pause',onPause],['timeupdate',onTimeUpdate],['ended',onEnded],['error',onError]])video.addEventListener(e,h);};
-  const unbind=()=>{for(const [e,h] of [['loadstart',onLoadStart],['waiting',onWaiting],['canplay',onCanPlay],['playing',onPlaying],['pause',onPause],['timeupdate',onTimeUpdate],['ended',onEnded],['error',onError]])video.removeEventListener(e,h);};
+  const bind=()=>{for(const [e,h] of [['loadstart',onLoadStart],['waiting',onWaiting],['canplay',onCanPlay],['playing',onPlaying],['pause',onPause],['timeupdate',onTimeUpdate],['durationchange',onTimeUpdate],['loadedmetadata',onTimeUpdate],['ended',onEnded],['error',onError]])video.addEventListener(e,h);};
+  const unbind=()=>{for(const [e,h] of [['loadstart',onLoadStart],['waiting',onWaiting],['canplay',onCanPlay],['playing',onPlaying],['pause',onPause],['timeupdate',onTimeUpdate],['durationchange',onTimeUpdate],['loadedmetadata',onTimeUpdate],['ended',onEnded],['error',onError]])video.removeEventListener(e,h);};
   const trackList=(list)=>Array.from(list??[]).map((t,i)=>({id:String(t.id??t.language??i),label:t.label??t.language??`Track ${i+1}`,language:t.language??'',kind:t.kind??''}));
   bind();
 
@@ -140,7 +143,15 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
     play(){if(!input)throw new Error('PLAYER_INPUT_REQUIRED');return video.play()??Promise.resolve();},
     pause(){video.pause();return true;},
     seek(seconds){if(!Number.isFinite(seconds))return false;if(!Number.isFinite(video.duration)&&!video.seekable?.length)return false;video.currentTime=Math.max(0,seconds);return video.currentTime;},
-    stop(){cleanupHls();video.pause();video.removeAttribute('src');video.load();state=PlayerState.STOPPED;emit('stopped');},
+    stop(){
+      cleanupHls();
+      try { video.pause(); } catch {}
+      try { video.src = ""; } catch {}
+      try { video.removeAttribute('src'); } catch {}
+      try { video.load(); } catch {}
+      state=PlayerState.STOPPED;
+      emit('stopped');
+    },
     setVolume(value){const n=Number(value);if(!Number.isFinite(n))return video.volume;video.volume=Math.min(1,Math.max(0,n));return video.volume;},
     getState(){return {state,input,currentTime:video.currentTime,duration:video.duration};},
     getAudioTracks(){return trackList(video.audioTracks);},
@@ -149,7 +160,7 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
     selectSubtitleTrack(trackId){if(!video.textTracks)return false;for(const t of video.textTracks)t.mode=String(t.id)===String(trackId)?'showing':'disabled';emit('subtitleTrackChanged',{trackId});return true;},
     getQualities(){return input?.manifest?.variants?.map((v,i)=>({qualityId:String(v.attributes?.['VIDEO-RANGE']??v.attributes?.RESOLUTION??i),width:Number(v.attributes?.RESOLUTION?.split('x')?.[0]??0),height:Number(v.attributes?.RESOLUTION?.split('x')?.[1]??0),bitrate:Number(v.attributes?.BANDWIDTH??0),url:v.url}))??[];},
     selectQuality(qualityId){const q=this.getQualities().find(x=>x.qualityId===String(qualityId));if(!q)return false;const wasPlaying=!video.paused;const pos=video.currentTime;video.src=q.url;video.load();if(wasPlaying)void video.play();if(Number.isFinite(pos))try{video.currentTime=pos;}catch{}emit('qualityChanged',{quality:q});return q;},
-    release(){if(released)return;released=true;cleanupHls();unbind();video.pause();video.removeAttribute('src');video.load();state=PlayerState.RELEASED;emit('released');},
+    release(){if(released)return;released=true;cleanupHls();unbind();try { video.pause(); } catch {} try { video.src = ""; } catch {} try { video.removeAttribute('src'); } catch {} try { video.load(); } catch {} state=PlayerState.RELEASED;emit('released');},
   };
   return createPlayerAdapterContract(adapter);
 }

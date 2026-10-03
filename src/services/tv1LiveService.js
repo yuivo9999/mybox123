@@ -70,12 +70,21 @@ export const tv1LiveService = {
     const session = sessions.get(source.sourceId);
     if (!session) await this.loadMetadata(source, options);
     const activeSession = sessions.get(source.sourceId);
-    const lineIndex = channelRef?.deferredRef?.lineIndex;
-    if (!Number.isInteger(lineIndex)) return [];
+    const lineIndices = channelRef?.deferredRef?.lineIndices ?? (channelRef?.deferredRef?.lineIndex != null ? [channelRef.deferredRef.lineIndex] : []);
+    if (!lineIndices.length) return [];
     if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-    const streams = parseTXTLiveLineStreams(activeSession.lines[lineIndex]);
-    return streams.map((stream, index) => ({
+
+    let rawStreams = [];
+    for (const idx of lineIndices) {
+      if (activeSession.lines[idx]) {
+        const lineStreams = parseTXTLiveLineStreams(activeSession.lines[idx]);
+        rawStreams.push(...lineStreams);
+      }
+    }
+
+    return rawStreams.map((stream, index) => ({
       ...stream,
+      label: stream.label === '线路 1' || /^线路 \d+$/.test(stream.label) ? `线路 ${index + 1}` : stream.label,
       streamId: 'stream:' + source.sourceId + ':' + channelRef.sourceItemId + ':' + (index + 1),
       sourceId: source.sourceId,
       sourceChannelId: source.sourceId + ':' + channelRef.sourceItemId,

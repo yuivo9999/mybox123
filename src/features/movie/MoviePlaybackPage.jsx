@@ -305,13 +305,13 @@ export function MoviePlaybackPage({
             <div>
               <h5>线路 / 播放源</h5>
               <div className="chips" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                {candidates.map(item => (
+                {candidates.map((item, idx) => (
                   <button
                     key={item.candidateId}
                     className={candidate?.candidateId === item.candidateId ? 'active' : ''}
                     onClick={() => { switchCandidate(item.candidateId); setSourceModalOpen(false); }}
                   >
-                    {item.metadata?.label ?? item.label ?? item.protocol}
+                    {item.metadata?.label || item.label || (item.index != null ? `线路 ${item.index + 1}` : `线路 ${idx + 1}`)}
                   </button>
                 ))}
               </div>

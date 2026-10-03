@@ -103,7 +103,8 @@ export function createLiveAdapter(config, transport = null) {
       const sourceRef = channelRef?.sourceRefs?.find((ref) => ref.sourceId === sourceId);
       const channel = channels.find((item) => item.channelId === channelRef?.channelId || item.sourceRefs?.some((ref) => ref.sourceChannelId === sourceRef?.sourceChannelId));
       if (!channel) return [];
-      if (detectedFormat === 'txt' && channel.deferredRef?.lineIndex != null) {
+      const lineIndices = channel.deferredRef?.lineIndices ?? (channel.deferredRef?.lineIndex != null ? [channel.deferredRef.lineIndex] : []);
+      if (detectedFormat === 'txt' && lineIndices.length > 0) {
         const body = config.localContent != null
           ? String(config.localContent)
           : await (async () => {
@@ -116,8 +117,17 @@ export function createLiveAdapter(config, transport = null) {
               if (!response.ok) throw new Error(`HTTP_${response.status}`);
               return response.text();
             })();
-        return parseTXTLiveLineStreams(String(body).replace(/^\uFEFF/, '').split(/\r?\n/)[channel.deferredRef.lineIndex]).map((stream, index) => ({
+        const lines = String(body).replace(/^\uFEFF/, '').split(/\r?\n/);
+        let rawStreams = [];
+        for (const idx of lineIndices) {
+          if (lines[idx]) {
+            const lineStreams = parseTXTLiveLineStreams(lines[idx]);
+            rawStreams.push(...lineStreams);
+          }
+        }
+        return rawStreams.map((stream, index) => ({
           ...stream,
+          label: stream.label === '线路 1' || /^线路 \d+$/.test(stream.label) ? `线路 ${index + 1}` : stream.label,
           streamId: 'stream:' + sourceId + ':' + channel.sourceItemId + ':' + (index + 1),
           sourceId,
           sourceItemId: channel.sourceItemId,
