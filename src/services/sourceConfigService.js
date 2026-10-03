@@ -117,8 +117,46 @@ function cleanMismatchedBraces(str) {
   return str;
 }
 
+function stripTrailingCommas(str) {
+  let out = '';
+  let inString = false;
+  let i = 0;
+  while (i < str.length) {
+    const char = str[i];
+    const nextChar = str[i + 1];
+    if (inString) {
+      if (char === '\\') {
+        out += char + (nextChar || '');
+        i += 2;
+        continue;
+      }
+      if (char === '"') inString = false;
+      out += char;
+      i++;
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      out += char;
+      i++;
+      continue;
+    }
+    if (char === ',') {
+      let j = i + 1;
+      while (j < str.length && /\s/.test(str[j])) j++;
+      if (str[j] === '}' || str[j] === ']') {
+        i++;
+        continue;
+      }
+    }
+    out += char;
+    i++;
+  }
+  return out;
+}
+
 function parseRelaxedJSON(text) {
-  const cleaned = cleanMismatchedBraces(sanitizeJSONControlChars(stripJSONComments(String(text).trim())));
+  const cleaned = stripTrailingCommas(cleanMismatchedBraces(sanitizeJSONControlChars(stripJSONComments(String(text).trim()))));
   return JSON.parse(cleaned);
 }
 
