@@ -166,6 +166,58 @@ export function parseTXTLiveMetadata(text) {
   return channels;
 }
 
+
+export function parseTXTLiveMetadataStream(text, onChannel) {
+  if (!text) return [];
+  const cleanText = String(text).replace(/^\\uFEFF/, '');
+  const lines = cleanText.split(/\\r?\\n/);
+  let currentCategory = '默认频道';
+  const seen = new Set();
+  const channels = [];
+
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    const line = lines[lineIndex].trim();
+    if (!line) continue;
+    if (line.includes('#genre#') || /^\\[.*\\]$/.test(line)) {
+      let cat = line.replace(/[,，]?\\s*#genre#.*$/i, '').trim();
+      const bracket = cat.match(/^\\[(.*)\\]$/);
+      if (bracket) cat = bracket[1].trim();
+      if (cat) currentCategory = cat;
+      continue;
+    }
+    if (line.startsWith('#') || line.startsWith('//')) continue;
+
+    const commaIndex = line.search(/[,，]/);
+    let name = '';
+    if (commaIndex !== -1) name = line.slice(0, commaIndex).trim();
+    else name = line.match(/^([^\\s]+)\\s+/)?.[1]?.trim() || '';
+    if (!name) continue;
+
+    const key = currentCategory + ':::' + name;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const channel = {
+      sourceItemId: 'txt-' + (channels.length + 1) + '-' + name,
+      canonicalId: name,
+      channelKey: name,
+      name,
+      logo: '',
+      categoryId: currentCategory,
+      category: currentCategory,
+      sourceOrder: channels.length,
+      streams: [],
+      epg: [],
+      currentProgram: null,
+      upcomingProgram: null,
+      deferredRef: { lineIndex },
+    };
+    channels.push(channel);
+    if (typeof onChannel === 'function') onChannel(channel);
+  }
+  return channels;
+}
+
 export function parseTXTLiveLineStreams(line) {
   const value = String(line || '').trim();
   if (!value) return [];
