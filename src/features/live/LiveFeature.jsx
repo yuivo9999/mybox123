@@ -270,6 +270,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
         } : { label: '请选择频道', protocol: 'LIVE' }}
         error={playbackError}
         resolvedInput={resolvedPlaybackInput}
+        isLive
         terminalTag={activeChannel ? 'LIVE · ' + activeChannel.name : 'LIVE · 等待频道'}
       >
         <video ref={videoRef} controls playsInline className="sangtian-video-element" />
