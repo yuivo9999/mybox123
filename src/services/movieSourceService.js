@@ -58,11 +58,12 @@ export async function testMovieSource(source, options = {}) {
   return adapter.healthCheck({ signal: options.signal });
 }
 
-export async function syncMovieSources(sourceConfigs = []) {
+export async function syncMovieSources(sourceConfigs = [], selectedSourceId = null) {
   movieRegistry.clear();
 
+  // 影视源采用按需加载：没有明确选择时不请求任何影视源。
   sourceConfigs
-    .filter(source => source.enabled !== false && source.sourceType === 'movie' && (source.sourceRef || source.url))
+    .filter(source => source.enabled !== false && source.sourceType === 'movie' && source.sourceId === selectedSourceId && (source.sourceRef || source.url))
     .forEach(source => {
       movieRegistry.register(createMovieAdapter({
         ...source,
