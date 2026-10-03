@@ -1,3 +1,5 @@
+import { DEFAULT_FONT_ID } from '../config/fontCatalog.js';
+
 export function createFavoriteId(targetType, targetId) {
   return `favorite:${targetType}:${targetId}`;
 }
