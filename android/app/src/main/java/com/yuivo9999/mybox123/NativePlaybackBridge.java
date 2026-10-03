@@ -159,6 +159,51 @@ public final class NativePlaybackBridge {
     }
 
     @JavascriptInterface
+    public synchronized String setPlayerViewBounds(String payload) {
+        try {
+            JSONObject input = new JSONObject(payload == null ? "{}" : payload);
+            final float leftCss = (float) Math.max(0d, input.optDouble("left", 0d));
+            final float topCss = (float) Math.max(0d, input.optDouble("top", 0d));
+            final float widthCss = (float) Math.max(0d, input.optDouble("width", 0d));
+            final float heightCss = (float) Math.max(0d, input.optDouble("height", 0d));
+            final float viewportWidthCss = (float) Math.max(1d, input.optDouble("viewportWidth", 1d));
+
+            final int webWidthPx = Math.max(1, webView.getWidth());
+            final float cssToPx = webWidthPx / viewportWidthCss;
+
+            final int[] webLocation = new int[2];
+            final int[] rootLocation = new int[2];
+            webView.getLocationOnScreen(webLocation);
+            FrameLayout root = activity.findViewById(android.R.id.content);
+            if (root == null) return error("PLAYER_ROOT_UNAVAILABLE");
+            root.getLocationOnScreen(rootLocation);
+
+            final int left = Math.max(0, Math.round((webLocation[0] - rootLocation[0]) + leftCss * cssToPx));
+            final int top = Math.max(0, Math.round((webLocation[1] - rootLocation[1]) + topCss * cssToPx));
+            final int width = Math.max(1, Math.round(widthCss * cssToPx));
+            final int height = Math.max(1, Math.round(heightCss * cssToPx));
+
+            mainHandler.post(() -> {
+                try {
+                    FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) textureView.getLayoutParams();
+                    if (lp == null) lp = new FrameLayout.LayoutParams(width, height);
+                    lp.leftMargin = left;
+                    lp.topMargin = top;
+                    lp.width = width;
+                    lp.height = height;
+                    textureView.setLayoutParams(lp);
+                    textureView.setVisibility(TextureView.VISIBLE);
+                    textureView.bringToFront();
+                    attachSurface();
+                } catch (Throwable ignored) {}
+            });
+            return ok("updated", true);
+        } catch (Throwable e) {
+            return error("PLAYER_VIEW_BOUNDS_ERROR:" + safeMessage(e));
+        }
+    }
+
+    @JavascriptInterface
     public synchronized String prepareMedia(String ignored) {
         if (released) return error("PLAYER_RELEASED");
         if (url == null || url.isEmpty()) return error("PLAYER_INPUT_REQUIRED");
