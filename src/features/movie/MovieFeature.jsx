@@ -231,12 +231,7 @@ function OtherSourceSearchDialog({title,currentSourceId,sources=[],onClose,onMov
        {state.results.filter(group=>(group.items?.length??0)>0).map(group=>
          <section className="android-search-source-group" key={group.sourceId}>
            <div className="android-search-source-title"><b>{group.sourceName}</b><span>{group.items.length} 条</span></div>
-           <div className="android-search-source-items">
-             {group.items.map((item,index)=><button className="android-search-result-row" key={item.contentId || item.episodeId || group.sourceId+':'+index} onClick={()=>{if(onPlay) onPlay(item,0,item?.sourceId,'detail'); else onMovie(item);}}>
-               <span className="android-search-result-copy"><b>{item.title||'未命名'}</b><small>{item.year||'—'} · {item.category||'—'}{item.episodeCount?' · '+item.episodeCount+'集':''}</small></span>
-               <ChevronRight size={17}/>
-             </button>)}
-           </div>
+           <MovieSearchList movies={group.items} onMovie={item=>{if(onPlay) onPlay(item,0,item?.sourceId,'detail'); else onMovie(item);}}/>
          </section>
        )}
        {state.loading&&state.results.length===0&&<div className="android-search-empty"><Search size={20}/><span>正在搜索第一个影视源，结果会逐个出现…</span></div>}
