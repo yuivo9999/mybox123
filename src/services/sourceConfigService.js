@@ -238,7 +238,6 @@ function parseTVBoxSources(parsed) {
           sourceType: 'live',
           sourceRef,
           url: sourceRef,
-          format: 'txt',
           enabled: true,
           status: '未测试',
           createdAt: Date.now(),
