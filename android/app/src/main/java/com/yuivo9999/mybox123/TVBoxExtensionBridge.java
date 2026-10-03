@@ -79,8 +79,19 @@ public final class TVBoxExtensionBridge {
                 String contentType = payloadObject == null
                         ? "application/x-www-form-urlencoded; charset=UTF-8"
                         : payloadObject.optString("contentType", "application/x-www-form-urlencoded; charset=UTF-8");
+                java.util.Map<String, String> headers = new java.util.LinkedHashMap<>();
+                if (payloadObject != null) {
+                    JSONObject headerObject = payloadObject.optJSONObject("headers");
+                    if (headerObject != null) {
+                        java.util.Iterator<String> keys = headerObject.keys();
+                        while (keys.hasNext()) {
+                            String key = keys.next();
+                            headers.put(key, headerObject.optString(key, ""));
+                        }
+                    }
+                }
 
-                DrpyHttpRuntime.Response response = DrpyHttpRuntime.request(method, url, body, contentType);
+                DrpyHttpRuntime.Response response = DrpyHttpRuntime.request(method, url, body, contentType, headers);
                 JSONObject result = new JSONObject();
                 result.put("ok", true);
                 result.put("operation", operation);
