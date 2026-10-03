@@ -17,7 +17,11 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.analytics.AnalyticsListener;
+import androidx.media3.exoplayer.mediacodec.MediaCodecInfo;
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 
 import org.json.JSONArray;
@@ -65,6 +69,7 @@ public final class NativePlaybackBridge {
     private boolean fallbackEnabled = true;
     private List<String> configuredFallbackOrder = Collections.emptyList();
     private String selectedEngine = ENGINE_EXO;
+    private String actualExoDecoderName = "";
     private List<String> engineOrder = Collections.emptyList();
     private int engineIndex = 0;
     private boolean prepared = false;
@@ -346,9 +351,24 @@ public final class NativePlaybackBridge {
             httpFactory.setDefaultRequestProperties(merged);
         }
 
-        exoPlayer = new ExoPlayer.Builder(activity)
+        DefaultRenderersFactory renderersFactory = new DefaultRenderersFactory(activity)
+                .setEnableDecoderFallback(true)
+                .setMediaCodecSelector(createDecoderSelector());
+
+        exoPlayer = new ExoPlayer.Builder(activity, renderersFactory)
                 .setMediaSourceFactory(new DefaultMediaSourceFactory(httpFactory))
                 .build();
+
+        exoPlayer.addAnalyticsListener(new AnalyticsListener() {
+            @Override public void onVideoDecoderInitialized(
+                    EventTime eventTime,
+                    String decoderName,
+                    long initializedTimestampMs,
+                    long initializationDurationMs) {
+                actualExoDecoderName = decoderName == null ? "" : decoderName;
+                emit("decoderChanged", decoderObject());
+            }
+        });
 
         exoPlayer.addListener(new Player.Listener() {
             @Override public void onPlaybackStateChanged(int state) {
@@ -375,6 +395,24 @@ public final class NativePlaybackBridge {
         exoPlayer.setVideoTextureView(textureView);
         exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(url)));
         attachSurface();
+    }
+
+    private MediaCodecSelector createDecoderSelector() {
+        if (!"hardware".equals(decoderMode) && !"software".equals(decoderMode)) {
+            return MediaCodecSelector.DEFAULT;
+        }
+        return (mimeType, requiresSecureDecoder, requiresTunnelingDecoder) -> {
+            List<MediaCodecInfo> available = MediaCodecSelector.DEFAULT.getDecoderInfos(
+                    mimeType, requiresSecureDecoder, requiresTunnelingDecoder);
+            ArrayList<MediaCodecInfo> filtered = new ArrayList<>();
+            boolean software = "software".equals(decoderMode);
+            for (MediaCodecInfo info : available) {
+                if (info.softwareOnly == software) {
+                    filtered.add(info);
+                }
+            }
+            return filtered;
+        };
     }
 
     private void createIjk() throws IOException {
@@ -496,6 +534,7 @@ public final class NativePlaybackBridge {
         } catch (Throwable ignored) {}
 
         exoPlayer = null;
+        actualExoDecoderName = "";
         ijkPlayer = null;
         nativePlayer = null;
         prepared = false;
@@ -538,7 +577,7 @@ public final class NativePlaybackBridge {
             } catch (Throwable ignored) {}
             return "Unknown";
         }
-        if (ENGINE_EXO.equals(selectedEngine)) return "MediaCodec";
+        if (ENGINE_EXO.equals(selectedEngine)) return actualExoDecoderName.isEmpty() ? "MediaCodec" : actualExoDecoderName;
         if (ENGINE_NATIVE.equals(selectedEngine)) return "System";
         return "Unknown";
     }
