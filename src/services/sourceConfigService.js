@@ -287,6 +287,29 @@ function classifyTVBoxCapability(site = {}) {
   };
 }
 
+function classifyTVBoxExtFormat(site = {}) {
+  const ext = site?.ext;
+  if (ext && typeof ext === 'object' && !Array.isArray(ext)) {
+    const serialized = JSON.stringify(ext);
+    if (serialized.length <= 5 * 1024 * 1024
+      && (Array.isArray(ext.movies) || Array.isArray(ext.vod) || Array.isArray(ext.list)
+        || Array.isArray(ext.data) || Array.isArray(ext.result)
+        || Array.isArray(ext.data?.list) || Array.isArray(ext.result?.list))) return 'json-vod';
+    return 'config-object';
+  }
+  if (typeof ext !== 'string') return 'unknown';
+  const value = ext.trim();
+  if (/^https?:\/\//i.test(value)) {
+    if (/\.json(?:[?#].*)?$/i.test(value)) return 'remote-json';
+    if (/\.(?:js|mjs)(?:[?#].*)?$/i.test(value)) return 'javascript';
+    if (/\.py(?:[?#].*)?$/i.test(value)) return 'python';
+    return 'remote-resource';
+  }
+  if (value.startsWith('{') || value.startsWith('[')) return 'inline-json';
+  if (/^(?:[A-Za-z0-9+/=_-]{24,})$/.test(value)) return 'opaque-string';
+  return 'inline-script';
+}
+
 function isSafeTVBoxExtJson(site = {}) {
   const ext = site?.ext;
   if (ext && typeof ext === 'object' && !Array.isArray(ext)) {
@@ -319,6 +342,7 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
       const sourceType = classifyTVBoxSite(site);
       const capability = classifyTVBoxCapability(site);
       const directMovie = capability.sourceCapability === 'direct-http-vod';
+      const extFormat = capability.kind === 'ext' ? classifyTVBoxExtFormat(site) : null;
       const safeExtJson = sourceType === 'movie' && capability.kind === 'ext' && isSafeTVBoxExtJson(site);
       const isSupportedDirect = sourceType === 'movie' && directMovie;
       const isTVBoxLiveProvider = sourceType === 'live' && capability.adapterType === 'tvbox-extension';
@@ -344,6 +368,7 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
         sourceCapability: isTVBoxLiveProvider ? 'tvbox-live-provider' : capability.sourceCapability,
         adapterType,
         tvboxAdapterKind: capability.kind,
+        ...(extFormat ? { tvboxExtFormat: extFormat } : {}),
         tvboxRequiresJar: capability.requiresJar === true,
         tvboxType: Number.isFinite(Number(site.type)) ? Number(site.type) : null,
         tvboxKey: String(site.key || '').trim(),
@@ -356,7 +381,7 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
             capability.kind === 'drpy-js' ? 'Drpy JS 源当前未适配执行器'
             : capability.kind === 'csp' ? 'CSP 源当前未适配执行器'
             : capability.kind === 'jar' || capability.kind === 'http-vod-with-jar' ? '该源依赖 JAR 扩展，已进入 CatVod Spider 执行阶段；首次请求时自动准备并校验 JAR'
-            : capability.kind === 'ext' ? '该源依赖 ext 扩展配置，当前未适配'
+             : capability.kind === 'ext' ? `该源依赖 ext（${extFormat || 'unknown'}）扩展配置，当前未适配`
             : '当前源不是标准可直接请求的 VOD HTTP 接口'
         ),
         ...(site.jar != null ? { tvboxJar: site.jar } : {}),
