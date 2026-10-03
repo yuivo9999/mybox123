@@ -11,6 +11,8 @@ function normalizeSource(source = {}) {
   return {
     ...source,
     sourceId,
+    bundleId: String(source.bundleId || ('bundle_' + sourceId)).trim(),
+    sourceKey: String(source.sourceKey || sourceId).trim(),
     name: String(source.name ?? sourceId).trim() || sourceId,
     sourceType: source.sourceType === 'live' ? 'live' : 'movie',
     sourceRef: String(source.sourceRef || source.url || '').trim(),
