@@ -56,7 +56,7 @@ export function createTVBoxExtensionAdapter(config = {}, runtime = null) {
   const resolveScript = async (payload = {}, options = {}) => {
     if (String(payload.script || '').trim()) return String(payload.script);
     const ext = definition.tvboxExt;
-    if (typeof ext === 'string' && /^https?:\\/\\//i.test(ext.trim())) {
+    if (typeof ext === 'string' && /^https?:\/\//i.test(ext.trim())) {
       const response = await request({ url: ext.trim(), method: 'GET' }, options);
       if (!response?.body) throw new Error('DRPY_EXTENSION_SCRIPT_EMPTY');
       return String(response.body);
