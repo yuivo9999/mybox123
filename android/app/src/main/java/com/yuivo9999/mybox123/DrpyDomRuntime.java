@@ -114,7 +114,10 @@ public final class DrpyDomRuntime {
             if (part.isEmpty()) continue;
             boolean intermediate = i < parts.length - 1;
             if (intermediate && isSimpleSelector(part)) {
-                selectors.add(part + (arrayMode ? ":first" : ":eq(0)"));
+                // pdfh/pd use the first match for each intermediate && segment.
+                // pdfa must preserve the full result set; otherwise
+                // "ul&&li&&a" incorrectly collapses to one anchor.
+                selectors.add(part + (arrayMode ? "" : ":eq(0)"));
             } else {
                 selectors.add(part);
             }
