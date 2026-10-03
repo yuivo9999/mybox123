@@ -18,9 +18,9 @@ export async function testSource(source, options = {}) {
   return { ok: false, sourceId: source.sourceId, status: 'unsupported', checkedAt: Date.now() };
 }
 
-export async function syncAllSources() {
+export async function syncAllSources({ movieSourceId = null } = {}) {
   const sources = sourceRepository.getAll().filter(source => source.enabled !== false);
-  const movieResult = await sourceRegistryService.syncMovieSources(sources);
+  const movieResult = await sourceRegistryService.syncMovieSources(sources, movieSourceId);
 
   sourceRegistryService.clear();
   sources
