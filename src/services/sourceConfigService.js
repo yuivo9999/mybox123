@@ -211,11 +211,17 @@ function resolveLiveSourceRef(value) {
   return '';
 }
 
-function classifyTVBoxSite() {
-  // TVBox 的 `sites` 始终是影视/内容站点定义；真正的直播源位于顶层 `lives`。
-  // 不能因为站点名称包含“直播/体育”等字样就把它注册到 Live Registry，
-  // 否则 csp/CSP、Drpy、ext 等内容提供器会污染直播源集合。
-  return 'movie';
+function classifyTVBoxSite(site = {}) {
+  const name = String(site.name || '').trim();
+  const key = String(site.key || '').trim();
+  const api = String(site.api || '').trim();
+  const ext = String(site.ext || '').trim();
+  const text = `${name} ${key} ${api} ${ext}`;
+  // TVBox 的 `sites` 通常是影视站点，但部分配置会把 Drpy/直播脚本
+  // 混在 sites 中。只有出现明确的直播标记时才拆到 Live，避免误伤普通影视源。
+  const explicitLive = /(直播|体育赛事|赛事直播|网红直播|310直播)/i.test(text)
+    || /(?:直播|sports|justlive)\\.(?:js|py|json)(?:$|[?#])/i.test(text);
+  return explicitLive ? 'live' : 'movie';
 }
 
 function classifyTVBoxCapability(site = {}) {
