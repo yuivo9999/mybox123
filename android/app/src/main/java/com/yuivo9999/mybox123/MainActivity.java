@@ -1,5 +1,28 @@
 package com.yuivo9999.mybox123;
 
+import android.os.Bundle;
+import android.webkit.WebView;
+
 import com.getcapacitor.BridgeActivity;
 
-public class MainActivity extends BridgeActivity {}
+public class MainActivity extends BridgeActivity {
+    private NativePlaybackBridge playbackBridge;
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        WebView webView = getBridge().getWebView();
+        playbackBridge = new NativePlaybackBridge(this, webView);
+        webView.addJavascriptInterface(playbackBridge, NativePlaybackBridge.JS_NAME);
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (playbackBridge != null) {
+            playbackBridge.release();
+            playbackBridge = null;
+        }
+        super.onDestroy();
+    }
+}
