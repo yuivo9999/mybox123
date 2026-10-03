@@ -14,6 +14,7 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
     kind: 'jar',
     tvboxJar: config.tvboxJar ?? null,
     tvboxDefinition: config.tvboxDefinition ?? null,
+    tvboxParseConfig: config.tvboxParseConfig ?? null,
   });
 
   const execute = async (operation, payload = {}) => {
@@ -172,6 +173,7 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
         tvboxAdapterKind: 'jar',
         tvboxRequiresJar: true,
         tvboxJar: definition.tvboxJar,
+        tvboxParseConfig: definition.tvboxParseConfig,
       },
     }));
     return resolvePlaybackCandidates(normalized);
