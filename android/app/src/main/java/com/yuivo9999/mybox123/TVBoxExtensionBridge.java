@@ -31,7 +31,7 @@ public final class TVBoxExtensionBridge {
         try {
             JSONObject result = new JSONObject();
             result.put("contractVersion", CONTRACT_VERSION);
-            result.put("available", false);
+            result.put("available", true);
             result.put("runtimeVersion", JSONObject.NULL);
             result.put("supportedKinds", new JSONArray().put("drpy-js"));
             result.put("supportedOperations", new JSONArray().put("load"));
