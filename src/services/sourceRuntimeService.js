@@ -14,7 +14,17 @@ export async function testSource(source, options = {}) {
 
   if (source.sourceType === 'live') {
     if (source.liveMode === 'tv1') return tv1LiveService.healthCheck(source, options);
-    return sourceRegistryService.testLiveSource(source, options);
+    const result = await sourceRegistryService.testLiveSource(source, options);
+    if (result.ok && result.detectedFormat === 'txt') {
+      const currentSources = sourceRepository.getAll();
+      sourceRepository.saveAll(currentSources.map(item => (
+        item.sourceId === source.sourceId
+          ? { ...item, liveMode: 'tv1' }
+          : item
+      )));
+      return { ...result, promotedTo: 'tv1' };
+    }
+    return result;
   }
 
   return { ok: false, sourceId: source.sourceId, status: 'unsupported', checkedAt: Date.now() };
@@ -31,6 +41,21 @@ export async function syncAllSources({ movieSourceId = null } = {}) {
 
   const liveResult = await liveService.sync();
   userDataService.migrateContentIdentities(movieResult.movies);
+
+  const detectedTv1SourceIds = new Set(
+    liveResult.results
+      .filter(result => result.status === 'fulfilled' && result.adapterStatus?.detectedFormat === 'txt')
+      .map(result => result.sourceId),
+  );
+
+  if (detectedTv1SourceIds.size) {
+    const promotedSources = sourceRepository.getAll().map(source => (
+      detectedTv1SourceIds.has(source.sourceId) && source.sourceType === 'live' && source.liveMode !== 'tv1'
+        ? { ...source, liveMode: 'tv1' }
+        : source
+    ));
+    sourceRepository.saveAll(promotedSources);
+  }
 
   const resultBySource = new Map(
     [...movieResult.results, ...liveResult.results].map(result => [result.sourceId, result]),
