@@ -445,6 +445,8 @@ function parseTVBoxSources(parsed, { bundleId = null } = {}) {
         tvboxRequiresJar: capability.requiresJar === true,
         tvboxType: Number.isFinite(Number(site.type)) ? Number(site.type) : null,
         tvboxKey: String(site.key || '').trim(),
+        // TVBox 直连源经常自带 categories；保留它作为零额外网络请求的分类索引。
+        ...(Array.isArray(site.categories) ? { categories: site.categories } : (typeof site.categories === 'string' && site.categories.trim() ? { categories: site.categories.split(/[,，#|]/).map(value => value.trim()).filter(Boolean) } : {})),
         tvboxApi: api,
         tvboxDefinition: { ...site },
         ...(Object.keys(normalizeTVBoxIJKProfiles(parsed.ijk)).length
