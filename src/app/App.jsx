@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Home, Film, Radio, Heart, User } from 'lucide-react';
 import { contentService } from '../services/contentService.js';
 import { playbackService } from '../services/playbackService.js';
@@ -19,25 +19,30 @@ import { ErrorCode } from '../models/errors.js';
 
 export function App(){
  const session=useSessionState(); const persistent=usePersistentState(); const {tab,route,selected}=session;
- const [contentState,setContentState]=useState({status:'idle',movies:[],channels:[],error:null});
- const applySourceResult=(result)=>{
+ const [contentState,setContentState]=useState({status:'idle',movies:[],channels:[],error:null,sourceLoading:false});
+ const reloadGenerationRef=useRef(0);
+ const applySourceResult=(result,generation=reloadGenerationRef.current)=>{
+   if(generation!==reloadGenerationRef.current)return;
    const movies=contentService.getMovies(result.movies);
    const failed=result.results.filter(item=>item.status==='rejected');
    const selectedMovieSourceId=persistent.selectedSources?.movie ?? persistent.settings?.defaultMovieSource ?? null;
    const selectedMovieFailed=Boolean(selectedMovieSourceId)&&failed.some(item=>item.sourceId===selectedMovieSourceId);
-   setContentState({status:selectedMovieFailed&&!movies.length?'error':'success',movies,channels:result.channels,error:failed.length?failed:null});
+   setContentState(state=>({status:selectedMovieFailed&&!movies.length?'error':'success',movies,channels:result.channels?.length?result.channels:state.channels,error:failed.length?failed:null,sourceLoading:false}));
    persistent.reload?.();
  };
- const reloadSources=async(movieSourceIdOverride=undefined)=>{
-   setContentState(state=>({...state,status:'loading',error:null}));
+ const reloadSources=async(movieSourceIdOverride=undefined,{background=false}={})=>{
+   const generation=++reloadGenerationRef.current;
+   if(!background) setContentState(state=>({...state,status:'loading',error:null,sourceLoading:false}));
+   else setContentState(state=>({...state,error:null,sourceLoading:true}));
    try{
      const selectedMovieSourceId = movieSourceIdOverride !== undefined
-     ? movieSourceIdOverride
-     : (persistent.selectedSources?.movie ?? persistent.settings?.defaultMovieSource ?? null);
-   const result=await sourceManagementService.reload({ movieSourceId: selectedMovieSourceId });
-     applySourceResult(result);
+       ? movieSourceIdOverride
+       : (persistent.selectedSources?.movie ?? persistent.settings?.defaultMovieSource ?? null);
+     const result=await sourceManagementService.reload({ movieSourceId: selectedMovieSourceId, includeMovie:true, includeLive:!background });
+     applySourceResult(result,generation);
    }catch(error){
-     setContentState({status:'error',movies:[],channels:[],error});
+     if(generation!==reloadGenerationRef.current)return;
+     setContentState(state=>({status:background?'success':'error',movies:background?state.movies:[],channels:state.channels,error,sourceLoading:false}));
    }
  };
  useEffect(()=>{cacheService.prune();},[]);
@@ -111,7 +116,7 @@ export function App(){
    const source=persistent.sources.find(item=>item.sourceId===id);
    await sourceManagementService.setActive(id);
    persistent.reload?.();
-   await reloadSources(source?.sourceType==='movie' ? id : undefined);
+   void reloadSources(source?.sourceType==='movie' ? id : undefined,{background:true});
  };
  const removeSource=async(id)=>{
    const source=persistent.sources.find(item=>item.sourceId===id);
@@ -200,7 +205,7 @@ export function App(){
 
         // 2. Handle sync states for content tabs
         const selectedMovieSourceId = persistent.selectedSources?.movie ?? persistent.settings?.defaultMovieSource ?? null;
-        if ((contentState.status === 'idle' || contentState.status === 'loading') && selectedMovieSourceId) {
+        if ((contentState.status === 'idle' || contentState.status === 'loading') && selectedMovieSourceId && !contentState.sourceLoading) {
           return <main className="page"><LoadingState text="正在加载当前影视源…"/></main>;
         }
 
