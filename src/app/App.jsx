@@ -129,6 +129,49 @@ export function App(){
    applySourceResult(result);
  };
  const nav=(key)=>sessionStateStore.patch({tab:key,route:null,selected:null});
+
+ // 移动端统一“右滑返回上一级”：只处理明显的水平右滑，避免干扰正常上下滚动。
+ // 使用 Pointer Events，可同时覆盖触摸屏与 WebView；React 官方支持 onPointerDown/Move/Up 生命周期。
+ const swipeRef = React.useRef({active:false,startX:0,startY:0,pointerId:null});
+ const handleSwipePointerDown = (event) => {
+   if (event.pointerType === 'mouse') return;
+   if (event.isPrimary === false) return;
+   swipeRef.current = {active:true,startX:event.clientX,startY:event.clientY,pointerId:event.pointerId};
+ };
+ const handleSwipePointerUp = (event) => {
+   const gesture = swipeRef.current;
+   swipeRef.current = {active:false,startX:0,startY:0,pointerId:null};
+   if (!gesture.active || event.pointerId !== gesture.pointerId) return;
+   const dx = event.clientX - gesture.startX;
+   const dy = event.clientY - gesture.startY;
+   // 右滑至少 64px，且水平距离明显大于垂直距离。
+   if (dx < 64 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
+
+   // 表单、横向滚动区域、按钮等控件上的横向操作不要抢占。
+   const target = event.target;
+   if (target instanceof Element && target.closest('input,textarea,select,button,[data-swipe-ignore="true"],[data-horizontal-scroll="true"]')) return;
+
+   // 系统/浏览器全屏优先退出全屏，不直接跳离播放页。
+   if (typeof document !== 'undefined' && document.fullscreenElement) {
+     void document.exitFullscreen?.().catch?.(() => {});
+     return;
+   }
+
+   if (route === 'movie-play') {
+     sessionStateStore.patch({route:'detail'});
+   } else if (route === 'detail') {
+     sessionStateStore.patch({route:null,selected:null});
+   } else if (route === 'live-play') {
+     sessionStateStore.patch({
+       route:'live-channel',
+       selected:contentState.channels.find(c => c.channelId === selected?.channelId) ?? null,
+     });
+   } else if (route === 'live-channel') {
+     sessionStateStore.patch({route:null,selected:null});
+   } else if (route === 'search') {
+     sessionStateStore.patch({route:null,selected:null});
+   }
+ };
  const openSearchHistory=(keyword)=>{pageStateStore.patch('search',{query:keyword});sessionStateStore.patch({tab:'movies',route:'search',selected:null});};
  const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
  const playLive=(channel,streamId=null)=>{
@@ -147,7 +190,7 @@ export function App(){
  const appearanceClass=`theme-${persistent.settings?.theme||'sangtian'} font-${persistent.settings?.fontSize||'medium'} cards-${persistent.settings?.cardStyle||'poster'} density-${persistent.settings?.density||'comfortable'}`;
 
  return (
-  <div className={`app-shell ${appearanceClass}`}>
+  <div className={`app-shell ${appearanceClass}`} onPointerDown={handleSwipePointerDown} onPointerUp={handleSwipePointerUp} onPointerCancel={() => { swipeRef.current = {active:false,startX:0,startY:0,pointerId:null}; }}>
     <div className="screen">
       {(() => {
         // 1. If in a management tab, always show it
