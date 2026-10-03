@@ -26,7 +26,7 @@ function Main({tab,movies,channels,favorites,history,sources,searches,progress,s
   const additions = Array.isArray(source) ? source : [{...source,sourceId:`source_${source.sourceType}_${Date.now()}`,enabled:true,status:'未测试'}];
   onSaveSources([...sources,...additions]);
   setSourceForm(null);
-}}/>}</Page>;
+}}/>}{batchMode&&<BatchSourceManager sources={sources} onBack={()=>setBatchMode(false)} onEnabled={onSourceEnabled} onTest={onTestSource} onRemove={onRemoveSource}/>}</Page>;
  if(tab==='settings'){
   const playback=settings?.playback??{};
   const decoder=playback.decoder??{};
