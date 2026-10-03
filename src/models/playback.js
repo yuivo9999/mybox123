@@ -51,6 +51,8 @@ export function normalizePlaybackCandidate(input = {}) {
     referer: input.referer ?? '',
     userAgent: input.userAgent ?? '',
     token: input.token ?? undefined,
+    timeoutMs: input.timeoutMs ?? undefined,
+    retryCount: input.retryCount ?? undefined,
     expiresAt: input.expiresAt ?? undefined,
     parserHint: input.parserHint ?? undefined,
     playerHint: input.playerHint ?? undefined,
