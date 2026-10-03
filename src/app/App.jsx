@@ -144,33 +144,44 @@ export function App(){
  };
  const nav=(key)=>sessionStateStore.patch({tab:key,route:null,selected:null});
 
- // 移动端统一“右滑返回上一级”：只处理明显的水平右滑，避免干扰正常上下滚动。
- // 使用 Pointer Events，可同时覆盖触摸屏与 WebView；React 官方支持 onPointerDown/Move/Up 生命周期。
+ // 直播页专用横向手势：右滑回到首页，左滑进入设置。
+ // 双向手势都在应用内部完成导航，绝不把横向手势交给“退出应用”逻辑。
  const swipeRef = React.useRef({active:false,startX:0,startY:0,pointerId:null});
  const handleSwipePointerDown = (event) => {
-   if (event.pointerType === 'mouse') return;
-   if (event.isPrimary === false) return;
+   if (event.pointerType === 'mouse' || event.isPrimary === false) return;
    swipeRef.current = {active:true,startX:event.clientX,startY:event.clientY,pointerId:event.pointerId};
  };
  const handleSwipePointerUp = (event) => {
    const gesture = swipeRef.current;
    swipeRef.current = {active:false,startX:0,startY:0,pointerId:null};
    if (!gesture.active || event.pointerId !== gesture.pointerId) return;
+
    const dx = event.clientX - gesture.startX;
    const dy = event.clientY - gesture.startY;
-   // 右滑至少 64px，且水平距离明显大于垂直距离。
-   if (dx < 64 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
+   // 只认明显的横向滑动，避免干扰正常上下滚动。
+   if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
 
-   // 表单、横向滚动区域、按钮等控件上的横向操作不要抢占。
    const target = event.target;
    if (target instanceof Element && target.closest('input,textarea,select,button,[data-swipe-ignore="true"],[data-horizontal-scroll="true"]')) return;
 
-   // 系统/浏览器全屏优先退出全屏，不直接跳离播放页。
-   if (typeof document !== 'undefined' && document.fullscreenElement) {
-     const exitFullscreen = document.exitFullscreen?.(); if (exitFullscreen?.catch) exitFullscreen.catch(() => {});
+   // 直播界面的左右滑动永远是应用内导航：
+   // 右滑 -> 首页；左滑 -> 设置。这里不调用任何退出 App 的 API。
+   if (tab === 'live') {
+     if (dx > 0) {
+       nav('home');
+     } else {
+       nav('settings');
+     }
      return;
    }
 
+   // 其他页面保留原有的应用内返回行为；没有匹配路由时什么都不做，
+   // 不把手势升级成 Activity finish/退出应用。
+   if (typeof document !== 'undefined' && document.fullscreenElement) {
+     const exitFullscreen = document.exitFullscreen?.();
+     if (exitFullscreen?.catch) exitFullscreen.catch(() => {});
+     return;
+   }
    if (route === 'movie-play') {
      sessionStateStore.patch({route:selected?.metadata?.returnRoute||'detail',selected:(selected?.metadata?.returnRoute==='movies'||selected?.metadata?.returnRoute==='search')?null:selected});
    } else if (route === 'detail') {
