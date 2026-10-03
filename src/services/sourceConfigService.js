@@ -160,7 +160,7 @@ function parseRelaxedJSON(text) {
   return JSON.parse(cleaned);
 }
 
-function createLocalSource({ name, sourceType, text, format }) {
+function createLocalSource({ name, sourceType, text, format, liveMode }) {
   const sourceId = `source_${sourceType}_local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   return {
     sourceId,
@@ -170,6 +170,7 @@ function createLocalSource({ name, sourceType, text, format }) {
     url: `local://${encodeURIComponent(name)}`,
     localContent: text,
     localFormat: format,
+    ...(sourceType === 'live' && liveMode ? { liveMode } : {}),
     enabled: true,
     status: '未测试',
     createdAt: Date.now(),
@@ -270,6 +271,7 @@ export const sourceConfigService = {
         sourceType: 'live',
         text,
         format: lowerName.endsWith('.m3u') || /^#EXTM3U/i.test(trimmed) ? 'm3u' : 'txt',
+        liveMode: /#genre#/i.test(trimmed) ? 'tv1' : 'generic',
       })];
     }
 
