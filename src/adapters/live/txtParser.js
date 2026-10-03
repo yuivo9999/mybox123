@@ -24,7 +24,7 @@ export function parseTXTLive(text) {
     if (!line) continue;
 
     // 1. Detect Category line (e.g. "📺央视频道,#genre#" or "卫视频道, #genre#" or "[央视频道]")
-    if (line.includes('#genre#') || /\[.+\]/.test(line)) {
+    if (line.includes('#genre#') || /^\[.*\]$/.test(line)) {
       let cat = line.replace(/[,，]?\s*#genre#.*$/i, '').trim();
       if (/^\[(.*)\]$/.test(cat)) {
         cat = cat.slice(1, -1).trim();
