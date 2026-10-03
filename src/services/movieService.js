@@ -77,7 +77,7 @@ export const movieService = {
     const key = createCacheKey({ namespace: CacheNamespace.MOVIE, sourceId: sourceIdentity(movies), contentId: 'search', params: { keyword: clean } });
     const cached = cacheStorage.get(CacheNamespace.MOVIE, key, { allowStale: true });
     if (cached.hit && !cached.stale) return cached.value;
-    const value = movies.filter((movie) => normalizeText(movie.title).includes(clean) || normalizeText(movie.description).includes(clean) || normalizeText(movie.category).includes(clean) || (movie.categoryLabels ?? []).some(label => normalizeText(label).includes(clean)));
+    const value = movies.filter((movie) => normalizeText(movie.title).includes(clean) || normalizeText(movie.titleEn).includes(clean) || normalizeText(movie.description).includes(clean) || normalizeText(movie.category).includes(clean) || (movie.categoryLabels ?? []).some(label => normalizeText(label).includes(clean)));
     cacheStorage.set(CacheNamespace.MOVIE, key, value); return value;
   },
   getDetail({ movies = [], contentId } = {}) { return cachedDetail(movies, contentId); },
