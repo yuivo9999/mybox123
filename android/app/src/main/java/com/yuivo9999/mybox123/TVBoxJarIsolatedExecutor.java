@@ -1,6 +1,7 @@
 package com.yuivo9999.mybox123;
 
 import android.content.Context;
+import android.os.Build;
 import android.os.ParcelFileDescriptor;
 
 import dalvik.system.InMemoryDexClassLoader;
@@ -44,6 +45,7 @@ public final class TVBoxJarIsolatedExecutor {
     public String invoke(ParcelFileDescriptor descriptor, String className,
                          String operation, JSONObject payload) throws Exception {
         if (descriptor == null) throw new IllegalArgumentException("TVBOX_JAR_FD_REQUIRED");
+        if (Build.VERSION.SDK_INT < 26) throw new UnsupportedOperationException("TVBOX_JAR_ISOLATED_DEX_UNSUPPORTED_API");
         if (className == null || className.trim().isEmpty()) {
             throw new IllegalArgumentException("TVBOX_JAR_CLASS_NAME_REQUIRED_FOR_ISOLATED_EXECUTION");
         }
