@@ -17,9 +17,7 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
   });
 
   const execute = async (operation, payload = {}) => {
-    if (!effectiveRuntime?.isAvailable?.()) {
-      throw new Error('TVBOX_JAR_RUNTIME_UNAVAILABLE');
-    }
+    if (!effectiveRuntime?.isAvailable?.()) throw new Error('TVBOX_JAR_RUNTIME_UNAVAILABLE');
     return effectiveRuntime.execute({ operation, payload });
   };
 
@@ -68,97 +66,41 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
     const object = first && typeof first === 'object' ? first : {};
     const mediaUrl = String(object.url ?? object.playUrl ?? object.play_url ?? (typeof first === 'string' ? first : '')).trim();
     if (!mediaUrl) return null;
+
     const rawHeaders = object.headers ?? object.header ?? {};
     const headers = {};
     if (typeof rawHeaders === 'string') {
       rawHeaders.split('&').forEach(part => {
-        const index = part.indexOf('
-    const userAgent = object.userAgent ?? object['user-agent'] ?? headers['User-Agent'] ?? headers['user-agent'] ?? '';
-    const referer = object.referer ?? object.Referer ?? headers.Referer ?? headers.referer ?? '';
-    const cookie = object.cookie ?? object.Cookie ?? headers.Cookie ?? headers.cookie ?? '';
-    return { ...fallback, mediaUrl, headers, userAgent, referer, cookies: cookie,
-      parserHint: object.parse ? { parse: object.parse, jx: object.jx } : fallback.parserHint,
-      metadata: { ...(fallback.metadata ?? {}), tvboxPlayFlag: object.flag ?? fallback.metadata?.tvboxPlayFlag ?? '', tvboxJx: object.jx ?? false, tvboxParse: object.parse ?? false } };
-  };
-
-  const resolvePlaybackCandidates = async (items) => {
-    const output = [];
-    for (const item of items) {
-      const episodes = [];
-      for (const episode of item.episodes ?? []) {
-        const candidates = [];
-        for (const candidate of episode.playbackCandidates ?? []) {
-          const url = String(candidate.mediaUrl ?? candidate.url ?? '').trim();
-          if (/^https?:\/\//i.test(url)) { candidates.push(candidate); continue; }
-          try {
-            const result = await play({ flag: candidate.metadata?.tvboxPlayFlag ?? candidate.label ?? '', id: url, vipFlags: candidate.metadata?.tvboxVipFlags ?? [] });
-            candidates.push(normalizePlaybackResult(result, candidate) || candidate);
-          } catch { candidates.push(candidate); }
-        }
-        episodes.push({ ...episode, playbackCandidates: candidates });
-      }
-      output.push({ ...item, episodes });
-    }
-    return output;
-  };
-
-  const normalizeResult = async (result) => {
-    const raw = result?.result ?? result;
-    const items = parseTVBoxResult(raw);
-    const normalized = items.map((item, index) => normalizeMovie({
-      sourceId,
-      item,
-      index,
-      sourceMetadata: {
-        sourceCapability: 'tvbox-jar',
-        adapterType: 'tvbox-extension',
-        tvboxAdapterKind: 'jar',
-        tvboxRequiresJar: true,
-        tvboxJar: definition.tvboxJar,
-      },
-    }));
-    return resolvePlaybackCandidates(normalized);
-  };
-
-  const getMovies = async (payload = {}) => normalizeResult(await home(payload));
-  const searchMovies = async (payload = {}) => normalizeResult(await search(payload));
-  const getCategory = async (payload = {}) => normalizeResult(await category(payload));
-  const getDetail = async (payload = {}) => normalizeResult(await detail(payload));
-
-  return {
-    sourceId,
-    definition,
-    isRuntimeAvailable: () => Boolean(effectiveRuntime?.isAvailable?.()),
-    getCapabilities: () => effectiveRuntime?.getCapabilities?.() || { available: false },
-    getDefinition: () => ({ ...definition, status: 'runtime' }),
-    getStatus: () => ({ status: 'runtime', error: null }),
-    prepare,
-    inspect,
-    invoke,
-    home,
-    category,
-    detail,
-    search,
-    play,
-    normalizeResult,
-    getMovies,
-    searchMovies,
-    getCategory,
-    getDetail,
-    execute,
-  };
-}
-);
+        const index = part.indexOf('$');
         if (index > 0) headers[part.slice(0, index).trim()] = part.slice(index + 1).trim();
+        else {
+          const equalIndex = part.indexOf('=');
+          if (equalIndex > 0) headers[part.slice(0, equalIndex).trim()] = part.slice(equalIndex + 1).trim();
+        }
       });
       if (!Object.keys(headers).length) headers['X-TVBox-Header'] = rawHeaders;
-    } else Object.assign(headers, rawHeaders);
+    } else if (rawHeaders && typeof rawHeaders === 'object') {
+      Object.assign(headers, rawHeaders);
+    }
+
     const userAgent = object.userAgent ?? object['user-agent'] ?? headers['User-Agent'] ?? headers['user-agent'] ?? '';
     const referer = object.referer ?? object.Referer ?? headers.Referer ?? headers.referer ?? '';
     const cookie = object.cookie ?? object.Cookie ?? headers.Cookie ?? headers.cookie ?? '';
-    return { ...fallback, mediaUrl, headers, userAgent, referer, cookies: cookie,
+    return {
+      ...fallback,
+      mediaUrl,
+      headers,
+      userAgent,
+      referer,
+      cookies: cookie,
       parserHint: object.parse ? { parse: object.parse, jx: object.jx } : fallback.parserHint,
-      metadata: { ...(fallback.metadata ?? {}), tvboxPlayFlag: object.flag ?? fallback.metadata?.tvboxPlayFlag ?? '', tvboxJx: object.jx ?? false, tvboxParse: object.parse ?? false } };
+      metadata: {
+        ...(fallback.metadata ?? {}),
+        tvboxPlayFlag: object.flag ?? fallback.metadata?.tvboxPlayFlag ?? '',
+        tvboxJx: object.jx ?? false,
+        tvboxParse: object.parse ?? false,
+      },
+    };
   };
 
   const resolvePlaybackCandidates = async (items) => {
@@ -169,11 +111,20 @@ export function createTVBoxJarAdapter(config = {}, runtime = null) {
         const candidates = [];
         for (const candidate of episode.playbackCandidates ?? []) {
           const url = String(candidate.mediaUrl ?? candidate.url ?? '').trim();
-          if (/^https?:\/\//i.test(url)) { candidates.push(candidate); continue; }
+          if (/^https?:\/\//i.test(url)) {
+            candidates.push(candidate);
+            continue;
+          }
           try {
-            const result = await play({ flag: candidate.metadata?.tvboxPlayFlag ?? candidate.label ?? '', id: url, vipFlags: candidate.metadata?.tvboxVipFlags ?? [] });
+            const result = await play({
+              flag: candidate.metadata?.tvboxPlayFlag ?? candidate.label ?? '',
+              id: url,
+              vipFlags: candidate.metadata?.tvboxVipFlags ?? [],
+            });
             candidates.push(normalizePlaybackResult(result, candidate) || candidate);
-          } catch { candidates.push(candidate); }
+          } catch {
+            candidates.push(candidate);
+          }
         }
         episodes.push({ ...episode, playbackCandidates: candidates });
       }
