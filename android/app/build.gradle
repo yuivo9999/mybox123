@@ -63,6 +63,8 @@ dependencies {
     // capabilities are not exposed directly to scripts; they are provided by
     // the controlled runtime adapter.
     implementation "org.mozilla:rhino:1.7.15"
+    // HTML DOM + CSS selector engine for Drpy jq/pdfh/pdfa/pd compatibility.
+    implementation "org.jsoup:jsoup:1.20.1"
 }
 
 apply from: 'capacitor.build.gradle'
