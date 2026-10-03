@@ -27,7 +27,10 @@ public final class TVBoxJarExecutionService extends Service {
     public static final int MSG_NETWORK_REQUEST = 4;
     public static final int MSG_FILE_READ = 5;
     public static final int MSG_RESULT = 100;
+    public static final int MSG_NETWORK_RESULT = 101;
+    public static final int MSG_FILE_RESULT = 102;
     private static final int MAX_MESSAGE_CHARS = 256 * 1024;
+    private static final int MAX_PROXY_BODY_CHARS = 192 * 1024;
     public static final String KEY_REQUEST_ID = "requestId";
     public static final String KEY_PAYLOAD = "payload";
 
@@ -86,6 +89,9 @@ public final class TVBoxJarExecutionService extends Service {
                     .put("maxMessageChars", MAX_MESSAGE_CHARS)
                     .put("networkMessage", MSG_NETWORK_REQUEST)
                     .put("fileMessage", MSG_FILE_READ)
+                    .put("networkResultMessage", MSG_NETWORK_RESULT)
+                    .put("fileResultMessage", MSG_FILE_RESULT)
+                    .put("maxProxyBodyChars", MAX_PROXY_BODY_CHARS)
                     .toString();
         } catch (Exception e) {
             return "{\"ok\":false,\"code\":\"TVBOX_JAR_ISOLATED_CAPABILITY_ERROR\"}";
