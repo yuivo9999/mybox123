@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.net.URI;
 import android.util.Base64;
 
 /**
