@@ -39,7 +39,7 @@ function SourceList({sources,onEnabled,onActive,onTest,onRemove}){
         <Server size={19}/>
         <span>
           <b>{source.name}</b>
-          <small>{source.sourceType} · <span style={{color: statusColor, fontWeight: 600}}>{source.status}</span>{source.isActive?' · 当前使用':''}</small>
+          <small>{source.sourceType}{source.liveMode==='tv1'?' · TV1专用':''} · <span style={{color: statusColor, fontWeight: 600}}>{source.status}</span>{source.isActive?' · 当前使用':''}</small>
         </span>
         <button className={source.isActive?'primary':'secondary'} onClick={()=>onActive?.(source.sourceId)}>{source.isActive?'当前使用':'设为当前'}</button>
         <button className="secondary" disabled={isTesting} onClick={()=>onTest(source)}>{isTesting?'测试中…':'测试'}</button>
