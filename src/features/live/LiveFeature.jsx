@@ -1,73 +1,146 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, startTransition } from 'react';
 import Hls from 'hls.js';
 import { ChevronLeft, Heart, Play, Radio } from 'lucide-react';
 import { liveService } from '../../services/liveService.js';
 import { requestManager } from '../../services/requestManager.js';
+import { tv1LiveService } from '../../services/tv1LiveService.js';
 import { usePageState, pageStateStore } from '../../state/pageStateStore.js';
-import { SmartImage, EmptyState, LoadingState, ErrorState } from '../../components/StateViews.jsx';
+import { SmartImage, EmptyState, LoadingState } from '../../components/StateViews.jsx';
 import { SangtianPlayerWindow } from '../../components/theme/SangtianPlayerConsole.jsx';
-import { Tv1LiveFeature } from './Tv1LiveFeature.jsx';
-
-const ALL_CATEGORY = '全部';
 
 export function createLiveFeature({ channels = [] } = {}) {
   return {
-    getCategories() { return liveService.getCategories(channels) },
-    list(options = {}) { return liveService.listChannels(channels, options) },
-    getChannel(id) { return liveService.getById(channels, id) },
-    async getEPG(channel, range) { return liveService.getEPG(channel, range) }
-  }
+    getCategories() { return liveService.getCategories(channels); },
+    list(options = {}) { return liveService.listChannels(channels, options); },
+    getChannel(id) { return liveService.getById(channels, id); },
+    async getEPG(channel, range) { return liveService.getEPG(channel, range); },
+  };
 }
 
 export function LiveFeature({ channels = [], sources = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite }) {
-  const feature = useMemo(() => createLiveFeature({ channels }), [channels]);
   const page = usePageState();
   const videoRef = useRef(null);
-
   const [selectedChannelId, setSelectedChannelId] = useState('');
   const [activeStreamIndex, setActiveStreamIndex] = useState(0);
-  const [viewMode, setViewMode] = useState('generic');
+  const [tv1Channels, setTv1Channels] = useState([]);
+  const [tv1Loading, setTv1Loading] = useState(false);
+  const [tv1LoadedCount, setTv1LoadedCount] = useState(0);
+  const [tv1Error, setTv1Error] = useState(null);
+  const [resolvedStreams, setResolvedStreams] = useState({});
+  const [streamLoading, setStreamLoading] = useState(false);
 
+  const enabledTv1Sources = useMemo(
+    () => sources.filter(source => source.sourceType === 'live' && source.liveMode === 'tv1' && source.enabled !== false),
+    [sources],
+  );
+
+  useEffect(() => {
+    let active = true;
+    setTv1Channels([]);
+    setTv1LoadedCount(0);
+    setTv1Error(null);
+    if (!enabledTv1Sources.length) {
+      setTv1Loading(false);
+      return () => { active = false; };
+    }
+
+    setTv1Loading(true);
+    const loadSource = async source => {
+      try {
+        await tv1LiveService.loadMetadata(source, {
+          onChannel: channel => {
+            if (!active) return;
+            startTransition(() => {
+              setTv1Channels(prev => [...prev, channel]);
+              setTv1LoadedCount(count => count + 1);
+            });
+          },
+        });
+      } catch (error) {
+        if (active && error?.name !== 'AbortError') setTv1Error(error);
+      }
+    };
+
+    void Promise.all(enabledTv1Sources.map(loadSource)).finally(() => {
+      if (active) setTv1Loading(false);
+    });
+
+    return () => {
+      active = false;
+      enabledTv1Sources.forEach(source => tv1LiveService.clear(source.sourceId));
+    };
+  }, [enabledTv1Sources]);
+
+  const allChannels = useMemo(() => [...channels, ...tv1Channels], [channels, tv1Channels]);
+  const activeChannelBase = useMemo(
+    () => allChannels.find(channel => channel.channelId === selectedChannelId) || null,
+    [allChannels, selectedChannelId],
+  );
   const activeChannel = useMemo(() => {
-    if (!selectedChannelId) return null;
-    return channels.find(c => c.channelId === selectedChannelId) || null;
-  }, [channels, selectedChannelId]);
+    if (!activeChannelBase) return null;
+    const lazyStreams = resolvedStreams[activeChannelBase.channelId];
+    return lazyStreams ? { ...activeChannelBase, streams: lazyStreams } : activeChannelBase;
+  }, [activeChannelBase, resolvedStreams]);
 
-  const activeStream = useMemo(() => {
-    return activeChannel?.streams?.[activeStreamIndex] || activeChannel?.streams?.[0] || null;
-  }, [activeChannel, activeStreamIndex]);
+  const activeStream = activeChannel?.streams?.[activeStreamIndex] || activeChannel?.streams?.[0] || null;
+
+  const loadTv1Streams = async channel => {
+    const sourceRef = channel?.sourceRefs?.find(ref => enabledTv1Sources.some(source => source.sourceId === ref.sourceId));
+    const source = sourceRef ? enabledTv1Sources.find(item => item.sourceId === sourceRef.sourceId) : null;
+    if (!source || !channel?.deferredRef) return;
+    if (resolvedStreams[channel.channelId]) return;
+
+    setStreamLoading(true);
+    setSelectedChannelId(channel.channelId);
+    setActiveStreamIndex(0);
+    try {
+      const streams = await requestManager.run(
+        'tv1-streams:' + source.sourceId + ':' + channel.channelId,
+        signal => tv1LiveService.getStreams(source, channel, { signal }),
+      );
+      setResolvedStreams(prev => ({ ...prev, [channel.channelId]: streams }));
+    } catch (error) {
+      if (error?.name !== 'AbortError') setTv1Error(error);
+    } finally {
+      setStreamLoading(false);
+    }
+  };
+
+  const selectChannel = channel => {
+    setSelectedChannelId(channel.channelId);
+    setActiveStreamIndex(0);
+    if (channel.deferredRef) {
+      void loadTv1Streams(channel);
+    }
+  };
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !activeStream?.url) return;
+    if (!video) return;
+    if (!activeStream?.url) {
+      video.pause?.();
+      video.removeAttribute('src');
+      video.load?.();
+      return;
+    }
 
     const url = activeStream.url;
     let hls = null;
-
-    if (Hls.isSupported() && (url.includes('.m3u8') || activeStream.protocol === 'hls' || url.includes('m3u8'))) {
-      try {
-        hls = new Hls({ enableWorker: true, lowLatencyMode: true });
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-          hls.loadSource(url);
-        });
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          video.play().catch(() => {});
-        });
-      } catch {
-        video.src = url;
-        video.play().catch(() => {});
-      }
+    if (Hls.isSupported() && (activeStream.protocol === 'hls' || /\.m3u8(?:[?#]|$)/i.test(url))) {
+      hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MEDIA_ATTACHED, () => hls.loadSource(url));
+      hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
     } else {
       video.src = url;
       video.play().catch(() => {});
     }
-
     return () => {
       if (hls) {
-        try {
-          hls.destroy();
-        } catch {}
+        try { hls.destroy(); } catch {}
+      } else {
+        video.removeAttribute('src');
+        video.load?.();
       }
     };
   }, [activeStream?.url]);
@@ -80,151 +153,118 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     return () => window.removeEventListener('scroll', save);
   }, []);
 
-  const category = page.live.category;
-  const categories = useMemo(() => feature.getCategories(), [feature]);
-  const visible = useMemo(() => feature.list({ category }), [feature, category]);
-
-  if (viewMode === 'tv1') return <Tv1LiveFeature sources={sources} favorites={favorites} onPlay={onPlay} toggleFavorite={toggleFavorite} onBack={() => setViewMode('generic')} />;
-
-  if (!channels.length) return <Page><Header title="直播" />
-      <div className="actions"><button className="secondary" onClick={() => setViewMode('tv1')}>TV1 专用直播</button></div><EmptyState text="暂无 Live 频道" /></Page>;
+  const grouped = useMemo(() => {
+    const map = new Map();
+    for (const channel of allChannels) {
+      const category = channel.category || '未分类';
+      if (!map.has(category)) map.set(category, []);
+      map.get(category).push(channel);
+    }
+    return [...map.entries()];
+  }, [allChannels]);
 
   return (
     <Page>
       <Header title="直播" />
 
-      {/* 1. Top Video Playback Window matching the image with landscape and web fullscreen */}
-      {activeChannel && (
-        <>
-          <SangtianPlayerWindow
-            videoRef={videoRef}
-            status={activeStream ? 'playing' : 'idle'}
-            candidate={{
-              label: activeStream?.label || '默认线路',
-              url: activeStream?.url,
-              protocol: activeStream?.protocol || 'HLS/M3U8',
-              sourceId: activeChannel?.sourceRefs?.[0]?.sourceId,
-            }}
-            terminalTag={`LIVE · ${activeChannel.name}`}
-          >
-            <video
-              ref={videoRef}
-              controls
-              playsInline
-              className="sangtian-video-element"
-            />
-          </SangtianPlayerWindow>
+      <SangtianPlayerWindow
+        videoRef={videoRef}
+        status={activeStream ? 'playing' : 'idle'}
+        candidate={activeStream ? {
+          label: activeStream.label || '默认线路',
+          url: activeStream.url,
+          protocol: activeStream.protocol || 'HLS/M3U8',
+          sourceId: activeStream.sourceId,
+        } : { label: '请选择频道', protocol: 'LIVE' }}
+        terminalTag={activeChannel ? 'LIVE · ' + activeChannel.name : 'LIVE · 等待频道'}
+      >
+        <video ref={videoRef} controls playsInline className="sangtian-video-element" />
+      </SangtianPlayerWindow>
 
-          {/* Current Channel Bar & Stream Selector */}
-          <div className="live-current-bar">
-            <div className="live-current-info">
-              <span className="live-pill">● 正在直播</span>
-              <b>{activeChannel.name}</b>
-              <small>{activeChannel.category} · {activeStream?.label || '线路 1'}</small>
-            </div>
-            <div className="live-current-actions">
-              {activeChannel.streams?.length > 1 && (
-                <div className="stream-switcher">
-                  {activeChannel.streams.map((s, idx) => (
-                    <button
-                      key={s.streamId || idx}
-                      className={activeStreamIndex === idx ? 'active' : ''}
-                      onClick={() => setActiveStreamIndex(idx)}
-                    >
-                      {s.label || `线路 ${idx + 1}`}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <button
-                className="secondary icon-button"
-                onClick={() => toggleFavorite('channel', activeChannel.channelId)}
-                title="收藏频道"
-              >
-                <Heart
-                  size={16}
-                  fill={favorites.some(i => i.targetType === 'channel' && i.targetId === activeChannel.channelId) ? 'currentColor' : 'none'}
-                />
-              </button>
-              <button
-                className="primary"
-                style={{ padding: '5px 10px', fontSize: 12 }}
-                onClick={() => onPlay?.(activeChannel, activeStream?.streamId)}
-                title="进入全屏详情"
-              >
-                <Play size={13} /> 沉浸播放
-              </button>
-            </div>
+      {activeChannel && (
+        <div className="live-current-bar">
+          <div className="live-current-info">
+            <span className="live-pill">● 正在直播</span>
+            <b>{activeChannel.name}</b>
+            <small>{activeChannel.category} · {activeStream?.label || (streamLoading ? '正在读取地址…' : '等待播放')}</small>
           </div>
-        </>
+          <div className="live-current-actions">
+            {activeChannel.streams?.length > 1 && activeChannel.streams.map((stream, index) => (
+              <button key={stream.streamId || index} className={activeStreamIndex === index ? 'active' : ''} onClick={() => setActiveStreamIndex(index)}>
+                {stream.label || '线路 ' + (index + 1)}
+              </button>
+            ))}
+            <button className="secondary icon-button" onClick={() => toggleFavorite('channel', activeChannel.channelId)}>
+              <Heart size={16} fill={favorites.some(i => i.targetType === 'channel' && i.targetId === activeChannel.channelId) ? 'currentColor' : 'none'} />
+            </button>
+            <button className="primary" onClick={() => onPlay?.(activeChannel, activeStream?.streamId)} disabled={!activeStream}>
+              <Play size={13} /> 沉浸播放
+            </button>
+          </div>
+        </div>
       )}
 
-      {/* 2. Category Chips */}
-      <div className="chips">
-        {categories.map(item => (
-          <button key={item} className={category === item ? 'active' : ''} onClick={() => pageStateStore.patch('live', { category: item })}>
-            {item}
-          </button>
-        ))}
+      <div className="section-title">
+        <h3>频道文件树</h3>
+        {tv1Loading && <small>正在读取频道名称：{tv1LoadedCount}</small>}
       </div>
 
-      {/* 3. Channel List */}
-      <div className="channel-list">
-        {visible.map(channel => {
-          const isCurrent = channel.channelId === activeChannel?.channelId;
-          const favorite = favorites.some(i => i.targetType === 'channel' && i.targetId === channel.channelId);
-          return (
-            <div
-              className={`channel ${isCurrent ? 'active-playing' : ''}`}
-              key={channel.channelId}
-              onClick={() => {
-                setSelectedChannelId(channel.channelId);
-                setActiveStreamIndex(0);
-              }}
-            >
-              <div className="channel-logo">
-                <SmartImage src={channel.logo} alt={channel.name} fallback={<Radio />} />
+      {tv1Error && <div className="info-card"><Radio size={18}/><div><b>部分 TV1 源读取异常</b><span>{tv1Error.message || '未知错误'}；已保留已读取的频道。</span></div></div>}
+
+      {!allChannels.length && tv1Loading && (
+        <LoadingState compact text="正在建立频道文件树，暂不读取频道播放地址…" />
+      )}
+
+      {!!allChannels.length && (
+        <div className="channel-tree">
+          {grouped.map(([category, categoryChannels]) => (
+            <details key={category} open>
+              <summary style={{ cursor: 'pointer', padding: '9px 6px', fontWeight: 700 }}>
+                <Radio size={15} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                {category}
+                <small style={{ marginLeft: 8, opacity: 0.65 }}>{categoryChannels.length}</small>
+              </summary>
+              <div className="channel-list" style={{ paddingLeft: 12 }}>
+                {categoryChannels.map(channel => {
+                  const isCurrent = channel.channelId === activeChannel?.channelId;
+                  const favorite = favorites.some(i => i.targetType === 'channel' && i.targetId === channel.channelId);
+                  const isLazy = Boolean(channel.deferredRef);
+                  const isResolving = streamLoading && selectedChannelId === channel.channelId && isLazy;
+                  const streamCount = resolvedStreams[channel.channelId]?.length ?? channel.streams?.length ?? 0;
+                  return (
+                    <div className={'channel ' + (isCurrent ? 'active-playing' : '')} key={channel.channelId} onClick={() => selectChannel(channel)}>
+                      <div className="channel-logo"><SmartImage src={channel.logo} alt={channel.name} fallback={<Radio />} /></div>
+                      <div className="channel-main">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <b>{channel.name}</b>
+                          {isCurrent && <span className="live-pill" style={{ fontSize: 10, padding: '1px 5px' }}>当前</span>}
+                        </div>
+                        <small>
+                          {isResolving ? '正在读取播放地址…' : isLazy ? 'TV1 · 地址按需读取' : 'Live'} · {streamCount ? streamCount + ' 条线路' : '未读取线路'}
+                        </small>
+                      </div>
+                      <button className={favorite ? 'channel-favorite active-fav' : 'channel-favorite'} onClick={event => { event.stopPropagation(); toggleFavorite('channel', channel.channelId); }}>
+                        <Heart size={17} fill={favorite ? 'currentColor' : 'none'} />
+                      </button>
+                      <button className="secondary" disabled={isResolving} onClick={event => { event.stopPropagation(); selectChannel(channel); if (channel.streams?.length) onPlay?.(channel); }}>
+                        <Play size={17} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="channel-main">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <b>{channel.name}</b>
-                  {isCurrent && <span className="live-pill" style={{ fontSize: 10, padding: '1px 5px' }}>播放中</span>}
-                </div>
-                <small>{channel.category} · {channel.streams.length} 条线路 · {channel.sourceRefs.length} 个来源</small>
-                {(() => {
-                  const current = (channel.capabilities?.currentProgram || channel.capabilities?.upcomingProgram)
-                    ? (liveService.getCurrentEPG(channel).find(program => program.status === 'live') ?? liveService.getCurrentEPG(channel).find(program => program.status === 'upcoming'))
-                    : null;
-                  return current ? (
-                    <small>{current.status === 'live' ? '当前' : '下一'}：{current.title || '未命名节目'} · {current.startAt || '—'}–{current.endAt || '—'}</small>
-                  ) : null;
-                })()}
-              </div>
-              <button className={favorite ? 'channel-favorite active-fav' : 'channel-favorite'} onClick={e => { e.stopPropagation(); toggleFavorite('channel', channel.channelId) }}>
-                <Heart size={17} fill={favorite ? 'currentColor' : 'none'} />
-              </button>
-              <button
-                className="secondary"
-                onClick={e => {
-                  e.stopPropagation();
-                  setSelectedChannelId(channel.channelId);
-                  setActiveStreamIndex(0);
-                  onPlay(channel);
-                }}
-                title="沉浸播放"
-              >
-                <Play size={17} />
-              </button>
-            </div>
-          );
-        })}
-      </div>
-      {!visible.length && <EmptyState text="当前分类没有频道" />}
-      <InfoCard title="Live 数据边界" text="页面只消费标准 Channel；源解析、合并、多线路与 EPG 均由 Live Service / Adapter 负责。" />
+            </details>
+          ))}
+        </div>
+      )}
+
+      {!tv1Loading && !allChannels.length && <EmptyState text="暂无可用 Live 源" />}
     </Page>
   );
 }
 
+const Page = ({ children }) => <main className="page">{children}</main>;
+const Header = ({ title }) => <header><div><span className="eyebrow">TVBOX REACT · LIVE</span><h2>{title}</h2></div></header>;
 export function LiveChannelPanel({ channel, channels = [], favorites = [], onBack, onPlay, onChannel, toggleFavorite }) {
   const feature = useMemo(() => createLiveFeature({ channels }), [channels]);
   const [epg, setEpg] = useState(channel?.epg ?? []);
