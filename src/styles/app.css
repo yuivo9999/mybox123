@@ -1322,3 +1322,12 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
   .font-picker-footer>div{width:100%}
   .font-picker-footer>div button{flex:1}
 }
+
+
+/* Live 直连播放窗口：明确区分“直连”与影视解析链，避免用户误以为仍在解析。 */
+.console-live-status{display:inline-flex;align-items:center;gap:7px;min-height:28px;padding:4px 9px;border:1px solid rgba(85,195,112,.22);border-radius:999px;background:rgba(85,195,112,.08);color:#6ee38a;font-size:11px;font-weight:600;white-space:nowrap}
+.console-live-status .live-pill{padding:2px 6px}
+.sangtian-window.is-live-direct .sangtian-window-tag{border-color:rgba(85,195,112,.35);color:#55c370}
+.sangtian-window.is-live-direct .sangtian-video-overlay span{color:#d7f5dc}
+.sangtian-window.is-live-direct .sangtian-video-error b{color:#ffb4a8}
+@media(max-width:560px){.console-live-status{font-size:10px}.sangtian-window.is-live-direct .sangtian-window-actions{gap:3px}.sangtian-window.is-live-direct .sangtian-window-btn span{display:none}.sangtian-window.is-live-direct .sangtian-window-btn{min-width:32px;padding:0 7px}}
