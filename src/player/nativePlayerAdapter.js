@@ -19,7 +19,7 @@ export function createNativePlayerAdapter(hooks={}) {
   [PlayerCapability.AUDIO_TRACKS]:false,[PlayerCapability.SUBTITLE_TRACKS]:false,
   [PlayerCapability.TRACK_SELECTION]:false,[PlayerCapability.QUALITY_SELECTION]:false,
   [PlayerCapability.LIVE_RECONNECT]:true,
- });;
+ });
  const emit=(event,data={})=>{if(event==='playing')state=PlayerState.PLAYING;if(event==='paused')state=PlayerState.PAUSED;if(event==='bufferingStart')state=PlayerState.BUFFERING;if(event==='reconnecting')state=PlayerState.RECONNECTING;if(event==='stopped')state=PlayerState.STOPPED;if(event==='released')state=PlayerState.RELEASED;hooks.onEvent?.({event,...data});};
  const eventHandler=(payload)=>{try{const value=typeof payload==='string'?JSON.parse(payload):payload;if(value?.event)emit(value.event,value.data??value);}catch{}};
  const previousEventHandler=typeof window!=='undefined'?window.TVBoxWebView?.onPlayerEvent:null;
@@ -27,7 +27,7 @@ export function createNativePlayerAdapter(hooks={}) {
  const adapter={
   get capabilities(){return capabilities;},
   load(next){if(released)throw new Error('PLAYER_ADAPTER_RELEASED');input=next;state=PlayerState.LOADING;emit('loading');return call('loadMedia',{url:next.url,headers:next.headers??{},cookies:next.cookies??'',referer:next.referer??'',userAgent:next.userAgent??'',token:next.token,protocol:next.protocol,playerHint:next.playerHint}).then(()=>input);},
-  prepare(){if(!input)throw new Error('PLAYER_INPUT_REQUIRED');state=PlayerState.PREPARING;emit('prepared');return call('prepareMedia',{});},
+  prepare(){if(!input)throw new Error('PLAYER_INPUT_REQUIRED');state=PlayerState.PREPARING;return call('prepareMedia',{});},
   play(){if(!input)throw new Error('PLAYER_INPUT_REQUIRED');return call('playMedia',{});},
   pause(){return call('pauseMedia',{});},
   seek(seconds){return call('seekMedia',{seconds});},
