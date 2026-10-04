@@ -953,3 +953,69 @@ P2.4 下一小步：审计 fullscreen 的“选集 / 线路设置 / More 设置�
 第一次删除诊断三元分支后，静态回读发现终端面板本体仍残留；已立即删除该不可达块，并再次检查 `showTerminal` / `setShowTerminal` / terminal panel / fullscreen metrics 均不存在。
 当前最新代码提交：3b31211378fcd53af68621676b8434c2d29cfd31
 本轮仍未运行 build/lint/test；下一次验证优先级为 JSX 编译 / lint。
+
+
+## 21. P2.4.2 已完成：统一全屏右侧播放面板
+
+### 21.1 本轮确认的问题
+文件：`src/components/theme/SangtianPlayerConsole.jsx`
+
+全屏 VOD 原本维护两套右侧侧栏：
+- “剧集选集”侧栏：只负责 episode grid，并额外包含线路。
+- “线路与播放设置”侧栏：负责画面比例、清晰度、音轨、字幕、线路。
+
+两者都是同一个“播放过程中打开的右侧工作面板”，却由两个 state 和两个 JSX 分支维护，容易造成：
+- 同一条线路在不同面板重复出现。
+- 选集和线路入口分裂。
+- 后续增加播放速度/更多设置时继续产生第三套入口。
+
+### 21.2 已实际修改
+仍只修改：
+- `src/components/theme/SangtianPlayerConsole.jsx`
+
+具体：
+- 删除 `showEpisodeSidebar`，改为单一 `showRightSidebar` + `rightSidebarSection`。
+- “选集”按钮只切换右侧面板到 `episodes` 区域。
+- “更多”按钮只切换右侧面板到 `settings` 区域。
+- 两个入口现在共用同一个右侧面板容器。
+- VOD 选集区域保留：分组、集数选择、播放线路。
+- VOD 播放设置区域保留：播放速度、画面比例、清晰度、音轨、字幕、播放线路。
+- Live 继续保留左侧“选台”与右侧“播放与解码设置”，没有把 Live 频道选择错误并入 VOD episode IA。
+- 全屏设置入口从“线路设置”改名为“更多”，避免把 More 面板误解成单纯换源功能。
+
+### 21.3 当前信息架构
+Landscape VOD：
+- 顶部：返回 / 当前标题 / 选集 / 更多 / 锁定 / 时间 / 退出。
+- 选集：同一右侧播放面板的 episode 区域，同时允许选线路。
+- 更多：同一右侧播放面板的 playback settings 区域。
+- 底部：进度、上一集、下一集、倍速、比例、退出。
+
+因此目前没有再增加第三套“播放设置”入口。
+
+### 21.4 静态验证
+已回读当前文件确认：
+- `showEpisodeSidebar` 不再存在。
+- `setShowEpisodeSidebar` 不再存在。
+- 全屏只保留一个 `showRightSidebar` 右侧面板。
+- 选集入口使用 `rightSidebarSection='episodes'`。
+- 更多入口使用 `rightSidebarSection='settings'`。
+- 播放速度已进入统一 More 面板。
+
+尚未验证：
+- 浏览器真实全屏交互。
+- 移动端横竖屏真实行为。
+- build / lint / test。
+
+### 21.5 下一步
+继续按优先级进入 P2.5 / Live 播放职责收敛：
+1. 审计 `LiveFeature.jsx` 的 inline preview 与 `PlaybackPage.jsx` immersive 播放控制是否重复。
+2. 目标是 inline = 轻量 PreviewPlayer，immersive = 正式 LivePlaybackPage；共享底层 controller，不再复制完整控制逻辑。
+3. 在没有必要之前，不要继续往 `SangtianPlayerConsole.jsx` 增加新的入口。
+
+### 21.6 接力状态
+- 当前分支：`ai-handoff/playback-phase1`
+- 本轮代码提交：`b85513fce64ea8696986fca095fb41f038603d33`
+- 文档提交会在本次代码提交之后继续推进；下一位以实际 branch HEAD 为准。
+- 本轮没有合并 `main`。
+- 本轮没有运行真实浏览器、build、lint、test。
+
