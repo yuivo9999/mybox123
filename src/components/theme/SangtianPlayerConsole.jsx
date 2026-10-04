@@ -17,6 +17,7 @@ export function SangtianPlayerWindow({
   onPreviousEpisode, onNextEpisode,
   candidates = [], onSelectCandidate, onOpenSourceModal,
   onTimeMetricsChange,
+  playbackCapabilities = {}, getAudioTracks, getSubtitleTracks, getQualities, selectAudioTrack, selectSubtitleTrack, selectQuality,
 }) {
   const [showTerminal, setShowTerminal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -37,6 +38,12 @@ export function SangtianPlayerWindow({
   const [showEpisodeSidebar, setShowEpisodeSidebar] = useState(false);
   const [episodePage, setEpisodePage] = useState(0);
   const [isStoppedManually, setIsStoppedManually] = useState(false);
+  const [audioTracks, setAudioTracks] = useState([]);
+  const [subtitleTracks, setSubtitleTracks] = useState([]);
+  const [qualities, setQualities] = useState([]);
+  const [selectedAudioTrack, setSelectedAudioTrack] = useState('');
+  const [selectedSubtitleTrack, setSelectedSubtitleTrack] = useState('off');
+  const [selectedQuality, setSelectedQuality] = useState('');
 
   useEffect(() => {
     setIsStoppedManually(false);
@@ -44,6 +51,23 @@ export function SangtianPlayerWindow({
 
   const lastBufferRef = useRef({ time: 0, buffered: 0 });
   const controlsTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    let active=true;
+    const refreshTracks=async()=>{
+      if(!active)return;
+      try{
+        if(playbackCapabilities.audioTracks && getAudioTracks){const value=await getAudioTracks();if(active)setAudioTracks(Array.isArray(value)?value:[]);}
+        else setAudioTracks([]);
+        if(playbackCapabilities.subtitleTracks && getSubtitleTracks){const value=await getSubtitleTracks();if(active)setSubtitleTracks(Array.isArray(value)?value:[]);}
+        else setSubtitleTracks([]);
+        if(playbackCapabilities.qualitySelection && getQualities){const value=await getQualities();if(active)setQualities(Array.isArray(value)?value:[]);}
+        else setQualities([]);
+      }catch{if(active){setAudioTracks([]);setSubtitleTracks([]);setQualities([]);}}
+    };
+    refreshTracks();
+    return()=>{active=false;};
+  },[playbackCapabilities,resolvedInput,candidate,status,getAudioTracks,getSubtitleTracks,getQualities]);
 
   const streamUrl = resolvedInput?.url || candidate?.mediaUrl || candidate?.url || candidate?.metadata?.url || '';
   const aspectOptions = [
@@ -648,6 +672,31 @@ export function SangtianPlayerWindow({
                           ))}
                         </div>
                       </div>
+
+                      {(playbackCapabilities.qualitySelection && qualities.length > 0) && (
+                        <div className="settings-group">
+                          <label>清晰度</label>
+                          <div className="settings-btn-grid">
+                            {qualities.map(q=><button key={q.qualityId} className={`setting-btn ${selectedQuality===q.qualityId?'active':''}`} onClick={async()=>{const value=await selectQuality?.(q.qualityId);if(value){setSelectedQuality(q.qualityId);}}}>{q.label || (q.height ? q.height+'p' : '自动')}</button>)}
+                          </div>
+                        </div>
+                      )}
+                      {(playbackCapabilities.audioTracks && audioTracks.length > 0) && (
+                        <div className="settings-group">
+                          <label>音轨</label>
+                          <div className="settings-btn-grid">
+                            {audioTracks.map(t=><button key={t.id} className={`setting-btn ${selectedAudioTrack===t.id?'active':''}`} onClick={async()=>{const ok=await selectAudioTrack?.(t.id);if(ok!==false)setSelectedAudioTrack(t.id);}}>{t.label || t.language || t.id}</button>)}
+                          </div>
+                        </div>
+                      )}
+                      {(playbackCapabilities.subtitleTracks && subtitleTracks.length > 0) && (
+                        <div className="settings-group">
+                          <label>字幕</label>
+                          <div className="settings-btn-grid">
+                            {subtitleTracks.map(t=><button key={t.id} className={`setting-btn ${selectedSubtitleTrack===t.id?'active':''}`} onClick={async()=>{const ok=await selectSubtitleTrack?.(t.id);if(ok!==false)setSelectedSubtitleTrack(t.id);}}>{t.label || t.language || t.id}</button>)}
+                          </div>
+                        </div>
+                      )}
 
                       {/* VOD Candidate Lines */}
                       {!isLive && candidates?.length > 0 && (
