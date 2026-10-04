@@ -250,6 +250,7 @@ export function App(){
  return (
   <div className={`app-shell ${appearanceClass}`} style={{'--app-font-family':`"${selectedFont.family}",Inter,ui-sans-serif,system-ui,sans-serif`}} onPointerDown={handleSwipePointerDown} onPointerUp={handleSwipePointerUp} onPointerCancel={() => { swipeRef.current = {active:false,startX:0,startY:0,pointerId:null}; }}>
     <div className="screen">
+      <PersistentLivePlayerHost />
       {(() => {
         // 1. If in a management tab, always show it
         if (isManagementTab) {
