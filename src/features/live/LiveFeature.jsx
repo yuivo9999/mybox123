@@ -247,12 +247,20 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   };
 
   const selectChannel = channel => {
+    // A previous lazy-stream request belongs to the previously selected channel.
+    // Abort it before changing selection so a slow response cannot keep the old
+    // loading state alive while the user is already on another channel.
+    if (streamAbortRef.current) {
+      streamAbortRef.current.abort();
+      streamAbortRef.current = null;
+    }
+    setStreamLoading(false);
     setSelectedChannelId(channel.channelId);
     setActiveStreamIndex(0);
     setPlaybackCandidate(null);
     setResolvedPlaybackInput(null);
     setPlaybackError('');
-    if (channel.deferredRef) {
+    if (channel.deferredRef && !resolvedStreams[channel.channelId]) {
       void loadChannelStreams(channel);
     }
   };
