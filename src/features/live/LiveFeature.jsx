@@ -151,7 +151,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
       const next = Object.fromEntries(
         Object.entries(prev).filter(([cacheKey]) => {
           const separator = cacheKey.indexOf('\u0000');
-          if (separator < 0) return availableIds.has(cacheKey);
+          if (separator < 0) return false;
           const sourceId = cacheKey.slice(0, separator);
           const channelId = cacheKey.slice(separator + 1);
           return availableIds.has(channelId) && (sourceId === 'merged' || enabledSourceIds.has(sourceId));
