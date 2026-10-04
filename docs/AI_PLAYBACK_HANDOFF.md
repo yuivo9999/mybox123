@@ -1457,3 +1457,39 @@ P2.6 上一轮的 History 调用传入了 `'live-history'`，但 `App.handleLive
 3. 检查 returnRoute / returnTab 是否存在语义冲突。
 4. 检查 PlaybackPage、旧 decoderEngine、重复播放 controller 等遗留命名/路径。
 5. 若静态结果稳定，再进入 P3 UI/响应式收敛；同时在环境允许时优先跑 build/lint/test。
+## 30. P2.7 全局静态回归完成：播放导航链进一步收敛
+
+### 30.1 本轮修正
+发现 AppRoot.recoverFromPageError() 的 live-play 仍保留旧的 history / live 重复分支。
+已改为直接复用 resolvePlaybackReturnTarget(selected, { fallbackTab: 'live' })。
+因此 VOD / Live 的正常返回与 ErrorBoundary 返回现在都经过统一 ReturnTarget 解析。
+
+### 30.2 全局静态审计结论
+已回读核心播放链：App、playbackContext、playback model/service、usePlaybackController、MoviePlaybackPage、MovieFeature、LiveFeature、LivePlaybackPage、SangtianPlayerConsole、MainPage、watchProgressService。
+确认：
+- 播放 request 的正式创建入口仍集中在 playbackService。
+- LiveFeature 的正式播放生命周期仍通过 usePlaybackController，没有重新引入页面级 createController。
+- MainPage 的 VOD / Live History 都统一经过 onPlay / onLive，Live History 使用 returnRoute='history'。
+- MovieFeature 返回 detail 时可从 playback request 的 contentId 重新解析真实 movie，不依赖把 request 当完整 movie。
+- SangtianPlayerConsole 不再出现 decoderEngine。
+- 旧 PlaybackPage.jsx 已删除，正式 Live 沉浸页为 LivePlaybackPage.jsx。
+- 仍存在 playbackContext.js 内对 metadata.returnRoute 的兼容读取，这是有意保留的迁移兜底，不属于业务页面直接读取。
+- returnRoute 与 returnTab 当前语义没有发现冲突：明确 route 优先，tab 只作 fallback。
+
+### 30.3 当前验证边界
+本轮属于源码静态审计与修正。
+当前环境没有可用的仓库本地执行结果，因此：
+- 浏览器 E2E：未运行
+- npm build：未运行
+- lint：未运行
+- unit test：未运行
+- CI：当前提交没有可引用的 workflow run
+不能把静态通过写成运行时通过。
+
+### 30.4 下一优先级：P3 播放 UI / 响应式收敛
+P2.7 导航与播放上下文已经基本收口，下一阶段不再继续无收益地拆 App。进入 P3 时按以下顺序：
+1. 审计 SangtianPlayerConsole 的 VOD / Live 共用 UI，继续减少重复控制与信息密度。
+2. 审计普通页与沉浸页的控制层级，明确主控制 / 次控制 / More。
+3. 审计移动竖屏、横屏、桌面宽屏三个布局状态，避免播放区与侧栏互相挤压。
+4. 将播放器 UI 与播放生命周期彻底解耦：UI 只发 intent，不自行管理 source/controller。
+5. 最后再做 CSS / 命名 / 微交互清理。
