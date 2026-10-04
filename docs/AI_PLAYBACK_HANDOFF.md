@@ -1209,3 +1209,60 @@ Live 正式沉浸播放继续由 `LivePlaybackPage` 负责；页面下方已有�
 - 当前分支：`ai-handoff/playback-phase1`
 - 未合并 main。
 - 本轮没有运行浏览器、build、lint、test。
+
+
+## 26. P2.6 已完成：History → 直接恢复对应影视集数
+
+### 26.1 审计发现
+`MainPage.jsx` 的播放历史卡片以前只执行：
+`onMovie(movie)`
+
+因此用户点击历史记录后：
+- 只进入影视详情；
+- 没有使用历史记录里的 `episodeId`；
+- 没有直接恢复对应集数；
+- 历史记录已经保存的 `sourceId / positionSeconds / durationSeconds` 没有形成直接播放入口。
+
+### 26.2 已修改
+文件：`src/pages/MainPage.jsx`
+- 历史卡片根据 `historyItem.episodeId` 找到对应 episode index。
+- 点击历史卡片改为调用：
+  `onPlay(movie, episodeIndex, historyItem.sourceId, 'history')`
+- 因此直接进入现有 `playMovie()` → `MoviePlaybackPage` 流程。
+- 没有新建 History 专用播放器，也没有复制 resume 逻辑。
+
+文件：`src/app/App.jsx`
+- `getMovieReturnRoute()` 增加 `history`。
+- `returnFromMoviePlayback()` 增加回 `tab=history`。
+- ErrorBoundary 的播放页恢复逻辑同样支持 `returnRoute=history`。
+- 所有 MainPage 渲染分支均传入 `onPlay={playMovie}`。
+
+### 26.3 为什么这样设计
+历史记录负责告诉入口“用户上次在哪一集、哪个源”，播放系统仍统一负责：
+- source/candidate fallback；
+- autoplayResume；
+- progress persistence；
+- player lifecycle；
+- playback error recovery。
+
+这样不会出现“详情页续播一套、历史页续播一套”的第二套播放状态机。
+
+### 26.4 静态验证
+已确认：
+- History card 使用 `episodeId` 计算 episodeIndex。
+- History card 传递历史 `sourceId`。
+- App 能识别 `returnRoute=history`。
+- 正常返回和 ErrorBoundary 恢复均能回 History。
+- MainPage 的 3 个渲染调用点都传入 `onPlay`。
+
+尚未验证：
+- 浏览器真实点击历史卡片；
+- 对应 episode 是否实际从正确 position 恢复；
+- 已失效 sourceId 时的 fallback；
+- build / lint / test。
+
+### 26.5 下一步
+继续 P2.6：
+1. 审计 Favorites → 播放闭环，确认收藏影视是否能保持正确 content identity；
+2. 审计 Live History 是否应该直接恢复对应频道/线路，而不是只回频道详情；
+3. 然后进入 P2.7：整理 playback context，逐步减少 `selected` / `metadata.returnRoute` 这种散落约定。
