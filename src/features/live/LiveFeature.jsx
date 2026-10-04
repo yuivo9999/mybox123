@@ -209,29 +209,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   const [playbackStatus, setPlaybackStatus] = useState('idle');
   const [playbackError, setPlaybackError] = useState('');
   const [resolvedPlaybackInput, setResolvedPlaybackInput] = useState(null);
-
-  const playbackController = useMemo(() => livePlaybackRequest
-    ? playbackService.createController(livePlaybackRequest, {
-        onStateChange: setPlaybackStatus,
-        onCandidateChange: next => {
-          setPlaybackCandidate(next);
-          if (next) {
-            setPlaybackError('');
-            const index = livePlaybackRequest.candidates.findIndex(item => item.candidateId === next.candidateId);
-            if (index >= 0) setActiveStreamIndex(index);
-          }
-        },
-        onResolvedInput: setResolvedPlaybackInput,
-        onPlayerError: ({ error }) => {
-          // Automatic fallback is owned by playbackCore/task. The feature layer only
-          // surfaces an error that escaped the core recovery pipeline; it must not
-          // switch candidates again or recreate the controller.
-          setPlaybackError(error?.message || '播放器加载失败');
-        },
-        onParserError: ({ code }) => setPlaybackError('解析失败：' + code),
-        onExhausted: () => setPlaybackStatus('error'),
-      })
-    : null, [livePlaybackRequest]);
+  const playbackController = useMemo(() => playbackService.getLivePlayerController(), []);
 
   // Load current EPG program details when active channel changes
   useEffect(() => {
@@ -361,27 +339,41 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   }, [playbackController]);
 
   useEffect(() => {
-    if (!playbackController) {
-      setPlaybackCandidate(null);
-      setResolvedPlaybackInput(null);
-      setPlaybackStatus('idle');
-      setPlaybackError('');
-      return undefined;
-    }
-    const player = playbackController.attachPlayer(videoRef.current);
-    const initial = playbackController.start();
-    setPlaybackCandidate(initial);
+    const unsubscribe = playbackController.subscribe?.(event => {
+      if (event.event === 'stateChanged') setPlaybackStatus(event.state);
+      if (event.event === 'sourceChanged' && event.candidate) {
+        setPlaybackCandidate(event.candidate);
+        const index = livePlaybackRequest?.candidates?.findIndex(item => item.candidateId === event.candidate.candidateId) ?? -1;
+        if (index >= 0) setActiveStreamIndex(index);
+      }
+      if (event.event === 'error') setPlaybackError(event.error || '播放器加载失败');
+    });
+    return () => unsubscribe?.();
+  }, [playbackController, livePlaybackRequest]);
+
+  useEffect(() => {
+    if (!activeChannel?.streams?.length) return undefined;
+    const request = playbackService.createLiveRequest({ channel: activeChannel });
+    playbackController.ensureRequest(request);
+    const body = playerWindowBodyRef.current;
+    const video = playbackController.getVideoElement();
+    videoRef.current = video;
+    playbackController.attachPresentation(body);
+    setPlaybackCandidate(playbackController.getPlaybackState?.().state ? request.candidates[0] : request.candidates[0]);
     setResolvedPlaybackInput(null);
-    if (initial) {
-      playbackController.resolveAndLoad(initial).catch(error => setPlaybackError(error?.message || '播放初始化失败'));
-    } else {
-      setPlaybackStatus('error');
-      setPlaybackError('没有可用的播放候选');
-    }
+    setPlaybackError('');
     return () => {
-      void player;
-      playbackController.leave();
+      playbackController.detachPresentation();
     };
+  }, [activeChannel, playbackController]);
+
+  useEffect(() => {
+    const video = playbackController.getVideoElement();
+    videoRef.current = video;
+    const body = playerWindowBodyRef.current;
+    if (!body) return undefined;
+    playbackController.attachPresentation(body);
+    return () => playbackController.detachPresentation();
   }, [playbackController]);
 
   useEffect(() => {
@@ -433,12 +425,10 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
           if (candidate && playbackController) playbackController.switchCandidate(candidate.candidateId);
         }}
         onStop={() => {
-          playbackController?.stop();
-          if (videoRef.current) {
-            videoRef.current.pause();
-            videoRef.current.removeAttribute('src');
-            videoRef.current.load();
-          }
+          playbackController.stop();
+          setPlaybackCandidate(null);
+          setResolvedPlaybackInput(null);
+          setPlaybackStatus('stopped');
         }}
         decoderEngine={decoderEngine}
         onChangeDecoderEngine={setDecoderEngine}
