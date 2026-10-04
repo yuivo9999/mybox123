@@ -10,6 +10,10 @@ export function createPlaybackResourceManager(registry = playbackTaskRegistry) {
 
   return {
     acquire(taskId, kind = 'movie', onReplaced = () => {}) {
+      if (typeof kind === 'function') {
+        onReplaced = kind;
+        kind = 'movie';
+      }
       const domain = normalizeKind(kind);
       const current = owners[domain];
 
