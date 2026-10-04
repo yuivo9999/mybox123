@@ -39,6 +39,7 @@ function PlaybackView({
   const [decoderEngine, setDecoderEngine] = useState('exo');
   const [playbackTime, setPlaybackTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
+  const [liveControllerEpoch, setLiveControllerEpoch] = useState(0);
 
   const videoRef = useRef(null);
 
@@ -130,7 +131,7 @@ function PlaybackView({
       onPlayerError: ({ error: e }) => setError(e?.message || '播放器加载失败'),
       onExhausted: () => setStatus('error'),
     });
-  }, [request, isLive, recordProgress]);
+  }, [request, isLive, recordProgress, liveControllerEpoch]);
 
   useEffect(() => {
     let active = true;
@@ -232,9 +233,22 @@ function PlaybackView({
 
   const handleRetry = () => {
     setError('');
-    const retry = controller.start();
+    // Explicit live stop releases the singleton session. Re-acquire it on retry
+    // so retry never calls start() on a disposed controller. The epoch forces
+    // the view effects to resubscribe to the newly acquired controller.
+    const activeController = isLive
+      ? playbackService.getLivePlayerController(request)
+      : controller;
+    if (isLive) {
+      setLiveControllerEpoch(value => value + 1);
+      activeController.attachPresentation?.(playerWindowBodyRef.current);
+      videoRef.current = activeController.getVideoElement?.() || null;
+    }
+    const retry = activeController.start();
     if (retry) {
-      controller.resolveAndLoad(retry).catch(e => setError(e?.message || '重新加载失败'));
+      setCandidate(retry);
+      setStatus(activeController.getPlaybackState?.().state || 'loading');
+      activeController.resolveAndLoad(retry).catch(e => setError(e?.message || '重新加载失败'));
     }
   };
 
