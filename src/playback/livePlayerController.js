@@ -11,6 +11,8 @@ export function createLivePlayerController(session) {
   return Object.freeze({
     get sessionId() { return session.sessionId; },
     get state() { return session.core?.state ?? state; },
+    get currentCandidate() { return session.currentCandidate; },
+    get currentChannel() { return session.currentChannel; },
     get failedCandidateIds() { return session.core?.task?.failedCandidateIds ?? []; },
     subscribe(listener) {
       listeners.add(listener);
