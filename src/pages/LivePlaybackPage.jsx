@@ -233,7 +233,10 @@ function PlaybackView({
         activeChannel={channel}
         activeStreamIndex={request?.candidates?.findIndex(item => item.candidateId === candidate?.candidateId) ?? 0}
         onSelectChannel={onChannel}
-        onSwitchStreamIndex={index => {\n          const next = candidates[index];\n          if (next) switchCandidate(next.candidateId);\n        }}
+        onSwitchStreamIndex={index => {
+          const next = candidates[index];
+          if (next) switchCandidate(next.candidateId);
+        }}
         title={request?.metadata?.title ?? channel?.name ?? 'LIVE 直播'}
         sourceLabel={candidateLabel}
         candidates={candidates}
@@ -316,4 +319,6 @@ function PlaybackView({
   );
 }
 
-export function LivePlaybackPage(props) {\n  return <PlaybackView {...props} />;\n}\n
+export function LivePlaybackPage(props) {
+  return <PlaybackView {...props} />;
+}
