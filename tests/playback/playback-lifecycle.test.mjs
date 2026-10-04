@@ -210,7 +210,27 @@ test('stop keeps the controller restartable and rebinds player events', async ()
   delete globalThis.window;
 });
 
-test('release while loading prevents late prepare and play', async () => {
+
+test('stopped owner is released when a competing controller acquires the playback resource', async () => {
+  const { calls } = installNativeBridge();
+  const first = createLiveCore();
+  first.core.attachPlayer(null);
+  first.core.start();
+  first.core.stop();
+
+  const second = createLiveCore();
+  second.core.attachPlayer(null);
+  second.core.start();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(first.task.status, 'released');
+  assert.equal(second.task.status !== 'released', true);
+  assert.equal(calls.filter((item) => item.method === 'releaseMedia').length, 1);
+
+  second.core.release();
+  delete globalThis.window;
+});
+\ntest('release while loading prevents late prepare and play', async () => {
   const { calls, loadWaiters } = installNativeBridge();
   const aLoad = deferred();
   loadWaiters.set('https://example.test/a.m3u8', aLoad);
