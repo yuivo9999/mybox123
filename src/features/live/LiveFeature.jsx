@@ -59,7 +59,6 @@ const globalLiveCache = {
   selectedCategory: '全部',
   resolvedStreams: {},
   activeStreamIndex: 0,
-  decoderEngine: 'exo',
   isImmersive: false,
 };
 
@@ -76,7 +75,6 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   const [tv1Error, setTv1Error] = useState(null);
   const [resolvedStreams, setResolvedStreams] = useState(globalLiveCache.resolvedStreams || {});
   const [streamLoading, setStreamLoading] = useState(false);
-  const [decoderEngine, setDecoderEngine] = useState(globalLiveCache.decoderEngine || 'exo');
   const [isImmersive, setIsImmersive] = useState(globalLiveCache.isImmersive || false);
 
   const enabledTv1Sources = useMemo(
@@ -90,7 +88,6 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   useEffect(() => { globalLiveCache.activeStreamIndex = activeStreamIndex; }, [activeStreamIndex]);
   useEffect(() => { globalLiveCache.tv1Channels = tv1Channels; }, [tv1Channels]);
   useEffect(() => { globalLiveCache.resolvedStreams = resolvedStreams; }, [resolvedStreams]);
-  useEffect(() => { globalLiveCache.decoderEngine = decoderEngine; }, [decoderEngine]);
   useEffect(() => { globalLiveCache.isImmersive = isImmersive; }, [isImmersive]);
 
   useEffect(() => {
@@ -404,8 +401,6 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
             videoRef.current.load();
           }
         }}
-        decoderEngine={decoderEngine}
-        onChangeDecoderEngine={setDecoderEngine}
         isImmersive={isImmersive}
         onToggleImmersive={() => setIsImmersive(false)}
       />
