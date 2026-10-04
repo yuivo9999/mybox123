@@ -74,6 +74,12 @@ export const playbackService = {
     return createPlaybackTask(request);
   },
 
+  createLivePlaybackParts(request, hooks = {}) {
+    const task = createPlaybackTask(request);
+    const core = createPlaybackCore(task, hooks);
+    return { task, core };
+  },
+
   createController(request, hooks = {}) {
     const task = createPlaybackTask(request);
     const core = createPlaybackCore(task, hooks);
