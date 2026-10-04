@@ -1,4 +1,4 @@
-import { PlaybackFailureCode, PlaybackKind } from '../models/playback.js';
+import { PlaybackFailureCode, PlaybackKind, PlaybackRequestStatus } from '../models/playback.js';
 import { parserService } from '../parsers/parserService.js';
 import { createHtml5PlayerAdapter } from '../player/html5PlayerAdapter.js';
 import { createNativePlayerAdapter } from '../player/nativePlayerAdapter.js';
@@ -198,8 +198,7 @@ export function createPlaybackCore(task,hooks={}) {
    if(state==='foreground'&&task.request.kind===PlaybackKind.LIVE&&task.currentCandidate){try{await resolveAndLoad(task.currentCandidate);}catch(e){void recover(e,PlaybackFailureCode.NETWORK);}}
   },
   stop(){
-   if(released) return;
-   if(task.status==='stopped') return;
+   if(released || task.status === PlaybackRequestStatus.STOPPED) return;
    player?.stop?.();
    task.stop();
    resourceRelease?.();
