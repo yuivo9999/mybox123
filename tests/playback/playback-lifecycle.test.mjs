@@ -3,6 +3,8 @@ import { test } from 'node:test';
 
 import { PlaybackKind, createPlaybackRequest } from '../../src/models/playback.js';
 import { createPlaybackCore } from '../../src/playback/playbackCore.js';
+import { createLivePlayerSession } from '../../src/playback/livePlayerSession.js';
+import { createPlaybackLifecyclePolicy } from '../../src/playback/playbackLifecyclePolicy.js';
 import { createPlaybackResourceManager } from '../../src/playback/playbackResourceManager.js';
 import { createPlaybackTaskRegistry } from '../../src/playback/playbackTaskRegistry.js';
 import { playbackService } from '../../src/services/playbackService.js';
@@ -74,6 +76,33 @@ function createLiveCore(hooks = {}) {
   return { request, task, core: createPlaybackCore(task, hooks) };
 }
 
+test('resource manager keeps movie and live owners independent', () => {
+  const registry = createPlaybackTaskRegistry();
+  const events = [];
+  for (const id of ['movie-a', 'live-a']) {
+    registry.register({
+      request: { taskId: id },
+      stop: () => events.push(`${id}.stop`),
+      release: () => events.push(`${id}.release`),
+    });
+  }
+
+  const manager = createPlaybackResourceManager(registry);
+  manager.acquire('movie-a', 'movie');
+  manager.acquire('live-a', 'live');
+
+  assert.equal(manager.movieOwner, 'movie-a');
+  assert.equal(manager.liveOwner, 'live-a');
+
+  manager.acquire('movie-b', 'movie');
+  assert.deepEqual(events, ['movie-a.stop', 'movie-a.release']);
+  assert.equal(manager.movieOwner, 'movie-b');
+  assert.equal(manager.liveOwner, 'live-a');
+
+  registry.stopAndRelease('movie-b');
+  registry.stopAndRelease('live-a');
+});
+
 test('resource manager releases previous owner before assigning the next owner', () => {
   const events = [];
   const registry = createPlaybackTaskRegistry();
@@ -90,6 +119,90 @@ test('resource manager releases previous owner before assigning the next owner',
   assert.deepEqual(events, ['replaced:A', 'A.stop', 'A.release']);
   assert.equal(manager.ownerTaskId, 'B');
   assert.deepEqual(registry.ids(), []);
+});
+
+
+test('live lifecycle policy detaches on page leave and releases only on explicit stop', () => {
+  const livePolicy = createPlaybackLifecyclePolicy({ kind: PlaybackKind.LIVE });
+  const moviePolicy = createPlaybackLifecyclePolicy({ kind: PlaybackKind.VOD });
+
+  assert.equal(livePolicy.onPageLeave, 'detach');
+  assert.equal(livePolicy.shouldReleaseOnLeave, false);
+  assert.equal(moviePolicy.onPageLeave, 'release');
+  assert.equal(moviePolicy.shouldReleaseOnLeave, true);
+});
+
+test('live session preserves controller, core, and video identity across channel switch', async () => {
+  const { calls } = installNativeBridge();
+  const session = createLivePlayerSession();
+  const host = { appendChild(node) { node.parentNode = host; } };
+  const target = { appendChild(node) { node.parentNode = target; } };
+  const video = { parentNode: null };
+
+  session.registerVideo(video, host);
+  const channelA = {
+    channelId: 'channel-a',
+    name: 'A',
+    streams: [candidate('a', 'https://example.test/a.m3u8')],
+  };
+  const channelB = {
+    channelId: 'channel-b',
+    name: 'B',
+    streams: [candidate('b', 'https://example.test/b.m3u8')],
+  };
+
+  const requestA = playbackService.createLiveRequest({ channel: channelA, metadata: { channel: channelA } });
+  const controller = session.ensureRequest(requestA);
+  const core = session.core;
+  const task = session.task;
+
+  assert.ok(controller);
+  assert.equal(session.controller, controller);
+  assert.equal(session.getVideoElement(), video);
+  assert.equal(session.core, core);
+
+  session.attachPresentation(target);
+  assert.equal(video.parentNode, target);
+  session.detachPresentation();
+  assert.equal(video.parentNode, host);
+
+  const requestB = playbackService.createLiveRequest({ channel: channelB, metadata: { channel: channelB } });
+  const nextController = session.ensureRequest(requestB);
+
+  assert.equal(nextController, controller);
+  assert.equal(session.controller, controller);
+  assert.equal(session.core, core);
+  assert.equal(session.task, task);
+  assert.equal(session.getVideoElement(), video);
+  assert.equal(session.currentCandidate?.candidateId, requestB.candidates[0]?.candidateId);
+
+  session.release();
+  assert.equal(session.core, null);
+  assert.equal(session.controller, null);
+  assert.ok(calls.some((item) => item.method === 'releaseMedia'));
+  delete globalThis.window;
+});
+
+test('playback service returns the same live controller until the session is released', () => {
+  installNativeBridge();
+  const request = playbackService.createLiveRequest({
+    channel: {
+      channelId: 'singleton-channel',
+      name: 'Singleton',
+      streams: [candidate('a', 'https://example.test/a.m3u8')],
+    },
+  });
+
+  const first = playbackService.getLivePlayerController(request);
+  const second = playbackService.getLivePlayerController(request);
+  assert.equal(second, first);
+  assert.equal(second.sessionId, first.sessionId);
+
+  first.release();
+  const third = playbackService.getLivePlayerController(request);
+  assert.notEqual(third, first);
+  third.release();
+  delete globalThis.window;
 });
 
 test('stale candidate load cannot prepare or play after a rapid switch', async () => {
@@ -230,7 +343,8 @@ test('stopped owner is released when a competing controller acquires the playbac
   second.core.release();
   delete globalThis.window;
 });
-\ntest('release while loading prevents late prepare and play', async () => {
+
+test('release while loading prevents late prepare and play', async () => {
   const { calls, loadWaiters } = installNativeBridge();
   const aLoad = deferred();
   loadWaiters.set('https://example.test/a.m3u8', aLoad);
