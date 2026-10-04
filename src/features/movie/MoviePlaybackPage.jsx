@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Heart, ListVideo, Film, RotateCw, Ratio, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Heart, Film, RotateCw, Ratio, Play } from 'lucide-react';
 import { movieService } from '../../services/movieService.js';
 import { usePlaybackController } from '../../playback/usePlaybackController.js';
 import { usePersistentState } from '../../state/usePersistentState.js';
