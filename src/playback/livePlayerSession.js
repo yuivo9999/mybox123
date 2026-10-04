@@ -1,6 +1,5 @@
 import { PlaybackKind } from '../models/playback.js';
-import { createPlaybackTask } from '../services/playbackService.js';
-import { createPlaybackCore } from './playbackCore.js';
+import { playbackService } from '../services/playbackService.js';
 import { createLivePlayerController } from './livePlayerController.js';
 
 let nextSessionId = 1;
@@ -51,8 +50,7 @@ export function createLivePlayerSession({ onReleased } = {}) {
     createPlayback(nextRequest) {
       if (released || !nextRequest || nextRequest.kind !== PlaybackKind.LIVE) return null;
       request = nextRequest;
-      const task = createPlaybackTask(nextRequest);
-      const core = createPlaybackCore(task, {
+      const { task, core } = playbackService.createLivePlaybackParts(nextRequest, {
         onResolvedInput: input => { currentCandidate = input; },
         onCandidateChange: candidate => { currentCandidate = candidate; },
       });
