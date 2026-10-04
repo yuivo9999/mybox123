@@ -44,6 +44,7 @@ function Main({tab,movies,channels,favorites,history,sources,searches,progress,s
   return <Page><Header title="设置"/>
    <SectionTitle title="播放设置"/>
    <SettingMenu icon={Radio} title="自动继续播放" value={settings?.autoplayResume?'开启':'关闭'} onClick={()=>onUpdateSettings?.({autoplayResume:!settings?.autoplayResume})}/>
+   <SettingMenu icon={Radio} title="自动播放下一集" value={settings?.autoplayNext===false?'关闭':'开启'} onClick={()=>onUpdateSettings?.({autoplayNext:settings?.autoplayNext===false})}/>
    <SettingMenu icon={Radio} title="默认影视播放器" value={playerLabel(playback.moviePlayer)} onClick={()=>updatePlayback({moviePlayer:cycle(playback.moviePlayer??'exo',['exo','ijk','native'])})}/>
    <SettingMenu icon={Radio} title="默认直播播放器" value={playerLabel(playback.livePlayer)} onClick={()=>updatePlayback({livePlayer:cycle(playback.livePlayer??'exo',['exo','ijk','native'])})}/>
    <SettingMenu icon={Radio} title="失败自动切换" value={playback.fallbackEnabled===false?'关闭':'开启'} onClick={()=>updatePlayback({fallbackEnabled:playback.fallbackEnabled===false})}/>
