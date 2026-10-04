@@ -252,6 +252,28 @@ test('stopped owner is released when a competing controller acquires the playbac
   delete globalThis.window;
 });
 
+test('native callback after stop cannot resurrect recovery', async () => {
+  const { calls } = installNativeBridge();
+  const errors = [];
+  const { core } = createLiveCore({
+    onPlayerError: ({ error }) => errors.push(error),
+  });
+
+  core.attachPlayer(null);
+  core.start();
+  const oldCallback = globalThis.window.TVBoxWebView.onPlayerEvent;
+
+  core.stop();
+  oldCallback(JSON.stringify({ event: 'error', data: { message: 'stale after stop' } }));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(errors, []);
+  assert.equal(calls.filter((item) => item.method === 'loadMedia').length, 0);
+
+  core.release();
+  delete globalThis.window;
+});
+
 test('old native callback is ignored after candidate switch', async () => {
   const { calls } = installNativeBridge();
   const exhausted = [];
