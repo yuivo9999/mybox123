@@ -1649,3 +1649,304 @@ playbackResourceManager → playbackTaskRegistry.stopAndRelease → player.relea
 - 不要删除 `hlsGeneration`。
 - 不要把 Native bridge payload identity 当成已知事实；当前仍 UNKNOWN。
 - 真正下一步优先级仍是“取得真实测试执行证据”，其次才是浏览器/真机验证。
+
+
+---
+
+# 23. 2026-10-05 本轮执行记录：P0-2 第一处实际修复
+
+## 本轮结论
+
+重新审核本接力方案后，确认原方案仍然值得继续，但不能继续停留在“泛审查”。当前代码已经有一部分 P0 生命周期防护，尤其是：
+
+- `playbackCore` 已存在 `operationGeneration`；
+- player callback 已存在 `playerGeneration`；
+- `resolveAndLoad` 会在异步完成后再次校验 generation；
+- `playbackResourceManager` + `playbackTaskRegistry` 已形成单资源 owner 链；
+- 已存在 `tests/playback/playback-lifecycle.test.mjs`，覆盖快速切候选、stop/release、竞争 owner、旧 native callback 等场景。
+
+因此下一阶段不能重复“重新设计 generation”，而应继续找真实业务层竞态。
+
+## 本轮实际修改
+
+### 文件
+
+`src/features/live/LiveFeature.jsx`
+
+### 修复
+
+修复直播频道切换时的 **lazy stream 请求残留**：
+
+原问题：
+
+1. A 频道是 `deferredRef`，开始异步读取线路；
+2. 用户在请求完成前切到 B；
+3. 原来的 `selectChannel(B)` 对非 deferred B 不会取消 A 的请求；
+4. A 的请求仍继续运行；
+5. 如果 B 是普通已知线路，`streamLoading` 可能因为 A 的 finally 不执行状态更新而继续保持 `true`；
+6. 用户已经在 B，却可能看到错误的“正在读取地址”状态；
+7. 同时浪费 A 的网络请求，并把异步生命周期继续留在旧频道。
+
+本轮改为：
+
+- 每次 `selectChannel` 先 abort 当前旧的 `streamAbortRef`；
+- 清空 `streamAbortRef`；
+- 立即 `setStreamLoading(false)`；
+- 再设置新的 selected channel；
+- 只有 deferred 且尚无缓存时才重新启动 lazy stream 请求。
+
+### 当前 commit
+
+`f11c9a7fd9e7d23090298795ccef3709b33732b4`
+
+### 状态
+
+- [x] 代码修改完成
+- [x] 修改范围仅限直播频道 lazy stream 生命周期
+- [x] 没有修改 playbackCore generation 机制
+- [x] 没有删除 globalLiveCache
+- [x] 没有修改 HLS buffer
+- [x] 没有修改 Native bridge
+- [ ] 浏览器真实验证
+- [ ] Android 真实验证
+- [ ] 多频道快速点击真实验证
+- [ ] HLS 实源验证
+
+## 为什么现在先做这个
+
+这是一个已经能从代码直接证明的业务层竞态，不需要猜真实 CDN 行为，也不需要大重构。
+
+优先级高于 UI 美化，因为它直接影响：
+
+- 频道切换正确性；
+- loading 状态正确性；
+- 请求取消；
+- 用户快速选台；
+- 直播页的状态单一事实源。
+
+---
+
+# 24. 重新审核后的剩余工作排序
+
+## P0-1：播放生命周期
+
+当前部分已经有 generation guard，下一位 AI 不要重复实现。
+
+继续检查：
+
+1. `src/playback/playbackCore.js`
+2. `src/playback/playbackResourceManager.js`
+3. `src/playback/playbackTaskRegistry.js`
+4. `src/services/playbackService.js`
+5. `src/features/live/LiveFeature.jsx`
+6. `src/pages/PlaybackPage.jsx`
+
+目标：
+
+- 证明 controller 创建/销毁唯一；
+- 证明 channel switch 不会产生两个 live owner；
+- 证明 leave 后 release 一定到 adapter；
+- 证明 old resolve / old player event 不会污染新 controller。
+
+## P0-2：LiveFeature 业务层异步竞态
+
+本轮已修复：
+
+- [x] deferred A → 普通 B 时取消 A request
+- [x] 避免旧 request 把 loading 状态长期留在 B
+
+还未完成：
+
+- [ ] deferred A → deferred B → deferred C 快速切换的真实行为
+- [ ] A 的 streams resolve 完成后不能改变 B/C 的 selected/playback state
+- [ ] `resolvedStreams` 是否应该按 sourceId + channelId，而不仅仅 channelId 缓存
+- [ ] source 删除/禁用后旧缓存是否必须立即失效
+- [ ] 多个 TV1 source 返回相同 channelId 时是否会发生覆盖
+
+重点文件：
+
+- `src/features/live/LiveFeature.jsx`
+- `src/services/requestManager.js`
+- `src/services/tv1LiveService.js`
+- `src/services/liveService.js`
+- `src/models/live.js`
+
+## P0-3：Native bridge 旧事件隔离
+
+当前代码已经能阻止“旧 adapter callback 本身”直接触发 core recovery，但仍存在更深层风险：
+
+`window.TVBoxWebView.onPlayerEvent` 是全局单 callback。
+
+Android 侧 `NativePlaybackBridge` 本身也是单 playback owner。
+
+因此必须继续确认：
+
+- 新 adapter 创建前旧 native player 是否已经 release；
+- Android late callback 是否可能在新 adapter 已安装后抵达；
+- event payload 当前没有明确看到 session/generation id；
+- 如果 Android 不能区分事件来源，仅靠 JS callback 引用无法区分“旧播放器事件”和“新播放器事件”。
+
+重点文件：
+
+- `src/player/nativePlayerAdapter.js`
+- `android/app/src/main/java/com/yuivo9999/mybox123/NativePlaybackBridge.java`
+- `android/app/src/main/java/com/yuivo9999/mybox123/MainActivity.java`
+
+**不要直接加入 session id 却不修改 Android 侧。必须先确认 bridge event payload 合约。**
+
+## P0-4：HTML5/HLS live latency
+
+当前明确存在：
+
+- `lowLatencyMode: false`
+- live 初始 `maxBufferLength: 20`
+- 首个 fragment 后动态提升到 `60`
+- `maxMaxBufferLength: 120`
+- `liveSyncDurationCount: 6`
+- `liveMaxLatencyDurationCount: 30`
+
+这仍是 PENDING，不得写成 FAIL。
+
+下一步需要：
+
+- 实源测试；
+- 看 target duration；
+- 观察起播 latency；
+- 观察持续观看后 live edge latency；
+- 观察网络抖动时 buffer 与追赶行为。
+
+文件：
+
+- `src/player/html5PlayerAdapter.js`
+
+## P0-5：Controller / page ownership
+
+重点确认：
+
+- `LiveFeature` 内嵌播放器；
+- `PlaybackPage` 沉浸播放器；
+- `App.jsx` 路由切换；
+- `playbackResourceManager` 单 owner。
+
+目标不是砍掉一个页面，而是证明：
+
+> 任意时刻只有预期的播放 owner。
+
+文件：
+
+- `src/features/live/LiveFeature.jsx`
+- `src/pages/PlaybackPage.jsx`
+- `src/app/App.jsx`
+- `src/state/sessionStateStore.js`
+
+---
+
+# 25. 已经排除/不要重复做的事情
+
+下一位 AI 不要重新花一轮去证明以下事项，除非代码已变化：
+
+- `playbackCore` 已经存在 operation generation；
+- player callback 已经有 player generation；
+- `playbackResourceManager` 已经会释放 previous owner；
+- `playbackTaskRegistry` 已经有 stopAndRelease；
+- 已经有 playback lifecycle 行为测试；
+- LiveFeature fallback comment 已明确说明自动 fallback 由 playbackCore/task owner；
+- HLS cleanup 已有 generation + destroy；
+- HTML5 adapter 已有 event listener unbind；
+- Native adapter release 时不会无条件删除别人的 global callback。
+
+这些是“已有事实”，不是“已经全部正确”。
+
+---
+
+# 26. 当前测试真实状态
+
+`package.json` 中：
+
+- `test:playback-lifecycle` → `node --test tests/playback/playback-lifecycle.test.mjs`
+- 大量其他 `test:*` 仍然指向同一个 `tests/architecture/test-runner.mjs`
+
+因此：
+
+> 不能因为脚本名字很多，就认为已经有大量独立行为测试。
+
+当前 lifecycle test 已覆盖：
+
+- resource owner replacement；
+- stale candidate load；
+- A → B → C 快速切换；
+- stop invalidates pending load；
+- stop 后 restart；
+- competing controller；
+- release while loading；
+- native callback after stop；
+- old native callback after candidate switch。
+
+下一位 AI 应继续补：
+
+- LiveFeature channel switch；
+- deferred request abort；
+- page unmount；
+- route switch；
+- EPG request race；
+- source disable/remove race。
+
+---
+
+# 27. 下一位 AI 立即执行（严格顺序）
+
+1. **先读本文件，然后检查 main HEAD。**
+2. 打开 `src/features/live/LiveFeature.jsx`，确认本轮 lazy-stream abort 修改仍存在。
+3. 检查 `selectChannel → loadChannelStreams → resolveLiveChannelStreams → requestManager`，证明 A→B→C 的异步结果不会污染状态。
+4. 检查 `src/player/nativePlayerAdapter.js` + `NativePlaybackBridge.java` 的 callback/event 合约，确认是否能安全增加 session/generation。
+5. 检查 `src/pages/PlaybackPage.jsx` 与 `LiveFeature.jsx` 的 controller 生命周期是否完全对称。
+6. 检查 `html5PlayerAdapter.js` 的 live latency 策略，但在没有实源证据前保持 PENDING。
+7. 新增/补行为测试；不要为了测试而修改生产逻辑。
+8. 完成后更新本文件，再交接给下一位 AI。
+
+---
+
+# 28. 给下下一位 AI 的接力资料
+
+如果本轮没有完成 P0-3 Native event isolation：
+
+### 已知道
+
+- JS Native adapter 使用 `window.TVBoxWebView.onPlayerEvent`；
+- Android 真正播放器入口是 `NativePlaybackBridge`；
+- `MainActivity` 创建单个 `NativePlaybackBridge`；
+- Android bridge 当前 payload 中可见字段主要是 url、headers、cookies、playerHint 等；
+- 当前没有在已读取代码中确认 event payload 带 sessionId；
+- JS core 已有 generation guard，但这个 guard 只知道“当前 JS adapter generation”，不能凭空知道 Android event 来自哪个 native engine instance。
+
+### 尚未知道
+
+- Android 的 `emit()` 完整实现是否能安全携带 playback generation；
+- Android engine fallback 时 event 是否来自同一 logical session；
+- releaseMedia 与下一次 loadMedia 在 Android bridge 中的实际调用时序；
+- 是否存在异步旧 engine callback 穿透到新 logical playback 的真实路径。
+
+### 下一步应该搜索
+
+- `NativePlaybackBridge.java` 中所有 `emit(` 调用；
+- `emit(String event` 的完整实现；
+- `fallbackOrError`；
+- `releaseCurrentEngine`；
+- Exo/IJK/MediaPlayer listener；
+- JS `nativePlayerAdapter.js` 的 event payload normalization。
+
+### 不要重复做
+
+不要再重做 JS generation guard，除非后续发现它有 bug。
+
+---
+
+# 29. 本轮交接原则
+
+本轮只做了一个明确、可证明的生产修复，没有顺手做 UI 大改或播放架构重构。
+
+下一位 AI 必须继续遵守：
+
+> **先证明竞态，再改代码；先完成一个闭环，再更新 handoff；任何未知都保留 UNKNOWN/PENDING。**
+
+每一位 AI 都必须继续把未完成资料留在本文件，使下下一位 AI 能从具体文件、具体函数、具体验证目标继续，而不是重新审查整个仓库。
