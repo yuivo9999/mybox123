@@ -558,3 +558,74 @@ MoviePlaybackPage 原本维护 decoderEngine local state，并把 ExoPlayer / IJ
 - 不要为了恢复 decoderEngine UI 而重新添加 local state。
 - 如果未来真的实现手动 engine switching，必须走 PlaybackCore/controller，并保存 position 后切换 adapter，再恢复 position/playback。
 
+
+
+## 16. P1.7 已完成：真实 quality / subtitle / audio 接线
+
+### 16.1 先确认的能力边界
+本轮没有把 parser 中的 `manifest.variants` 当成已经稳定可用的清晰度来源。实际确认：
+- HLS parser 默认不会主动抓 manifest，`fetchManifest` 未开启时 resolved input 可能没有 `manifest`。
+- HTML5 播放实际使用 hls.js，因此最可靠的 HLS 清晰度/音轨/字幕来源是 hls.js 当前实例的 `levels` / `audioTracks` / `subtitleTracks`。
+- Native adapter 已有对应桥接方法，但 capabilities 明确标记 AUDIO_TRACKS / SUBTITLE_TRACKS / QUALITY_SELECTION=false，因此 VOD 页面不会因为 Native API 存在就误显示这些控件。
+- 原生 HTML5 `audioTracks` / `textTracks` 仍作为非 HLS fallback。
+
+### 16.2 已修改
+文件：`src/player/html5PlayerAdapter.js`
+- capabilities 动态暴露真实 HLS 能力：
+  - audioTracks
+  - subtitleTracks
+  - trackSelection
+  - qualitySelection
+- HLS audio tracks 通过 hls.js `audioTracks` / `audioTrack` 接线。
+- HLS subtitles 通过 hls.js `subtitleTracks` / `subtitleTrack` / `subtitleDisplay` 接线，并提供“关闭字幕”。
+- HLS quality 通过 hls.js `levels` / `currentLevel` 接线。
+- 非 HLS 继续使用浏览器原生 track API；若存在 parser manifest variants，也保留 variants fallback。
+- 未增加新的“假清晰度/假字幕/假音轨”状态。
+
+文件：`src/features/movie/MoviePlaybackPage.jsx`
+- 将 PlaybackCore 暴露的 capabilities 和 track/quality API 传入播放窗口。
+- 页面本身不复制播放器状态。
+
+文件：`src/components/theme/SangtianPlayerConsole.jsx`
+- 全屏右侧播放设置增加条件式：
+  - 清晰度
+  - 音轨
+  - 字幕
+- 只有底层 capability + 实际列表存在时才显示。
+- 控件通过真实 adapter API 操作，不再维护假状态。
+- track/quality 查询失败时隐藏对应区域。
+
+### 16.3 当前语义
+- Native 播放：由于 native capabilities 当前明确为 false，这三个控件隐藏。
+- HLS + hls.js：有多个 levels/audio/subtitle 时显示对应控件。
+- 单清晰度 / 没有音轨 / 没有字幕：对应区域不显示。
+- 选择清晰度时优先使用 hls.js level 切换，不再直接替换 HLS master URL。
+- 字幕支持关闭。
+
+### 16.4 验证
+已做静态回读：
+- html5 adapter 已存在 HLS level/audio/subtitle 的真实读写路径。
+- MoviePlaybackPage 已把 controller API 接到 SangtianPlayerWindow。
+- SangtianPlayerConsole 只在 capability + 数据存在时渲染对应控件。
+- Native adapter 未被错误标记为支持这些能力。
+
+尚未验证：
+- [ ] 浏览器真实 HLS master playlist 多清晰度切换
+- [ ] 浏览器真实 HLS 多音轨切换
+- [ ] 浏览器真实 HLS 字幕切换/关闭
+- [ ] Native bridge 实际返回 track/quality 数据
+- [ ] build / lint / test
+- [ ] 移动端竖屏/横屏真实 UI
+
+### 16.5 下一步
+P1.7 之后不要继续堆播放按钮。下一优先级是 P1.8：
+1. 审计并收敛 `src/pages/PlaybackPage.jsx` 中残留的 VOD-like 完整播放职责。
+2. 确认 Live 的 inline preview 与 immersive PlaybackPage 哪些控制可共享，避免删除 Live 所需能力。
+3. 目标是 VOD 只有 `MoviePlaybackPage` 一套正式播放页，Live 保留正式 immersive 页但共享 controller/基础控制。
+4. 在完成职责收敛后，再做 P2 的控制栏去重和自动下一集 UX。
+
+### 16.6 潜在回归点
+- hls.js 的 audio/subtitle/level 能力只在 HLS 实例真正加载并暴露对应 tracks 时存在；不能用 capability 名称代替真实列表。
+- 不要把 Native capabilities 改成 true，除非 bridge 契约和实际返回数据已经确认。
+- qualityId 当前对应 hls.js level index；切换时由 hls.js 保留 master playlist 语义。
+- 未来若引入跨 adapter 的统一 Track/Quality model，必须保持当前“能力不存在就隐藏”的原则。
