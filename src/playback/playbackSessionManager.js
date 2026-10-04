@@ -28,7 +28,6 @@ export function createPlaybackSessionManager() {
   };
 
   const getRaw = (sessionId) => sessions.get(sessionId) ?? null;
-  const get = () => null;
   const isExpired = (sessionId) => {
     const session = getRaw(sessionId);
     if (!session?.expiresAt) return false;
