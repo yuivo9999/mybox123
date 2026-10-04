@@ -354,7 +354,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
 
   useEffect(() => {
     if (!playbackController || !activeChannel?.streams?.length) return undefined;
-    const request = playbackService.createLiveRequest({ channel: activeChannel });
+    const request = playbackService.createLiveRequest({ channel: activeChannel, metadata: { channel: activeChannel } });
     playbackController.ensureRequest(request);
     videoRef.current = playbackController.getVideoElement();
     setPlaybackCandidate(playbackController.currentCandidate || request.candidates[0] || null);
