@@ -515,3 +515,46 @@ Home / Movies / Search / Detail 返回上下文、preferred source 保留其他�
 - 不要在没有真实底层能力时继续增加 decoderEngine UI。
 - 继续保留本文件作为下一位 AI 的唯一接力入口。
 
+
+## 15. P1.6 已完成：移除 decoderEngine 假 UI
+
+### 已确认
+MoviePlaybackPage 原本维护 decoderEngine local state，并把 ExoPlayer / IJKPlayer / Native / HTML5 四个选项展示给用户；但页面状态只改变 React state，没有通过 PlaybackCore/player adapter 完成真正的 engine release → recreate → load → seek → resume。
+
+因此这个控制属于假功能。
+
+### 已修改
+- src/features/movie/MoviePlaybackPage.jsx
+  - 删除 decoderEngine local state。
+  - 删除向 SangtianPlayerWindow 传递 decoderEngine / onChangeDecoderEngine。
+- src/components/theme/SangtianPlayerConsole.jsx
+  - 删除 VOD 全屏“解码内核 (Decoder Engine)”选择区。
+  - 保留现有真实播放引擎 fallback：Native 失败时 PlaybackCore 可自动尝试 HTML5。
+  - 不再向用户承诺当前页面可以手动选择 Exo/IJK/Native/HTML5。
+
+### 验证
+静态回读确认：
+- MoviePlaybackPage 不再声明 decoderEngine state。
+- MoviePlaybackPage 不再传 decoderEngine / onChangeDecoderEngine。
+- SangtianPlayerWindow 不再定义 decoderEngine / onChangeDecoderEngine props。
+- SangtianPlayerConsole 不再渲染 decoder engine 选择按钮。
+
+尚未运行：
+- npm build / lint / test
+- 浏览器真实播放
+- Native bridge
+
+### 下一步
+进入 P1.7：quality / subtitle / audio。
+
+顺序：
+1. 先确认 parserService 对 HLS/DASH resolved input 是否实际携带 manifest / variants / audio / subtitle 信息。
+2. 再确认 HTML5 adapter 的 track API 在实际浏览器中可用程度。
+3. Native adapter 当前 audio/subtitle/quality 能力虽有方法，但 capabilities 明确标记为 false；不能直接在 UI 中假设 Native 支持。
+4. 只把真实可用能力接进 More 面板。
+5. 若某能力只是“API 形状存在但后端/浏览器不支持”，宁可隐藏，不要展示假按钮。
+
+### P1.6 潜在回归点
+- 不要为了恢复 decoderEngine UI 而重新添加 local state。
+- 如果未来真的实现手动 engine switching，必须走 PlaybackCore/controller，并保存 position 后切换 adapter，再恢复 position/playback。
+
