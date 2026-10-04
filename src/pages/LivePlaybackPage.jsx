@@ -60,6 +60,7 @@ function PlaybackView({
     setError: setControllerError,
     switchCandidate: switchCandidateFromController,
     retry: handleRetry,
+    setPlaybackRate: setControllerPlaybackRate,
   } = usePlaybackController({
     request,
     videoRef,
@@ -143,7 +144,7 @@ function PlaybackView({
 
   const handleChangePlaybackRate = rate => {
     setPlaybackRate(rate);
-    if (videoRef.current) videoRef.current.playbackRate = rate;
+    setControllerPlaybackRate(rate);
   };
 
   const handleSelectTheme = newTheme => {
@@ -229,6 +230,10 @@ function PlaybackView({
         isLive
         playbackRate={playbackRate}
         onChangePlaybackRate={handleChangePlaybackRate}
+        onTogglePlayback={() => {
+          if (status === 'playing') controller?.pause?.();
+          else controller?.play?.();
+        }}
         channels={channels}
         activeChannel={channel}
         activeStreamIndex={request?.candidates?.findIndex(item => item.candidateId === candidate?.candidateId) ?? 0}
