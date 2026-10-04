@@ -86,9 +86,10 @@ for (const file of allSourceFiles) {
 }
 
 const packageJson = JSON.parse(read('package.json'));
-for (const script of ['test:live','test:playback','test:parser','test:player','test:state','test:movie','test:cache','test:errors','test:webview-runtime','test:performance','test:data-contract','test:acceptance','test:architecture','test:execution']) {
-  assert.match(packageJson.scripts[script] ?? '', /tests\/architecture\/test-runner\.mjs/, 'missing test runner: ' + script);
+for (const script of ['test:live','test:parser','test:player','test:state','test:movie','test:cache','test:errors','test:webview-runtime','test:performance','test:data-contract','test:acceptance','test:architecture','test:execution']) {
+  assert.match(packageJson.scripts[script] ?? '', /tests\/architecture\/test-runner\.mjs/, 'missing architecture test runner: ' + script);
 }
+assert.match(packageJson.scripts['test:playback-lifecycle'] ?? '', /node --test tests\/playback\/playback-lifecycle\.test\.mjs/, 'missing playback lifecycle behavior test');
 assert.ok(packageJson.engines?.node, 'Node engine must be pinned');
 assert.notEqual(packageJson.dependencies?.react, 'latest');
 assert.notEqual(packageJson.dependencies?.vite, 'latest');
