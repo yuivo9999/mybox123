@@ -1420,3 +1420,140 @@ playbackResourceManager → playbackTaskRegistry.stopAndRelease → player.relea
 - 不要删除 `hlsGeneration`，除非有等价或更强的 HLS instance identity 隔离。
 - Native bridge 没有在仓库中找到实现；不要假设 `onPlayerEvent` payload 有 session/player identity。
 - 当前 P0 的最后核心障碍已经越来越偏向“真实运行环境/宿主验证”，而不是继续堆静态 token。
+
+
+# 29. 本轮继续执行结果：P0 真实测试执行链与非 HLS DOM 事件审查
+
+## 本轮
+- 日期：2026-10-05
+- 起始有效 HEAD：`37d6eba1fed266b5c32340bd81a9dd39121d0fe4`
+- 本轮 CI 提交：`1af8425da8b36f72ddc11c9894a0386085479318`
+- 工作范围：按 P0 优先级解决“行为测试没有持续执行入口”的工程问题，并继续检查 HTML5 adapter 的非 HLS video DOM event 是否存在第二层 stale callback 风险。
+
+## HEAD / 仓库状态
+- 当前 `main` 在本轮开始时确认为 `37d6eba1fed266b5c32340bd81a9dd39121d0fe4`。
+- 该 HEAD 与上一轮交接记录一致，未发现后续 AI 提交被覆盖。
+- 现有 `.github/workflows/build-apk.yml` 只负责 Android APK 构建。
+- 现有 `.github/workflows/deploy.yml` 只负责 GitHub Pages 构建/部署。
+- 原先没有专门执行 `test:playback-lifecycle` 的 workflow。
+- 仓库仍没有发现 lockfile，因此 CI 继续使用 `npm install`，不能改写成 `npm ci`。
+
+## 本轮实现
+
+### P0-B-2：建立可持续执行的 Playback Lifecycle CI
+
+新增：
+- `.github/workflows/test-playback.yml`
+
+触发：
+- push main
+- pull request main
+- workflow_dispatch
+
+执行：
+1. Node 22
+2. `npm install --no-audit --no-fund`
+3. `npm run test:playback-lifecycle`
+4. `npm run test:architecture`
+
+目的：
+- 不再让行为测试只存在于仓库里却长期没有执行证据；
+- 后续任何 AI 修改 playback lifecycle 后，都可以通过 GitHub Actions 获得真实 Node 22 环境验证；
+- 同时保留 architecture boundary regression。
+
+注意：
+- 本轮不能把 workflow 的“将来执行”写成“已经 PASS”。
+- 本轮没有权限/工具调用去伪造 CI 结果，也没有把静态检查当作行为测试结果。
+
+## 非 HLS HTML5 DOM event 审查结论
+
+文件：
+- `src/player/html5PlayerAdapter.js`
+
+确认 adapter 在创建时一次性绑定：
+- `loadstart`
+- `waiting`
+- `canplay`
+- `playing`
+- `pause`
+- `timeupdate`
+- `durationchange`
+- `loadedmetadata`
+- `ended`
+- `error`
+
+这些 listener 会在 adapter `release()` 时统一解绑，因此：
+- candidate switch 通过 playbackCore `attachPlayer()` 创建新 adapter 时，旧 adapter listener 会被 release；
+- `stop()` 后的同 controller restart 会重新 attachPlayer，因此旧 adapter listener 也会被 release；
+- 这一点没有发现与上一轮 HLS callback 同等级、已被证明的旧 adapter listener 泄漏。
+
+但仍存在一个 **PENDING** 风险：
+- 同一个 HTML5 adapter 内部可以多次执行 `load()`；
+- `load()` 会先 cleanup HLS / 清空 video src / 再加载新 input；
+- 原生 video DOM 事件本身没有携带 playback input identity；
+- 因此极端情况下，旧 media load 产生的 DOM event 与新 input 的事件在同一个 video element 上交错时，目前没有 adapter-local input generation 可以直接区分。
+
+当前不能仅凭静态代码断言这是线上 bug，因为：
+- 浏览器在 `src` 替换、`load()` 后旧媒体事件的具体交付顺序需要真实浏览器验证；
+- 当前没有浏览器自动化测试环境；
+- playbackCore 的 playerGeneration 只能隔离“旧 adapter”，不能区分“同一个 adapter 的两次 load”。
+
+因此本轮 **不新增第二套 generation token**，避免在没有复现证据时继续堆防御代码。
+
+## 验证状态
+
+- [x] 当前 main HEAD 已重新确认。
+- [x] 已确认 build/deploy workflow 不执行 playback behavior tests。
+- [x] 已新增专门的 playback lifecycle CI workflow。
+- [x] 已完成非 HLS DOM listener 生命周期静态审查。
+- [ ] `npm run test:playback-lifecycle` 本轮仍未在当前工具环境本地执行。
+- [ ] 新 workflow 的真实 GitHub Actions run：等待本次提交后的 workflow 运行结果。
+- [ ] `npm run test:architecture`：等待 CI。
+- [ ] 真实浏览器 HLS rapid switch：PENDING。
+- [ ] 同 adapter 多次 load 的 DOM event 交错行为：PENDING。
+- [ ] Android Native rapid switch / release：PENDING。
+
+## 当前 P0
+
+### P0-B
+- [x] ResourceManager → TaskRegistry stopped-owner 代码/行为测试。
+- [x] Playback lifecycle CI execution path。
+- [ ] GitHub Actions 首次真实执行结果。
+- [ ] Native `releaseMedia` 真实宿主验证。
+
+### P0-C
+- [ ] Native bridge event identity：UNKNOWN。
+- [ ] Native bridge implementation：仓库内仍未发现。
+- [ ] 需要外部宿主源码或真实 event payload。
+
+### P0-D
+- [x] HLS instance-local `hlsGeneration`。
+- [x] HTML5 adapter release 时解绑 DOM listeners。
+- [ ] 同 adapter 多次 `load()` 的 DOM stale event：PENDING。
+- [ ] 真实浏览器 HLS destroy/rebind。
+
+## P1（继续暂缓）
+- HTML5 custom headers / candidate capability filtering
+- HLS live latency/buffer 策略
+- PlaybackPage / LiveFeature 双入口资源边界
+- live channel / stream / candidate identity
+- EPG stale request isolation
+
+## 下一位 AI 立即执行
+
+1. 先确认 `main` 是否已经进入新的 HEAD（本轮最后提交应包含 `test-playback.yml` 与本 handoff 更新）。
+2. 检查 GitHub Actions 中 `Playback lifecycle tests` 的第一次运行；如果失败，先修真实失败，不要继续堆 generation guard。
+3. 如果 workflow 通过，下一步在真实浏览器环境复现“同一 HTML5 adapter 连续 load 两个 source 时旧 DOM event 是否会污染新 input”。
+4. 如果浏览器可复现，再在 `src/player/html5PlayerAdapter.js` 增加**单一 input-load generation**；不要重复增加 HLS generation。
+5. 如果浏览器不能复现，保持当前 PENDING，不为理论风险修改代码。
+6. Native bridge 继续保持 UNKNOWN；不要猜 payload identity。
+7. P0 真实验证完成前，继续不要进入 UI polish / 路由重构 / HLS 参数 tuning。
+
+## 给下下一位 AI 留的资料
+
+- 新增 CI 的目的不是“证明本轮测试通过”，而是把此前缺失的真实 Node 22 行为测试执行链补上。
+- 没有 lockfile，因此当前 CI 必须使用 `npm install`。
+- `build-apk.yml` 和 `deploy.yml` 都不是 playback regression test workflow。
+- HTML5 DOM listener 在 adapter release 时有明确 unbind；不要把“listener 一直挂着”误判为当前 bug。
+- 真正剩余的 HTML5 风险是“同一个 adapter 的连续 load 是否存在旧 DOM event 与新 input 交错”，需要浏览器证据后再决定是否增加 input generation。
+- 不要删除上一轮的 `hlsGeneration`。
