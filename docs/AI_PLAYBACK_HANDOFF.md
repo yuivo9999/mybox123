@@ -860,3 +860,55 @@ VOD 播放页此前同时暴露：
 - 不要重新把 ConsoleCard episode grid 加回来。
 - 普通页面 selector 的唯一主入口仍应是 TopBar 的“集数”入口及其 modal。
 - 上一集 / 下一集按钮是线性导航，不算第二套 episode selector。
+
+
+## 19. P2.3 已完成：自动下一集倒计时 / 取消
+
+### 19.1 已确认的旧行为
+`MoviePlaybackPage.jsx` 原本已经存在 auto-next：视频结束后直接调用 onEpisode 进入下一集。
+因此本轮不是“补上 auto-next”，而是把现有行为从无提示的立即跳转改成可控 UX。
+
+### 19.2 设置语义
+现有 `autoplayResume` 只控制“进入播放时是否从保存进度续播”，不能拿来表示下一集自动播放。
+因此新增独立设置：
+- `autoplayNext`：是否允许下一集倒计时自动播放；默认 true。
+- 设置页新增“自动播放下一集”开关。
+- 两个开关互不覆盖，避免用户关闭续播却意外关闭 auto-next，或反之。
+
+### 19.3 播放结束行为
+文件：src/features/movie/MoviePlaybackPage.jsx
+- 当前集不是最后一集时，结束事件只打开下一集提示，不再立即跳转。
+- `autoplayNext !== false`：显示 5 秒倒计时。
+- 倒计时到 0：自动进入下一集。
+- “立即播放”：跳过倒计时直接进入下一集。
+- “取消”：关闭本次自动播放，不进入下一集。
+- `autoplayNext === false`：不倒计时，但仍显示下一集卡片，用户可以手动“立即播放”。
+- 切换到新的 episode request 时清理旧的下一集倒计时，避免旧 timer 污染新集。
+- 最后一集不显示下一集卡片。
+
+### 19.4 已修改文件
+- src/models/userData.js：新增 defaultSettings.autoplayNext。
+- src/pages/MainPage.jsx：设置页新增“自动播放下一集”。
+- src/features/movie/MoviePlaybackPage.jsx：增加 nextEpisodeCountdown、timer cleanup、立即播放/取消 UI。
+
+### 19.5 验证
+已做静态代码回读：
+- 旧的结束即跳转逻辑已替换为 countdown state。
+- timer 在倒计时结束时调用统一 playNextEpisode。
+- cancel 会清除 countdown，不调用 onEpisode。
+- autoplayNext=false 不会自动跳集，但仍保留手动下一集能力。
+- 本轮没有运行浏览器、npm build、lint、test。
+
+### 19.6 下一步优先级
+P2.3 后进入 P2.4：继续收敛 `SangtianPlayerConsole.jsx` 的职责与重复控制，但不要大拆组件导致播放行为回归。
+优先审计：
+1. VOD 普通页面 TopBar / PlayerWindow / FloatingBar / ConsoleCard 是否还有重复的播放控制。
+2. fullscreen 内“选集 / 线路 / 播放设置”是否可以统一为一个 More 侧栏入口。
+3. diagnostics、直链、网络指标等高级信息是否应从主播放 UI 移入 Playback Info。
+4. 然后再处理 Live inline preview 与 immersive PlaybackPage 的控制职责。
+
+### 19.7 潜在回归点
+- 不要把 autoplayNext 与 autoplayResume 合并。
+- 不要让倒计时 timer 在 episode 已经切换后继续触发旧 onEpisode。
+- 不要删除最后一集的无意义下一集卡片。
+- 不要重新恢复 ConsoleCard 的 VOD episode grid。
