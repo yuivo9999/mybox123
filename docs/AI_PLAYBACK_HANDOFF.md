@@ -919,5 +919,7 @@ P2.3 后进入 P2.4：继续收敛 `SangtianPlayerConsole.jsx` 的职责与重�
 当前结构已恢复为：section header → Live channel selector / VOD 当前播放提示 → Tab 2 信息区。
 这次回归仅发生在提交脚本的文本替换阶段，未声称已通过 build/lint；因此后续第一验证动作仍应是运行 lint/build 或至少 JSX 编译检查。
 
-当前最新代码提交：46632b2a806a7fb3404f59cb104a98d12145ef16
+当前最新代码提交：1360b933f6c0d85f25e0c3152c5bc8766629ea9a
 当前分支：ai-handoff/playback-phase1
+相对 main：ahead 49 / behind 0
+尚未合并 main，也没有创建最终合并 PR。
