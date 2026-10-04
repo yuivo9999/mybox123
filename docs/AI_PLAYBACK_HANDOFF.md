@@ -1558,3 +1558,52 @@ SangtianPlayerWindow 仍读取 video.currentTime、duration、buffered、paused�
 
 ### 33.4 下一优先级：P3.4
 继续清理播放器 UI 的重复状态来源：重点审计 isPlaying / currentTime / duration / status 是否同时由 DOM 事件、controller 状态、页面 state 三套维护。目标是减少重复状态，而不是继续增加控制按钮。
+
+
+## P3.4 已完成：播放状态源去重
+
+### 本轮目标
+围绕 `isPlaying / currentTime / duration / status` 检查是否存在 controller、DOM event、页面 local state、播放器 UI 四处同时维护的问题。确认后收敛到 controller hook 为播放状态的主来源，UI 只消费状态。
+
+### 已修改
+- `src/playback/usePlaybackController.js`
+  - 增加 controller-owned `currentTime / duration` React state。
+  - VOD playback progress 事件更新该状态，同时继续使用 `progressRef` 做持久化节流。
+  - `isPlaying` 直接由 controller 的 `status === 'playing'` 派生。
+  - request identity 改变时重置 metrics，避免上一集时间残留到下一集。
+- `src/components/theme/SangtianPlayerConsole.jsx`
+  - 删除 `currentTime / duration / isPlaying` 的 page-local state。
+  - 删除 UI 对 `timeupdate / playing / pause` 事件负责维护播放状态的做法。
+  - seek / ±10s 使用 controller 提供的 `currentTime`，不再先写 UI local state。
+  - 保留 videoRef 的只读 buffered 观测，用于缓冲区可视化/指标；这不再作为播放状态权威来源。
+- `src/features/movie/MoviePlaybackPage.jsx`
+  - 直接消费 `usePlaybackController` 返回的 `currentTime / duration / isPlaying`。
+  - 将这些值传给 PlayerWindow。
+- `src/pages/LivePlaybackPage.jsx`
+  - 删除 candidate/status/resolvedInput/error 的镜像 local state。
+  - 直接使用 `usePlaybackController` 的 candidate/status/resolvedInput/error。
+  - 删除对应同步 useEffect，避免 controller → page state → UI 的重复链路。
+
+### 状态责任边界
+- `status`：PlaybackController / PlaybackCore state machine 是权威来源。
+- `isPlaying`：由 `status === 'playing'` 派生，不再由 DOM event 自己维护一份。
+- `currentTime / duration`：VOD 由 PlaybackCore progress event → usePlaybackController state 提供给 UI。
+- `bufferedSeconds / bufferRate`：仍属于 PlayerWindow 的只读媒体指标，不作为播放状态源。
+- videoRef：页面/UI 只读观测，不直接驱动播放状态。
+
+### 静态验证
+已回读确认：
+- PlayerWindow 不再声明 `setCurrentTime / setDuration / setIsPlaying`。
+- PlayerWindow 不再使用 `onTimeMetricsChange`。
+- VOD 页面消费 controller metrics。
+- Live 页面不再维护 controller state 的镜像 local state。
+- 本轮未运行浏览器、build、lint、unit test，因此这些仍不能宣称通过。
+
+### 未完成
+- 需要实际运行验证 VOD progress event 的频率与 duration 在 HLS/DASH/native fallback 场景是否稳定。
+- 需要继续审计 PlayerWindow 内是否还有“控制意图”和“只读媒体观测”之外的 page-local playback state。
+- P3.5 优先检查 fullscreen/orientation 状态与移动端实际行为，尤其现有 `.is-landscape` CSS/rotation 逻辑。
+- 之后再做更大范围视觉 polish。
+
+### 当前接力要求
+下一位 AI 不要重新做 P3.4 状态源调查。优先检查本轮静态改动是否有调用方遗漏，然后继续 P3.5 移动端全屏/横竖屏行为审计。
