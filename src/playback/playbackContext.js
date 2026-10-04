@@ -41,3 +41,22 @@ export function getPlaybackContext(request) {
     episodeIndex: request?.metadata?.episodeIndex,
   });
 }
+
+
+export function resolvePlaybackReturnRoute({ explicit = null, currentRoute = null, currentTab = null, fallback = 'home' } = {}) {
+  if (explicit) return explicit;
+  if (currentRoute === 'detail' || currentRoute === 'search' || currentRoute === 'history' || currentRoute === 'movies') return currentRoute;
+  if (currentTab === 'movies') return 'movies';
+  if (currentTab === 'history') return 'history';
+  return fallback;
+}
+
+export function resolvePlaybackReturnTarget(request, { fallbackTab = 'home' } = {}) {
+  const context = getPlaybackContext(request);
+  const returnRoute = context.returnRoute || context.returnTab || fallbackTab;
+  if (returnRoute === 'detail') return { tab: context.returnTab || 'movies', route: 'detail', selected: request ?? null };
+  if (returnRoute === 'search') return { tab: context.returnTab || 'movies', route: 'search', selected: null };
+  if (returnRoute === 'history') return { tab: 'history', route: null, selected: null };
+  if (returnRoute === 'movies') return { tab: context.returnTab || 'movies', route: null, selected: null };
+  return { tab: context.returnTab || fallbackTab, route: null, selected: null };
+}
