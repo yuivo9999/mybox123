@@ -34,7 +34,7 @@ function PlaybackView({
   const currentProgram = useMemo(() => {
     if (!channel) return null;
     return channel.epg?.find(program => (
-      program.status === 'live'
+      program.controllerStatus === 'live'
       || (Date.parse(program.startAt) <= now && now < Date.parse(program.endAt))
     )) ?? null;
   }, [channel, now]);
@@ -42,14 +42,14 @@ function PlaybackView({
   const nextProgram = useMemo(() => {
     if (!channel) return null;
     return channel.epg?.find(program => (
-      program.status === 'upcoming' || Date.parse(program.startAt) > now
+      program.controllerStatus === 'upcoming' || Date.parse(program.startAt) > now
     )) ?? null;
   }, [channel, now]);
 
   const {
     controller,
-    candidate: activeCandidate,
-    status: controllerStatus,
+    activeCandidate: activeCandidate,
+    controllerStatus: controllerStatus,
     resolvedInput: controllerResolvedInput,
     error: controllerError,
     switchCandidate: switchCandidateFromController,
@@ -104,7 +104,7 @@ function PlaybackView({
     } catch (stopError) {
       console.error('Stop controller failed:', stopError);
     }
-      };
+  };
 
   const handleChangePlaybackRate = rate => {
     setPlaybackRate(rate);
@@ -116,14 +116,14 @@ function PlaybackView({
   };
 
   const candidates = request?.candidates ?? [];
-  const activeStreamUrl = resolvedInput?.url
-    || candidate?.mediaUrl
-    || candidate?.url
-    || candidate?.metadata?.url
+  const activeStreamUrl = controllerResolvedInput?.url
+    || activeCandidate?.mediaUrl
+    || activeCandidate?.url
+    || activeCandidate?.metadata?.url
     || '';
-  const candidateLabel = candidate?.metadata?.label
-    || candidate?.label
-    || (candidate?.index != null ? `线路 ${candidate.index + 1}` : null)
+  const candidateLabel = activeCandidate?.metadata?.label
+    || activeCandidate?.label
+    || (activeCandidate?.index != null ? `线路 ${activeCandidate.index + 1}` : null)
     || '线路 1';
 
   const parsedChannelInfo = useMemo(() => {
@@ -179,15 +179,15 @@ function PlaybackView({
       <SangtianPlayerWindow
         videoRef={videoRef}
         videoContainerRef={playerWindowBodyRef}
-        status={status}
+        controllerStatus={controllerStatus}
         error={error}
         resolvedInput={resolvedInput}
-        candidate={candidate}
+        activeCandidate={activeCandidate}
         request={request}
         onRetry={handleRetry}
         onStop={handleStop}
         onSwitchCandidate={() => {
-          const next = candidates.find(item => item.candidateId !== candidate?.candidateId);
+          const next = candidates.find(item => item.candidateId !== activeCandidate?.candidateId);
           if (next) switchCandidate(next.candidateId);
         }}
         terminalTag="LIVE DIRECT"
@@ -195,12 +195,12 @@ function PlaybackView({
         playbackRate={playbackRate}
         onChangePlaybackRate={handleChangePlaybackRate}
         onTogglePlayback={() => {
-          if (status === 'playing') controller?.pause?.();
+          if (controllerStatus === 'playing') controller?.pause?.();
           else controller?.play?.();
         }}
         channels={channels}
         activeChannel={channel}
-        activeStreamIndex={request?.candidates?.findIndex(item => item.candidateId === candidate?.candidateId) ?? 0}
+        activeStreamIndex={request?.candidates?.findIndex(item => item.candidateId === activeCandidate?.candidateId) ?? 0}
         onSelectChannel={onChannel}
         onSwitchStreamIndex={index => {
           const next = candidates[index];
@@ -230,7 +230,7 @@ function PlaybackView({
         episodes={[]}
         currentEpisodeId={null}
         candidates={candidates}
-        currentCandidateId={candidate?.candidateId}
+        currentCandidateId={activeCandidate?.candidateId}
         onSelectCandidate={switchCandidate}
         streamUrl={activeStreamUrl}
         relatedItems={channels}
@@ -239,7 +239,7 @@ function PlaybackView({
           if (next) onPlay?.(next);
         }}
         onReplay={handleRetry}
-        playerStatus={status}
+        playerStatus={controllerStatus}
         isLive
         onBack={onBack}
         onFav={() => {
@@ -267,7 +267,7 @@ function PlaybackView({
                 {candidates.map((item, index) => (
                   <button
                     key={item.candidateId}
-                    className={candidate?.candidateId === item.candidateId ? 'active' : ''}
+                    className={activeCandidate?.candidateId === item.candidateId ? 'active' : ''}
                     onClick={() => {
                       switchCandidate(item.candidateId);
                       setSourceModalOpen(false);
