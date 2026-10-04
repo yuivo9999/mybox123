@@ -232,10 +232,15 @@ export function App(){
  const playLive=(channel,streamId=null,returnRoute=null)=>{
    if(!channel)return;
    const preferredSource=persistent.settings?.defaultLiveSource||null;
-   const request=playbackService.createLiveRequest({channel,preferredSource,metadata:{title:channel.name,category:channel.category,channelId:channel.channelId,channel,returnRoute}});
-   if(streamId){const index=request.candidates.findIndex((candidate)=>candidate.streamId===streamId);if(index>=0){request.candidates=[request.candidates[index],...request.candidates.filter((_,i)=>i!==index)];sourceManagementService.touchUsage(request.candidates[0]?.sourceId);}}
-   else sourceManagementService.touchUsage(request.candidates[0]?.sourceId);
-   sessionStateStore.patch({selected:request,route:'live-play',tab:'live'}); persistent.recordLivePlay(channel,streamId);
+   const request=playbackService.createLiveRequest({channel,preferredSource});
+   const preferredCandidate=streamId
+     ? request.candidates.find(candidate=>candidate.streamId===streamId)
+     : request.candidates[0];
+   sourceManagementService.touchUsage(preferredCandidate?.sourceId);
+   // Live playback is owned by LiveFeature. Navigation only changes the visible Live UI;
+   // it must never create a PlaybackPage/controller pair for the same channel.
+   sessionStateStore.patch({selected:channel,route:null,tab:'live'});
+   persistent.recordLivePlay(channel,streamId);
  };
  const movieActive=['detail','movie-play','search'].includes(route)||tab==='home'||tab==='movies';
  const isManagementTab = ['sources', 'settings', 'appearance', 'me', 'about', 'data-management', 'history', 'search-history'].includes(tab);
