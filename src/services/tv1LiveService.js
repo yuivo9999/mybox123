@@ -21,9 +21,23 @@ async function fetchBody(source, options = {}) {
   return response.text();
 }
 
+function getSourceFingerprint(source) {
+  return JSON.stringify({
+    sourceRef: source?.sourceRef ?? source?.url ?? '',
+    headers: source?.headers ?? {},
+    localContent: source?.localContent ?? null,
+  });
+}
+
 function createSession(source, body) {
   const lines = String(body).replace(/^\uFEFF/, '').split(/\r?\n/);
-  const session = { sourceId: source.sourceId, lines, metadata: [], createdAt: Date.now() };
+  const session = {
+    sourceId: source.sourceId,
+    fingerprint: getSourceFingerprint(source),
+    lines,
+    metadata: [],
+    createdAt: Date.now(),
+  };
   sessions.set(source.sourceId, session);
   return session;
 }
@@ -33,7 +47,11 @@ export const tv1LiveService = {
 
   async loadMetadata(source, options = {}) {
     if (!isTv1Source(source)) throw new Error('TV1_SOURCE_REQUIRED');
+    const sourceFingerprint = getSourceFingerprint(source);
     const existing = sessions.get(source.sourceId);
+    if (existing?.fingerprint !== sourceFingerprint) {
+      sessions.delete(source.sourceId);
+    }
     if (existing && Array.isArray(existing.channels) && existing.channels.length > 0 && !options.force) {
       if (typeof options.onChannel === 'function') {
         for (const channel of existing.channels) {
@@ -44,6 +62,7 @@ export const tv1LiveService = {
     }
 
     const body = await fetchBody(source, options);
+    if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     const session = createSession(source, body);
     const capabilities = { search: true, categories: true, multiStream: true, epg: false, currentProgram: false, upcomingProgram: false };
     const result = [];
@@ -61,6 +80,10 @@ export const tv1LiveService = {
       if (typeof options.onChannel === 'function') options.onChannel(channel);
       await new Promise(resolve => setTimeout(resolve, 0));
     });
+    if (options.signal?.aborted) {
+      if (sessions.get(source.sourceId) === session) sessions.delete(source.sourceId);
+      throw new DOMException('Aborted', 'AbortError');
+    }
     session.channels = result;
     return result;
   },
