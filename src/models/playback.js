@@ -3,6 +3,11 @@ export const PlaybackKind = Object.freeze({
   LIVE: 'live',
 });
 
+export const PlaybackContextType = Object.freeze({
+  VOD: 'vod',
+  LIVE: 'live',
+});
+
 export const PlaybackRequestStatus = Object.freeze({
   CREATED: 'created',
   LOADING: 'loading',
@@ -84,6 +89,7 @@ export function createPlaybackRequest(input = {}) {
     candidates: candidates.map((candidate) => ({ ...candidate, headers: { ...candidate.headers }, metadata: { ...candidate.metadata } })),
     primaryCandidateId: candidates[0]?.candidateId ?? null,
     fallbackCandidateIds: candidates.slice(1).map((candidate) => candidate.candidateId),
+    context: { ...(input.context ?? {}) },
     createdAt: Date.now(),
     metadata: { ...(input.metadata ?? {}) },
   };
