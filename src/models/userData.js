@@ -27,6 +27,7 @@ export const defaultPlaybackSettings = () => ({
 export const defaultSettings = () => ({
   initialized: false,
   autoplayResume: true,
+  autoplayNext: true,
   defaultMovieSource: null,
   defaultLiveSource: null,
   theme: 'sangtian',
