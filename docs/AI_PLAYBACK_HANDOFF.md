@@ -923,3 +923,27 @@ P2.3 后进入 P2.4：继续收敛 `SangtianPlayerConsole.jsx` 的职责与重�
 当前分支：ai-handoff/playback-phase1
 相对 main：ahead 49 / behind 0
 尚未合并 main，也没有创建最终合并 PR。
+
+
+## 20. P2.4 第一小步已完成：移除不可达诊断 UI
+
+### 20.1 已确认问题
+`SangtianPlayerWindow` 曾维护 `showTerminal`，但全文件只有 `setShowTerminal(false)`，没有任何 `setShowTerminal(true)` 入口；因此“播放信息终端”实际上无法从 UI 打开。
+全屏底部还直接展示缓冲百分比、加载速率、网络估速等高级诊断指标，与“视频为主、诊断收进 More / Playback Info”的目标冲突。
+
+### 20.2 已修改
+文件：src/components/theme/SangtianPlayerConsole.jsx
+- 删除不可达 `showTerminal` 状态及终端面板分支。
+- 删除无入口的 Terminal 图标依赖。
+- 从全屏主控制栏移除缓冲 / 加载 / 网络诊断指标。
+- 保留播放器内部的 buffer 采样基础逻辑，后续如果建立真正的 Playback Info 面板，可重新接入；没有伪造新的入口。
+
+### 20.3 验证
+静态回读确认：
+- `showTerminal` 不再存在。
+- 全屏主栏不再直接显示诊断指标。
+- 正常视频 children / loading / error / fullscreen control 结构仍保留。
+- 本轮没有运行浏览器、npm build、lint、test。
+
+### 20.4 下一步
+P2.4 下一小步：审计 fullscreen 的“选集 / 线路设置 / More 设置”是否可以合并成更清晰的一个侧栏 IA，同时保持全屏状态下无需退出播放器即可操作。
