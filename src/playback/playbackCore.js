@@ -32,7 +32,8 @@ export function createPlaybackCore(task,hooks={}) {
  const transition=(next)=>{try{stateMachine.transition(next);}catch{stateMachine.reset();if(next!==PlayerState.IDLE)try{stateMachine.transition(next);}catch{}}hooks.onStateChange?.(stateMachine.state);return stateMachine.state;};
  const emit=(event,data={})=>{const normalized=normalizePlaybackEvent({event,requestId:task.request.requestId,taskId:task.request.taskId,...data});return eventBus.emit(normalized);};
 
- const handlePlayerEvent=(event)=>{
+ const handlePlayerEvent=(event,eventGeneration=operationGeneration)=>{
+  if(!isCurrentOperation(eventGeneration))return;
   if(event.event==='loading')transition(PlayerState.LOADING);
   if(event.event==='prepared')transition(PlayerState.PREPARING);
   if(event.event==='playing'){transition(PlayerState.PLAYING);networkPolicy.resetRetry();}
@@ -52,7 +53,7 @@ export function createPlaybackCore(task,hooks={}) {
   if(event.event==='error'){
    const code=classifyPlaybackError(event.nativeError,{code:event.nativeError?.message});
    const normalized=errorService.normalize(event.nativeError??new Error('MEDIA_LOAD_ERROR'),{code:code===PlaybackFailureCode.NETWORK?ErrorCode.NETWORK:ErrorCode.PLAYBACK,context:{scope:'playback',taskId:task.request.taskId,requestId:task.request.requestId,candidateId:task.currentCandidateId},retryable:code===PlaybackFailureCode.NETWORK});
-   void recover(normalized,code);
+   void recover(normalized,code,eventGeneration);
   }
   if(event.event==='requestContextIgnored')hooks.onPlayerWarning?.(event);
  };
@@ -92,7 +93,7 @@ export function createPlaybackCore(task,hooks={}) {
    hooks.onParserError?.({candidate,error:normalized,code});
    emit('error',{candidateId:candidate.candidateId,code,error:normalized.message});
    const failureCode=code===PlaybackFailureCode.NETWORK?PlaybackFailureCode.NETWORK:code===PlaybackFailureCode.EXPIRED?PlaybackFailureCode.EXPIRED:PlaybackFailureCode.PARSER;
-   failAndResolve(normalized,failureCode);
+   if(!released && task.currentCandidateId===candidate.candidateId) failAndResolve(normalized,failureCode);
    return null;
   }
  }
