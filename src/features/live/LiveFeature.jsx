@@ -191,22 +191,15 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
         },
         onResolvedInput: setResolvedPlaybackInput,
         onPlayerError: ({ error }) => {
-          const errMsg = error?.message || '播放器加载失败';
-          setPlaybackError(errMsg);
-          // Automatic stream fallback retry for live channels with multiple lines
-          if (activeChannel?.streams?.length > 1 && activeStreamIndex + 1 < activeChannel.streams.length) {
-            const nextIndex = activeStreamIndex + 1;
-            setActiveStreamIndex(nextIndex);
-            const candidate = livePlaybackRequest?.candidates?.[nextIndex];
-            if (candidate && playbackController) {
-              playbackController.switchCandidate(candidate.candidateId);
-            }
-          }
+          // Automatic fallback is owned by playbackCore/task. The feature layer only
+          // surfaces an error that escaped the core recovery pipeline; it must not
+          // switch candidates again or recreate the controller.
+          setPlaybackError(error?.message || '播放器加载失败');
         },
         onParserError: ({ code }) => setPlaybackError('解析失败：' + code),
         onExhausted: () => setPlaybackStatus('error'),
       })
-    : null, [livePlaybackRequest, activeChannel, activeStreamIndex]);
+    : null, [livePlaybackRequest]);
 
   // Load current EPG program details when active channel changes
   useEffect(() => {
