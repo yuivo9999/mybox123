@@ -1038,29 +1038,6 @@ export function SangtianConsoleCard({
                   </div>
                 )}
 
-                {/* Quick Line Candidates Bar if lines exist */}
-                {candidates.length > 0 && (
-                  <div className="console-quick-lines-bar">
-                    <span className="quick-lines-label">当前线路:</span>
-                    <div className="quick-lines-chips">
-                      {candidates.map((c, index) => {
-                        const isCurrentLine = c.candidateId === currentCandidateId;
-                        const lineName = c.metadata?.label || c.label || (c.index != null ? `线路 ${c.index + 1}` : `线路 ${index + 1}`);
-                        return (
-                          <button
-                            key={c.candidateId}
-                            type="button"
-                            className={`quick-line-pill ${isCurrentLine ? 'active' : ''}`}
-                            onClick={() => onSelectCandidate?.(c.candidateId)}
-                          >
-                            {lineName}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
                 {/* Channels Grid */}
                 <div className="sangtian-channel-selection-grid">
                   {filteredLiveChannels.map((item) => {
