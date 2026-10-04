@@ -152,7 +152,9 @@ export function usePlaybackController({
       reportError('没有可用的播放候选');
     } else {
       controller.resolveAndLoad(initial).catch(errorValue => {
-        if (active) reportError(errorValue?.message || '播放初始化失败');
+        if (active && requestKeyRef.current === requestKey) {
+          reportError(errorValue?.message || '播放初始化失败');
+        }
       });
     }
 
