@@ -18,6 +18,18 @@ export function createLiveFeature({ channels = [] } = {}) {
 }
 
 
+export function getLiveStreamCacheKey(channel, sources = []) {
+  if (!channel?.channelId) return '';
+  const sourceId = channel.sourceRefs?.find(ref =>
+    sources.some(source =>
+      source.sourceId === ref.sourceId
+      && source.sourceType === 'live'
+      && source.enabled !== false
+    )
+  )?.sourceId || channel.sourceRefs?.[0]?.sourceId || 'merged';
+  return sourceId + '\u0000' + channel.channelId;
+}
+
 export async function resolveLiveChannelStreams(channel, { sources = [], signal } = {}) {
   if (!channel) return [];
   if (Array.isArray(channel.streams) && channel.streams.length) return channel.streams;
@@ -45,7 +57,7 @@ export async function resolveLiveChannelStreams(channel, { sources = [], signal 
   }
 
   return requestManager.run(
-    'live-deferred-streams:' + channel.channelId,
+    'live-deferred-streams:' + getLiveStreamCacheKey(channel, sources),
     requestSignal => liveService.getStreams(channel, {
       signal: signal || requestSignal,
     }),
@@ -143,10 +155,16 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   // 不能只依赖页面卸载：Live 页面可能一直挂载，而 sources 会原地变化。
   useEffect(() => {
     const availableIds = new Set(allChannels.map(channel => channel.channelId));
+    const enabledSourceIds = new Set(sources.filter(source => source.enabled !== false).map(source => source.sourceId));
     setResolvedStreams(prev => {
       const next = Object.fromEntries(
-        Object.entries(prev).filter(([channelId]) => availableIds.has(channelId)),
-      );
+        Object.entries(prev).filter(([cacheKey]) => {
+          const separator = cacheKey.indexOf('\u0000');
+          if (separator < 0) return availableIds.has(cacheKey);
+          const sourceId = cacheKey.slice(0, separator);
+          const channelId = cacheKey.slice(separator + 1);
+          return availableIds.has(channelId) && (sourceId === 'merged' || enabledSourceIds.has(sourceId));
+        }),
       return Object.keys(next).length === Object.keys(prev).length ? prev : next;
     });
     if (selectedChannelId && !availableIds.has(selectedChannelId)) {
@@ -160,7 +178,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   );
   const activeChannel = useMemo(() => {
     if (!activeChannelBase) return null;
-    const lazyStreams = resolvedStreams[activeChannelBase.channelId];
+    const lazyStreams = resolvedStreams[getLiveStreamCacheKey(activeChannelBase, sources)];
     return lazyStreams ? { ...activeChannelBase, streams: lazyStreams } : activeChannelBase;
   }, [activeChannelBase, resolvedStreams]);
 
@@ -218,7 +236,8 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   }, [activeChannel]);
 
   const loadChannelStreams = async channel => {
-    if (!channel?.deferredRef || resolvedStreams[channel.channelId]) return;
+    const cacheKey = getLiveStreamCacheKey(channel, sources);
+    if (!channel?.deferredRef || resolvedStreams[cacheKey]) return;
 
     if (streamAbortRef.current) {
       streamAbortRef.current.abort();
@@ -235,7 +254,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
         signal: controller.signal,
       });
       if (!controller.signal.aborted) {
-        setResolvedStreams(prev => ({ ...prev, [channel.channelId]: streams }));
+        setResolvedStreams(prev => ({ ...prev, [cacheKey]: streams }));
       }
     } catch (error) {
       if (error?.name !== 'AbortError') setTv1Error(error);
@@ -260,7 +279,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     setPlaybackCandidate(null);
     setResolvedPlaybackInput(null);
     setPlaybackError('');
-    if (channel.deferredRef && !resolvedStreams[channel.channelId]) {
+    if (channel.deferredRef && !resolvedStreams[getLiveStreamCacheKey(channel, sources)]) {
       void loadChannelStreams(channel);
     }
   };
@@ -515,7 +534,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
                 const favorite = favorites.some(i => i.targetType === 'channel' && i.targetId === channel.channelId);
                 const isLazy = Boolean(channel.deferredRef);
                 const isResolving = streamLoading && selectedChannelId === channel.channelId && isLazy;
-                const streamCount = resolvedStreams[channel.channelId]?.length ?? channel.streams?.length ?? channel.estimatedStreamCount ?? channel.deferredRef?.lineIndices?.length ?? 0;
+                const streamCount = resolvedStreams[getLiveStreamCacheKey(channel, sources)]?.length ?? channel.streams?.length ?? channel.estimatedStreamCount ?? channel.deferredRef?.lineIndices?.length ?? 0;
 
                 return (
                   <div
