@@ -1862,3 +1862,32 @@ P3.9：继续审计 candidate/status 在手动切源、自动 fallback、retry�
 3. `npm test`
 4. 如能启动应用，再验证 Home/Movies/Search/Detail → Play → Back、续播、completed → 下一集、A1→A2→B1 fallback、手动切源、retry、stop/leave、Fullscreen/portrait/landscape。
 5. 只有运行验证通过后，再做最后一轮 UI polish / 清理重复信息。
+
+
+## P3.10 当前进展：执行环境 / CI 可验证性检查
+
+### 本轮实际检查
+- 重新读取当前 handoff，P3.10 已进入最终验证阶段。
+- 检查 `package.json`：项目要求 Node >=22，并提供 `build`、`test:react`、`test` 等脚本。
+- 检查 `.github/workflows/build-apk.yml`：仅监听 `main` push + 手动触发，不监听当前 `ai-handoff/playback-phase1`，因此本分支提交不会自动产生 CI build。
+- 检查当前分支对应 commit 的 workflow runs：没有可用的 Actions 运行记录。
+- 因而本轮没有伪造“build/test 已通过”；当前 GitHub connector 也不能直接提供本分支任意 workflow_dispatch 执行能力。
+
+### 结论
+当前最合理动作不是继续修改播放架构，而是把源码静态验证收口，并等待实际 Node/npm 或 CI 执行环境。当前分支仍没有运行时证据支持以下结论：
+- Vite build 成功；
+- architecture tests 成功；
+- React boundary tests 成功；
+- 浏览器播放器真实 fallback / completed / fullscreen 行为成功。
+
+### P3.10 静态收口项
+在等待运行环境期间，只继续处理**不会改变既有播放架构**的确定性问题；不再扩展新 controller / state machine 功能。任何后续 UI polish 必须建立在 build/test 结果之上。
+
+### 下一步
+1. 有 Node >=22 环境后执行：
+   - `npm install --no-audit --no-fund`
+   - `npm run build`
+   - `npm run test:react`
+   - `npm test`
+2. 有浏览器环境后执行 playback smoke matrix：Home/Movies/Search/Detail → Play → Back、resume、completed → next、fallback、manual source、retry、stop/leave、fullscreen/orientation。
+3. 若测试发现具体失败，再按失败用例最小范围修复；不要在未验证前继续大规模重构。
