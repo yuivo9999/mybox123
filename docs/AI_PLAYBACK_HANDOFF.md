@@ -629,3 +629,36 @@ P1.7 之后不要继续堆播放按钮。下一优先级是 P1.8：
 - 不要把 Native capabilities 改成 true，除非 bridge 契约和实际返回数据已经确认。
 - qualityId 当前对应 hls.js level index；切换时由 hls.js 保留 master playlist 语义。
 - 未来若引入跨 adapter 的统一 Track/Quality model，必须保持当前“能力不存在就隐藏”的原则。
+
+
+### 16.7 当前接力状态
+- 当前分支：`ai-handoff/playback-phase1`
+- 当前 HEAD：`1427fac917aac47a8abb1b94d67bbe5bab775c1d`
+- 相对 `main`：ahead 27 / behind 0
+- 本轮最新逻辑模块：P1.7 quality / subtitle / audio
+- 本轮文档已同步到本 commit。
+- 尚未合并 `main`，也没有创建最终合并 PR。
+
+### 本轮未验证
+- 没有浏览器真实播放环境。
+- 没有运行 npm build / lint / test。
+- 没有真实 HLS 多清晰度、多音轨、多字幕故障/切换验证。
+- 没有真实 Native bridge 验证。
+
+### 下一位 AI 第一任务
+1. 读取本文件，不重新调查 P1.5/P1.6/P1.7 已确认事实。
+2. 进入 P1.8：审计 `src/pages/PlaybackPage.jsx` 的 VOD-like 逻辑与 Live 真实调用关系。
+3. 删除/抽取重复 VOD UI 前，先确认 `LiveFeature.jsx`、`PlaybackPage.jsx` 的所有调用方，确保 Live immersive 不被误删。
+4. 每完成一个逻辑模块继续更新本文件并提交。
+
+### 不能重复的工作
+- 不要重新设计 fallback 三层模型。
+- 不要重新实现 watchProgressService。
+- 不要重新添加 decoderEngine 假 UI。
+- 不要把 Native 的 track/quality capabilities 改成 true，除非有实际 bridge 契约证据。
+- 不要把 quality/audio/subtitle 再复制成 page-local 播放状态。
+
+### 潜在回归点
+- HLS 控件依赖 hls.js 实例实际暴露 tracks/levels。
+- MoviePlaybackPage 仍有重复的选集/换源入口，P2 再做 UI 收敛。
+- `usePlaybackController` 仍可能因 request identity 变化而重建 controller，这是后续应验证的生命周期风险。
