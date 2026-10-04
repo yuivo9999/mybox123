@@ -13,10 +13,10 @@ export const playbackRuntime = {
         },
       });
     }
-    if (request) liveSession.ensureRequest(request);
     if (liveVideoElement) {
       liveSession.registerVideo(liveVideoElement, liveHostElement);
     }
+    if (request) liveSession.ensureRequest(request);
     return liveSession;
   },
 
