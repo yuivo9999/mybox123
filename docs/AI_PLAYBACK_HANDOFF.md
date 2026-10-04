@@ -1266,3 +1266,45 @@ Live 正式沉浸播放继续由 `LivePlaybackPage` 负责；页面下方已有�
 1. 审计 Favorites → 播放闭环，确认收藏影视是否能保持正确 content identity；
 2. 审计 Live History 是否应该直接恢复对应频道/线路，而不是只回频道详情；
 3. 然后进入 P2.7：整理 playback context，逐步减少 `selected` / `metadata.returnRoute` 这种散落约定。
+
+
+## 27. P2.6 补充完成：Live History → 直接恢复频道线路
+
+### 27.1 审计发现
+Live 历史记录已经保存：
+- channelId
+- streamId
+- sourceId
+- lastPlayedAt
+
+但 History 页原来点击 Live 历史只进入 `live-channel` 详情，没有利用 `streamId` 直接播放。
+
+### 27.2 已修改
+文件：`src/pages/MainPage.jsx`
+- Live History 现在保留 history item 与 channel 的对应关系。
+- 点击历史记录调用 `onLive(channel, item.streamId, 'live-history')`。
+- 因此进入现有 `playLive()`，由其负责 preferred source / candidate 排序和 LivePlaybackPage 生命周期。
+
+文件：`src/app/App.jsx`
+- `handleLiveBack()` 支持 `returnRoute=history`，Live 播放返回 History。
+- Live 播放 ErrorBoundary 恢复同样支持 `returnRoute=history`。
+
+### 27.3 责任边界
+History 不负责播放器状态，也不复制 Live fallback。
+它只负责把“上次播放的频道 + 线路”交给统一 `playLive()`。
+
+### 27.4 静态验证
+已确认：
+- Live History 使用保存的 `streamId`。
+- 返回路径识别 `history`。
+- 正常返回与播放异常恢复均可回 History。
+- 未改变 LivePlaybackPage / playbackCore。
+
+尚未验证：
+- 已删除/失效 streamId 的 fallback；
+- 浏览器真实 Live History 点击；
+- build / lint / test。
+
+### 27.5 下一步
+P2.6 的下一项优先审计：Favorites → 播放闭环。
+重点确认收藏影视使用稳定 `contentId`，收藏 Live 使用稳定 `channelId`，且点击收藏内容不会绕过统一播放入口。
