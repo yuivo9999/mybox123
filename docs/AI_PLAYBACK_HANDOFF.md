@@ -1700,3 +1700,58 @@ P3.7：做一次最终播放链静态回归，然后如果环境允许优先运�
 2. VOD / Live controller intent 是否没有遗漏调用方；
 3. Fullscreen fallback 与 document fullscreen 状态是否没有双状态残留；
 4. PlayerWindow 的 local state 是否全部属于 UI 状态/只读指标，而不是第二套 playback state machine。
+
+
+## P3.7 已完成：最终播放链静态回归与调用方修正
+
+### 本轮回归重点
+按 P3.6 handoff 对 controller lifecycle、VOD / Live intent、Fullscreen 状态、PlayerWindow 状态源做最终静态回归。
+
+### 本轮实际发现并修复
+1. `src/services/playbackService.js`
+   - `createController()` 返回对象中 `seek()` / `setPlaybackRate()` 重复声明了一次。
+   - 删除重复声明，避免维护时误以为存在两套 controller API。
+2. `src/pages/LivePlaybackPage.jsx`
+   - 回归时发现调用 `SangtianPlayerWindow` 使用了错误的 prop 名：`controllerStatus / activeCandidate / resolvedInput`。
+   - PlayerWindow 的正式接口实际是 `status / candidate / resolvedInput`。
+   - 已修正为 controller 输出直接映射到 PlayerWindow 正式接口。
+   - 删除已经不属于 PlayerWindow 接口的 `onOpenSourceModal` 传参。
+   - 这是本轮最重要的静态回归修复，否则 Live 播放页可能出现状态/候选为空的 UI 行为。
+3. `SangtianPlayerConsole.jsx`
+   - 继续确认 `videoRef` 只用于 buffered / readyState / 当前媒体只读观测以及 PIP 等浏览器能力，不重新承担播放生命周期。
+   - `isLandscape` 目前只用于 Fullscreen 控制栏的布局 class（portrait / landscape），不再用于播放器本体旋转。
+
+### 最终责任边界
+- PlaybackService：创建唯一 controller façade。
+- PlaybackCore / state machine：播放生命周期与状态迁移。
+- usePlaybackController：React 页面消费层、candidate/status/error/progress 聚合。
+- PlayerWindow：UI 状态 + 用户 intent + 只读媒体指标。
+- VOD / Live page：组装 request、上下文导航、业务选择，不复制 controller lifecycle。
+- Fullscreen：Fullscreen API + CSS fallback。
+- Orientation：真实 viewport / Orientation API；不通过 CSS rotate 伪造。
+
+### 静态回归结果
+已回读：
+- `playbackService.createController()` 的 controller 方法无重复 `seek/setPlaybackRate`。
+- Live PlayerWindow 的 `status/candidate/resolvedInput` 已正确连接 controller。
+- VOD PlayerWindow 仍直接消费 usePlaybackController 的 status/candidate/resolvedInput/currentTime/duration/isPlaying。
+- PlayerWindow 不再声明独立 currentTime/duration/isPlaying playback state。
+- 未发现旧 `is-system-fullscreen` / `is-web-fullscreen` / `is-landscape` 播放器本体 class。
+- 未发现直接 `video.play()` / `video.pause()` / `currentTime =` / `playbackRate =` 生命周期写入。
+- Live Native surface 的 ResizeObserver、resize、orientationchange bounds 同步仍保留。
+
+### 运行验证边界
+`package.json` 确认项目存在：
+- `npm run build`
+- `npm test`
+- `npm run test:react`
+
+但当前本轮没有仓库本地 Node/npm 执行环境结果，因此没有把这些命令写成“已通过”。浏览器 / 真机 E2E 也仍未运行。
+
+### 下一优先级
+P3.8：如果能取得本地执行环境，优先实际运行 build + test:react + test；若无法运行，则继续做源码级最终回归，重点检查：
+1. `usePlaybackController` requestKey / controller 重建时是否存在旧 controller 事件回写新页面 state 的竞态；
+2. candidate/status 在切集、切源、retry、fallback 后是否始终同步；
+3. VOD progress persistence 与自动下一集是否存在竞态；
+4. Live stop / leave / page back 是否存在重复 teardown；
+5. 最后再做视觉 polish，不再新增播放架构层。
