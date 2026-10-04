@@ -97,27 +97,48 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   useEffect(() => { globalLiveCache.isImmersive = isImmersive; }, [isImmersive]);
 
   useEffect(() => {
+    const controllers = new Map();
     let active = true;
     setTv1Error(null);
+
+    const enabledSourceIds = new Set(enabledTv1Sources.map(source => source.sourceId));
+    setTv1Channels(prev => prev.filter(channel =>
+      channel?.sourceRefs?.some(ref => enabledSourceIds.has(ref.sourceId))
+    ));
+
     if (!enabledTv1Sources.length) {
+      tv1LiveService.clear();
+      setTv1LoadedCount(0);
       setTv1Loading(false);
-      return () => { active = false; };
+      return undefined;
     }
 
-    // Skip network re-fetch if channels are already loaded in global cache
-    if (globalLiveCache.tv1Channels && globalLiveCache.tv1Channels.length > 0) {
+    const loadedSourceIds = new Set(
+      (globalLiveCache.tv1Channels || [])
+        .flatMap(channel => channel?.sourceRefs || [])
+        .map(ref => ref.sourceId)
+        .filter(Boolean),
+    );
+    const sourcesToLoad = enabledTv1Sources.filter(source => !loadedSourceIds.has(source.sourceId));
+
+    if (!sourcesToLoad.length) {
+      setTv1LoadedCount(globalLiveCache.tv1Channels?.length || 0);
       setTv1Loading(false);
-      return () => { active = false; };
+      return undefined;
     }
 
     setTv1Loading(true);
     const loadSource = async source => {
+      const controller = new AbortController();
+      controllers.set(source.sourceId, controller);
       try {
         await tv1LiveService.loadMetadata(source, {
+          signal: controller.signal,
           onChannel: channel => {
-            if (!active) return;
+            if (!active || controller.signal.aborted) return;
             startTransition(() => {
               setTv1Channels(prev => {
+                if (prev.some(item => item.channelId === channel.channelId && item.sourceRefs?.some(ref => ref.sourceId === source.sourceId))) return prev;
                 const next = [...prev, channel];
                 globalLiveCache.tv1Channels = next;
                 return next;
@@ -131,12 +152,14 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
       }
     };
 
-    void Promise.all(enabledTv1Sources.map(loadSource)).finally(() => {
+    void Promise.all(sourcesToLoad.map(loadSource)).finally(() => {
       if (active) setTv1Loading(false);
     });
 
     return () => {
       active = false;
+      controllers.forEach(controller => controller.abort());
+      sourcesToLoad.forEach(source => tv1LiveService.clear(source.sourceId));
     };
   }, [enabledTv1Sources]);
 
