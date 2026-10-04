@@ -143,7 +143,7 @@ function PlaybackView({
       controller.attachPresentation?.(playerWindowBodyRef.current);
       const liveState = controller.getPlaybackState?.();
       setStatus(liveState?.state || 'idle');
-      setCandidate(request?.candidates?.find(item => item.candidateId === controller.getPlaybackState?.()?.candidateId) || request?.candidates?.[0] || null);
+      setCandidate(controller.currentCandidate || request?.candidates?.[0] || null);
     } else {
       const player = controller.attachPlayer(videoRef.current);
       const initial = controller.start();
@@ -170,6 +170,21 @@ function PlaybackView({
       else controller.leave();
     };
   }, [controller, request, isLive, recordProgress]);
+
+  useEffect(() => {
+    if (!isLive || !controller?.subscribe) return undefined;
+    const unsubscribe = controller.subscribe(event => {
+      if (event.event === 'stateChanged') setStatus(event.state);
+      if (event.event === 'sourceChanged' && event.candidate) {
+        setCandidate(event.candidate);
+        setResolvedInput(null);
+      }
+      if (event.event === 'error') setError(event.error || '播放候选失败');
+    });
+    const current = controller.currentCandidate;
+    if (current) setCandidate(current);
+    return () => unsubscribe?.();
+  }, [controller, isLive]);
 
   useEffect(() => {
     const body = playerWindowBodyRef.current;
