@@ -19,10 +19,6 @@ function PlaybackView({
   toggleFavorite,
 }) {
   const { recordProgress, saveSettings, settings } = usePersistentState();
-  const [candidate, setCandidate] = useState(request?.candidates?.[0] ?? null);
-  const [status, setStatus] = useState('idle');
-  const [resolvedInput, setResolvedInput] = useState(null);
-  const [error, setError] = useState('');
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sourceModalOpen, setSourceModalOpen] = useState(false);
@@ -53,11 +49,9 @@ function PlaybackView({
   const {
     controller,
     candidate: activeCandidate,
-    setCandidate: setActiveCandidate,
     status: controllerStatus,
     resolvedInput: controllerResolvedInput,
     error: controllerError,
-    setError: setControllerError,
     switchCandidate: switchCandidateFromController,
     retry: handleRetry,
     setPlaybackRate: setControllerPlaybackRate,
@@ -66,27 +60,8 @@ function PlaybackView({
     videoRef,
     recordProgress,
     isLive: true,
-    onEvent: event => {
-      if (event.event === 'released') setStatus('released');
-      if (event.event === 'stopped') setStatus('stopped');
-    },
   });
 
-  useEffect(() => {
-    setCandidate(activeCandidate ?? null);
-  }, [activeCandidate]);
-
-  useEffect(() => {
-    setStatus(controllerStatus);
-  }, [controllerStatus]);
-
-  useEffect(() => {
-    setResolvedInput(controllerResolvedInput ?? null);
-  }, [controllerResolvedInput]);
-
-  useEffect(() => {
-    setError(controllerError || '');
-  }, [controllerError]);
 
   useEffect(() => {
     if (!controller || !playerWindowBodyRef.current?.getBoundingClientRect) return undefined;
@@ -121,10 +96,7 @@ function PlaybackView({
     };
   }, [controller]);
 
-  const switchCandidate = candidateId => {
-    const next = switchCandidateFromController(candidateId);
-    if (next) setActiveCandidate(next);
-  };
+  const switchCandidate = candidateId => switchCandidateFromController(candidateId);
 
   const handleStop = () => {
     try {
@@ -132,7 +104,6 @@ function PlaybackView({
     } catch (stopError) {
       console.error('Stop controller failed:', stopError);
     }
-    setResolvedInput(null);
       };
 
   const handleChangePlaybackRate = rate => {
