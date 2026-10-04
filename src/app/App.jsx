@@ -233,6 +233,10 @@ export function App(){
  const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
   const handleLiveBack = () => {
     const returnRoute = selected?.metadata?.returnRoute;
+    if (returnRoute === 'history') {
+      sessionStateStore.patch({tab:'history',route:null,selected:null});
+      return;
+    }
     if (returnRoute === 'live-channel') {
       const channelObj = selected?.metadata?.channel || contentState.channels.find(c => c.channelId === selected?.channelId) || null;
       if (channelObj) {
