@@ -136,17 +136,31 @@ export function createPlaybackTask(request) {
   };
 
   const next = () => {
-    for (let index = currentIndex + 1; index < snapshot.candidates.length; index += 1) {
-      if (!failedCandidates.has(snapshot.candidates[index].candidateId) && !isPlaybackCandidateExpired(snapshot.candidates[index])) {
-        currentIndex = index;
-        currentCandidateId = snapshot.candidates[index].candidateId;
-        status = PlaybackRequestStatus.LOADING;
-        retryCount = 0;
-        emit('sourceChanged', { candidate: current() });
-        return current();
+    const currentSourceId = current()?.sourceId ?? '';
+    const findNext = (allowSameSource) => {
+      for (let index = currentIndex + 1; index < snapshot.candidates.length; index += 1) {
+        const candidate = snapshot.candidates[index];
+        const sameSource = (candidate.sourceId ?? '') === currentSourceId;
+        if ((allowSameSource ? sameSource : !sameSource)
+          && !failedCandidates.has(candidate.candidateId)
+          && !isPlaybackCandidateExpired(candidate)) {
+          currentIndex = index;
+          currentCandidateId = candidate.candidateId;
+          status = PlaybackRequestStatus.LOADING;
+          retryCount = 0;
+          emit('sourceChanged', { candidate: current(), fallbackLevel: allowSameSource ? 'candidate' : 'source' });
+          return current();
+        }
       }
-    }
-    return null;
+      return null;
+    };
+
+    // 第一层：同一 source 内换下一个 candidate。
+    const sameSource = findNext(true);
+    if (sameSource) return sameSource;
+
+    // 第二层：当前 source 的候选全部耗尽后，再跨 source。
+    return findNext(false);
   };
 
   return {
@@ -188,7 +202,9 @@ export function createPlaybackTask(request) {
     },
     switchCandidate(candidateId) {
       const index = snapshot.candidates.findIndex((candidate) => candidate.candidateId === candidateId);
-      if (index < 0 || failedCandidates.has(candidateId)) return null;
+      if (index < 0) return null;
+      // 手动选源/候选代表用户明确要求再次尝试；不要把自动失败状态永久化。
+      failedCandidates.delete(candidateId);
       if (isPlaybackCandidateExpired(snapshot.candidates[index])) {
         failedCandidates.add(candidateId);
         emit('error', { candidateId, code: PlaybackFailureCode.EXPIRED, error: 'PLAYBACK_CANDIDATE_EXPIRED' });
