@@ -18,7 +18,7 @@ import { LoadingState, ErrorState } from '../components/StateViews.jsx';
 import { getFontById } from '../config/fontCatalog.js';
 import { ensureFont } from '../services/fontLoader.js';
 import { getGestureDirection, getTopLevelSwipeTarget, getParentForRoute, isSwipeExcludedTarget } from './navigationGesture.js';
-import { createPlaybackContext, getPlaybackContext } from '../playback/playbackContext.js';
+import { createPlaybackContext, getPlaybackContext, resolvePlaybackReturnRoute, resolvePlaybackReturnTarget } from '../playback/playbackContext.js';
 
 export function App(){
  const session=useSessionState(); const persistent=usePersistentState(); const {tab,route,selected}=session;
@@ -90,15 +90,8 @@ export function App(){
    return false;
  },onAppStateChange:(state)=>{if(state==='foreground'&&(route==='movie-play'||route==='live-play'))webViewRuntime.call('getAppState')} }),[route]);
 
- const getMovieReturnRoute=(explicit=null)=> explicit || (route==='detail'?'detail':route==='search'?'search':route==='history'?'history':tab==='movies'?'movies':'home');
- const returnFromMoviePlayback=()=>{
-  const returnRoute=getPlaybackContext(selected).returnRoute||'detail';
-  if(returnRoute==='detail') return sessionStateStore.patch({tab:'movies',route:'detail',selected});
-  if(returnRoute==='search') return sessionStateStore.patch({tab:'movies',route:'search',selected:null});
-  if(returnRoute==='movies') return sessionStateStore.patch({tab:'movies',route:null,selected:null});
-  if(returnRoute==='history') return sessionStateStore.patch({tab:'history',route:null,selected:null});
-  return sessionStateStore.patch({tab:'home',route:null,selected:null});
- };
+ const getMovieReturnRoute=(explicit=null)=> resolvePlaybackReturnRoute({explicit,currentRoute:route,currentTab:tab});
+ const returnFromMoviePlayback=()=> sessionStateStore.patch(resolvePlaybackReturnTarget(selected,{fallbackTab:'movies'}));
  const openMovie=(movie,routeOverride=null)=>{
    if(routeOverride==='search'){sessionStateStore.patch({tab:'movies',route:'search',selected:null});return}
    if(!movie)return;
@@ -234,18 +227,14 @@ export function App(){
  const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
   const handleLiveBack = () => {
     const returnRoute = getPlaybackContext(selected).returnRoute;
-    if (returnRoute === 'history') {
-      sessionStateStore.patch({tab:'history',route:null,selected:null});
-      return;
-    }
     if (returnRoute === 'live-channel') {
       const channelObj = selected?.metadata?.channel || contentState.channels.find(c => c.channelId === selected?.channelId) || null;
       if (channelObj) {
-        sessionStateStore.patch({ route: 'live-channel', selected: channelObj });
+        sessionStateStore.patch({ route: 'live-channel', selected: channelObj, tab: 'live' });
         return;
       }
     }
-    sessionStateStore.patch({ route: null, selected: null, tab: 'live' });
+    sessionStateStore.patch(resolvePlaybackReturnTarget(selected,{fallbackTab:'live'}));
   };
  const playLive=(channel,streamId=null,returnRoute=null)=>{
    if(!channel)return;
@@ -297,7 +286,7 @@ export function App(){
 
         // 3. Show normal content features
         return movieActive 
-          ? <MovieFeature route={route} tab={tab} selected={selected} movies={contentState.movies} channels={contentState.channels} history={persistent.history} progress={persistent.progress} selectedSources={persistent.selectedSources} sources={persistent.sources} movieCategories={contentState.movieCategories} movieActiveCategory={contentState.movieActiveCategory} movieCategoryLoading={contentState.movieCategoryLoading} onLoadMovieCategory={(category)=>{setContentState(state=>({...state,movieActiveCategory:category??state.movieActiveCategory,movieCategoryLoading:true}));void reloadSources(undefined,{background:true,includeMovie:true,includeLive:false,movieCategoryId:category?.id??null,movieCategoryName:category?.name??''})}} onSelectMovieSource={setSourceActive} favorites={persistent.favorites} onMovie={openMovie} onPlay={playMovie} onTab={nav} onBack={()=>sessionStateStore.patch({route:route==='movie-play'?(getPlaybackContext(selected).returnRoute||'detail'):null,selected:route==='movie-play'&&getPlaybackContext(selected).returnRoute==='detail'?selected:null})} onLive={playLive} recordSearch={persistent.recordSearch} toggleFavorite={persistent.toggleFavorite}/>
+          ? <MovieFeature route={route} tab={tab} selected={selected} movies={contentState.movies} channels={contentState.channels} history={persistent.history} progress={persistent.progress} selectedSources={persistent.selectedSources} sources={persistent.sources} movieCategories={contentState.movieCategories} movieActiveCategory={contentState.movieActiveCategory} movieCategoryLoading={contentState.movieCategoryLoading} onLoadMovieCategory={(category)=>{setContentState(state=>({...state,movieActiveCategory:category??state.movieActiveCategory,movieCategoryLoading:true}));void reloadSources(undefined,{background:true,includeMovie:true,includeLive:false,movieCategoryId:category?.id??null,movieCategoryName:category?.name??''})}} onSelectMovieSource={setSourceActive} favorites={persistent.favorites} onMovie={openMovie} onPlay={playMovie} onTab={nav} onBack={()=>route==='movie-play'?returnFromMoviePlayback():sessionStateStore.patch({route:null,selected:null})} onLive={playLive} recordSearch={persistent.recordSearch} toggleFavorite={persistent.toggleFavorite}/>
           : route === 'live-channel' ? <LiveChannelPanel channel={selected} channels={contentState.channels} favorites={persistent.favorites} onBack={()=>sessionStateStore.patch({route:null,selected:null,tab:'live'})} onPlay={playLive} onChannel={openLiveChannel} toggleFavorite={persistent.toggleFavorite}/>
           : route === 'live-play' ? <LivePlaybackPage request={selected} kind="live" channels={contentState.channels} favorites={persistent.favorites} onChannel={openLiveChannel} onPlay={playLive} toggleFavorite={persistent.toggleFavorite} onTab={nav} onBack={handleLiveBack}/>
           : <MainPage tab={tab} movies={contentState.movies} channels={contentState.channels} favorites={persistent.favorites} history={persistent.history} progress={persistent.progress} settings={persistent.settings} sources={persistent.sources} searches={persistent.searches} onTab={nav} onMovie={openMovie} onPlay={playMovie} onLive={playLive} onLiveChannel={openLiveChannel} onSearchHistory={openSearchHistory} toggleFavorite={persistent.toggleFavorite} onClearData={persistent.clearUserData} onClearHistory={persistent.clearHistory} onClearSearches={persistent.clearSearches} onRemoveSearch={persistent.removeSearch} onClearCache={persistent.clearCache} onSourceEnabled={setSourceEnabled} onSourceActive={setSourceActive} onUpdateSettings={persistent.updateSettings} onTestSource={testSource} onSaveSources={saveSources} onRemoveSource={removeSource}/>;
@@ -315,12 +304,7 @@ export function AppRoot(){
  const {tab,route,selected}=useSessionState();
  const recoverFromPageError=()=>{
    if(route==='movie-play'){
-     const returnRoute=getPlaybackContext(selected).returnRoute||'detail';
-     if(returnRoute==='detail') sessionStateStore.patch({tab:'movies',route:'detail',selected});
-     else if(returnRoute==='search') sessionStateStore.patch({tab:'movies',route:'search',selected:null});
-     else if(returnRoute==='movies') sessionStateStore.patch({tab:'movies',route:null,selected:null});
-     else if(returnRoute==='history') sessionStateStore.patch({tab:'history',route:null,selected:null});
-     else sessionStateStore.patch({tab:'home',route:null,selected:null});
+     sessionStateStore.patch(resolvePlaybackReturnTarget(selected,{fallbackTab:'movies'}));
    }else if(route==='detail'||route==='search'){
      sessionStateStore.patch({tab:'movies',route:null,selected:null});
    }else if(route==='live-play'){
