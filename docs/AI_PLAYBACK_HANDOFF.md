@@ -947,3 +947,9 @@ P2.3 后进入 P2.4：继续收敛 `SangtianPlayerConsole.jsx` 的职责与重�
 
 ### 20.4 下一步
 P2.4 下一小步：审计 fullscreen 的“选集 / 线路设置 / More 设置”是否可以合并成更清晰的一个侧栏 IA，同时保持全屏状态下无需退出播放器即可操作。
+
+
+### 20.5 终端面板残留修正
+第一次删除诊断三元分支后，静态回读发现终端面板本体仍残留；已立即删除该不可达块，并再次检查 `showTerminal` / `setShowTerminal` / terminal panel / fullscreen metrics 均不存在。
+当前最新代码提交：3b31211378fcd53af68621676b8434c2d29cfd31
+本轮仍未运行 build/lint/test；下一次验证优先级为 JSX 编译 / lint。
