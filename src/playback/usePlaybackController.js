@@ -14,6 +14,10 @@ export function usePlaybackController({
   onEvent,
 } = {}) {
   const progressRef = useRef({ currentTime: 0, duration: null, persistedAt: 0 });
+  const onEventRef = useRef(onEvent);
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  }, [onEvent]);
   const [candidate, setCandidate] = useState(request?.candidates?.[0] ?? null);
   const [status, setStatus] = useState('idle');
   const [resolvedInput, setResolvedInput] = useState(null);
@@ -25,7 +29,7 @@ export function usePlaybackController({
 
   const controller = useMemo(() => playbackService.createController(request, {
     onEvent: event => {
-      onEvent?.(event);
+      onEventRef.current?.(event);
       if (event.event === 'error') {
         reportError(event.error || '播放候选失败');
       }
@@ -60,7 +64,7 @@ export function usePlaybackController({
     onParserError: ({ code }) => reportError('解析失败：' + code),
     onPlayerError: ({ error: playerError }) => reportError(playerError?.message || '播放器加载失败'),
     onExhausted: () => setStatus('error'),
-  }), [request, isLive, recordProgress, onEvent, reportError]);
+  }), [request, isLive, recordProgress, reportError]);
 
   useEffect(() => {
     if (!request || !videoRef?.current || !controller) return undefined;
