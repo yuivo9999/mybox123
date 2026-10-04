@@ -33,7 +33,14 @@ export function usePlaybackController({
   const onEventRef = useRef(onEvent);
   const recordProgressRef = useRef(recordProgress);
   const requestRef = useRef(request);
+  const requestKeyRef = useRef(getPlaybackRequestKey(request));
   const requestKey = getPlaybackRequestKey(request);
+
+  if (requestKeyRef.current !== requestKey) {
+    requestKeyRef.current = requestKey;
+    requestRef.current = request;
+    progressRef.current = { currentTime: 0, duration: null, persistedAt: 0 };
+  }
 
   useEffect(() => {
     onEventRef.current = onEvent;
@@ -42,11 +49,6 @@ export function usePlaybackController({
   useEffect(() => {
     recordProgressRef.current = recordProgress;
   }, [recordProgress]);
-
-  useEffect(() => {
-    requestRef.current = request;
-    progressRef.current = { currentTime: 0, duration: null, persistedAt: 0 };
-  }, [requestKey]);
 
   const [candidate, setCandidate] = useState(request?.candidates?.[0] ?? null);
   const [status, setStatus] = useState('idle');
