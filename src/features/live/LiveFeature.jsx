@@ -66,7 +66,7 @@ const globalLiveCache = {
   isImmersive: false,
 };
 
-export function LiveFeature({ channels = [], sources = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite }) {
+export function LiveFeature({ channels = [], sources = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite, requestedChannelId = null }) {
   const page = usePageState();
   const videoRef = useRef(null);
   const playerWindowBodyRef = useRef(null);
@@ -81,6 +81,19 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   const [streamLoading, setStreamLoading] = useState(false);
   const [decoderEngine, setDecoderEngine] = useState(globalLiveCache.decoderEngine || 'exo');
   const [isImmersive, setIsImmersive] = useState(globalLiveCache.isImmersive || false);
+
+  // Keep Live playback selection synchronized with the persistent Live workspace.
+  // Route changes must not create a second controller or force a reconnect.
+  useEffect(() => {
+    if (!requestedChannelId || requestedChannelId === selectedChannelId) return;
+    if (allChannels.some(channel => channel.channelId === requestedChannelId)) {
+      setSelectedChannelId(requestedChannelId);
+      setActiveStreamIndex(0);
+      setPlaybackCandidate(null);
+      setResolvedPlaybackInput(null);
+      setPlaybackError('');
+    }
+  }, [requestedChannelId, allChannels, selectedChannelId]);
 
   const enabledTv1Sources = useMemo(
     () => sources.filter(source => source.sourceType === 'live' && source.liveMode === 'tv1' && source.enabled !== false),
