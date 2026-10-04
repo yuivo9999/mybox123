@@ -80,6 +80,10 @@ public final class NativePlaybackBridge {
     private boolean wantPlay = false;
     private boolean released = false;
     private long lastPositionMs = 0L;
+    // Monotonically increasing logical playback generation. Native engine callbacks can
+    // arrive asynchronously after an engine is released/replaced; stale generations must
+    // never be forwarded to the WebView's current player callback.
+    private long playbackGeneration = 0L;
 
     private ExoPlayer exoPlayer;
     private IjkMediaPlayer ijkPlayer;
@@ -165,6 +169,7 @@ public final class NativePlaybackBridge {
             configuredFallbackOrder = readStringList(hint == null ? null : hint.optJSONArray("fallbackOrder"));
             engineOrder = buildEngineOrder(requested, url, input.optString("protocol", ""));
 
+            playbackGeneration++;
             engineIndex = 0;
             selectedEngine = engineOrder.get(engineIndex);
             decoderMode = decoderModes.getOrDefault(selectedEngine, decoderMode);
@@ -399,6 +404,7 @@ public final class NativePlaybackBridge {
         if (released) return ok("released", true);
         released = true;
         wantPlay = false;
+        playbackGeneration++;
         releaseCurrentEngine();
         if (textureView != null) {
             detachSurface();
@@ -496,25 +502,26 @@ public final class NativePlaybackBridge {
             }
         });
 
+        final long engineGeneration = playbackGeneration;
         exoPlayer.addListener(new Player.Listener() {
             @Override public void onPlaybackStateChanged(int state) {
-                if (state == Player.STATE_BUFFERING) emit("bufferingStart", null);
+                if (state == Player.STATE_BUFFERING) emit("bufferingStart", null, engineGeneration);
                 if (state == Player.STATE_READY) {
                     prepared = true;
-                    emit("prepared", null);
+                    emit("prepared", null, engineGeneration);
                     if (wantPlay) {
                         try { exoPlayer.play(); } catch (Throwable e) { fallbackOrError("EXO_PLAY:" + safeMessage(e)); }
                     }
                 }
-                if (state == Player.STATE_ENDED) emit("completed", null);
+                if (state == Player.STATE_ENDED) emit("completed", null, engineGeneration);
             }
 
             @Override public void onIsPlayingChanged(boolean isPlaying) {
-                emit(isPlaying ? "playing" : "paused", null);
+                emit(isPlaying ? "playing" : "paused", null, engineGeneration);
             }
 
             @Override public void onPlayerError(PlaybackException error) {
-                fallbackOrError("EXO_ERROR:" + safeMessage(error));
+                fallbackOrError("EXO_ERROR:" + safeMessage(error), engineGeneration);
             }
         });
 
@@ -552,6 +559,7 @@ public final class NativePlaybackBridge {
             ijkPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "headers", "Cookie: " + cookies);
         }
 
+        final long engineGeneration = playbackGeneration;
         ijkPlayer.setOnPreparedListener(mp -> {
             // IJK can silently fall back to FFmpeg when MediaCodec selection fails.
             // Treat that as a hardware-decoder failure when hardware was requested,
@@ -560,28 +568,28 @@ public final class NativePlaybackBridge {
                 try {
                     int actual = ijkPlayer.getVideoDecoder();
                     if (actual != 2) {
-                        fallbackOrError("IJK_HARDWARE_NOT_ACTIVE:" + actual);
+                        fallbackOrError("IJK_HARDWARE_NOT_ACTIVE:" + actual, engineGeneration);
                         return;
                     }
                 } catch (Throwable e) {
-                    fallbackOrError("IJK_HARDWARE_PROBE:" + safeMessage(e));
+                    fallbackOrError("IJK_HARDWARE_PROBE:" + safeMessage(e), engineGeneration);
                     return;
                 }
             }
 
             prepared = true;
-            emit("decoderChanged", decoderObject());
-            emit("prepared", null);
+            emit("decoderChanged", decoderObject(), engineGeneration);
+            emit("prepared", null, engineGeneration);
             if (wantPlay) {
-                try { ijkPlayer.start(); } catch (Throwable e) { fallbackOrError("IJK_PLAY:" + safeMessage(e)); }
+                try { ijkPlayer.start(); } catch (Throwable e) { fallbackOrError("IJK_PLAY:" + safeMessage(e), engineGeneration); }
             }
         });
-        ijkPlayer.setOnCompletionListener(mp -> emit("completed", null));
+        ijkPlayer.setOnCompletionListener(mp -> emit("completed", null, engineGeneration));
         ijkPlayer.setOnBufferingUpdateListener((mp, percent) -> {
-            if (percent < 100) emit("buffering", null);
+            if (percent < 100) emit("buffering", null, engineGeneration);
         });
         ijkPlayer.setOnErrorListener((mp, what, extra) -> {
-            fallbackOrError("IJK_ERROR:" + what + ":" + extra);
+            fallbackOrError("IJK_ERROR:" + what + ":" + extra, engineGeneration);
             return true;
         });
 
@@ -674,19 +682,20 @@ public final class NativePlaybackBridge {
                 .setUsage(AudioAttributes.USAGE_MEDIA)
                 .build());
 
+        final long engineGeneration = playbackGeneration;
         nativePlayer.setOnPreparedListener(mp -> {
             prepared = true;
-            emit("prepared", null);
+            emit("prepared", null, engineGeneration);
             if (wantPlay) {
-                try { mp.start(); } catch (Throwable e) { emit("error", errorObject("NATIVE_PLAY:" + safeMessage(e))); }
+                try { mp.start(); } catch (Throwable e) { emit("error", errorObject("NATIVE_PLAY:" + safeMessage(e)), engineGeneration); }
             }
         });
-        nativePlayer.setOnCompletionListener(mp -> emit("completed", null));
+        nativePlayer.setOnCompletionListener(mp -> emit("completed", null, engineGeneration));
         nativePlayer.setOnBufferingUpdateListener((mp, percent) -> {
-            if (percent < 100) emit("buffering", null);
+            if (percent < 100) emit("buffering", null, engineGeneration);
         });
         nativePlayer.setOnErrorListener((mp, what, extra) -> {
-            emit("error", errorObject("NATIVE_ERROR:" + what + ":" + extra));
+            emit("error", errorObject("NATIVE_ERROR:" + what + ":" + extra), engineGeneration);
             return true;
         });
 
@@ -724,11 +733,17 @@ public final class NativePlaybackBridge {
     }
 
     private synchronized String fallbackOrError(String reason) {
+        return fallbackOrError(reason, playbackGeneration);
+    }
+
+    private synchronized String fallbackOrError(String reason, long callbackGeneration) {
+        if (callbackGeneration != playbackGeneration || released) return ok("stale", true);
         if (ENGINE_IJK.equals(selectedEngine)
                 && "hardware".equals(decoderMode)
                 && !livePlayback
                 && fallbackEnabled) {
             lastPositionMs = currentPositionMs();
+            playbackGeneration++;
             releaseCurrentEngine();
             decoderMode = "software";
             prepared = false;
@@ -747,6 +762,7 @@ public final class NativePlaybackBridge {
 
         if (engineIndex + 1 < engineOrder.size()) {
             lastPositionMs = currentPositionMs();
+            playbackGeneration++;
             releaseCurrentEngine();
             engineIndex++;
             selectedEngine = engineOrder.get(engineIndex);
@@ -889,6 +905,11 @@ public final class NativePlaybackBridge {
     }
 
     private void emit(String event, @Nullable Object data) {
+        emit(event, data, playbackGeneration);
+    }
+
+    private void emit(String event, @Nullable Object data, long eventGeneration) {
+        if (eventGeneration != playbackGeneration || released) return;
         try {
             JSONObject payload = new JSONObject().put("event", event);
             if (data != null) payload.put("data", data);
