@@ -662,3 +662,70 @@ P1.7 之后不要继续堆播放按钮。下一优先级是 P1.8：
 - HLS 控件依赖 hls.js 实例实际暴露 tracks/levels。
 - MoviePlaybackPage 仍有重复的选集/换源入口，P2 再做 UI 收敛。
 - `usePlaybackController` 仍可能因 request identity 变化而重建 controller，这是后续应验证的生命周期风险。
+
+
+## 16. P1.8 已完成：PlaybackPage 收敛为 Live-only
+
+### 16.1 已确认调用链
+本轮实际回读确认：
+- `src/app/App.jsx` 只有 `route === 'live-play'` 两处渲染 `<PlaybackPage ... kind="live" />`。
+- `route === 'movie-play'` 完全进入 `src/features/movie/MovieFeature.jsx` → `MoviePlaybackPage.jsx`。
+- `MovieFeature.jsx` 的 Home / Search / Detail / Continue Watching 播放入口全部调用 `onPlay`，最终由 App 的 `playMovie()` 进入 `movie-play`。
+- 因此 `src/pages/PlaybackPage.jsx` 中原来的 VOD 分支已经没有调用方，删除是安全的。
+
+### 16.2 已修改
+文件：`src/pages/PlaybackPage.jsx`
+- 删除 `movieService` 与所有 Movie / Episode / VOD metadata 派生逻辑。
+- 删除 VOD-only FloatingBar、上下集、选集、电影详情、相关影视等 UI。
+- 删除 `decoderEngine` 假状态及其 props。
+- 页面现在只维护 Live：
+  - 当前频道 / EPG
+  - Live candidate / source 切换
+  - Live player
+  - Live console
+  - 收藏频道
+  - 画中画
+  - Live 线路 modal
+- 继续复用 `usePlaybackController`，不复制底层 controller 生命周期。
+- 修正 Live player 内“上一条/下一条线路”按钮：组件回调传 index，页面先映射到 candidateId 再调用 controller。
+- 不再让 Live 页面携带 episode/source 混合语义。
+
+### 16.3 架构结论
+当前正式播放入口已经明确为：
+- VOD：`src/features/movie/MoviePlaybackPage.jsx`
+- Live immersive：`src/pages/PlaybackPage.jsx`
+
+暂时没有重命名为 `LivePlaybackPage.jsx`，原因是当前 App 仍直接引用 `PlaybackPage`；本轮先做职责收敛，避免同时引入路径迁移噪声。后续如果需要命名统一，可以单独做文件重命名 + import 更新。
+
+### 16.4 本轮验证
+已完成静态调用链回读：
+- `App.jsx` 的 movie-play → MovieFeature → MoviePlaybackPage。
+- `App.jsx` 的 live-play → PlaybackPage(kind=live)。
+- `MovieFeature.jsx` 的 Home/Search/Detail 播放入口均进入 `playMovie()`。
+- SangtianPlayerWindow 的 `onSwitchStreamIndex` 确认传入的是 index，因此已修正 PlaybackPage 的映射。
+- 本轮没有运行浏览器真实播放。
+- 本轮没有运行 npm build / lint / test。
+- Native bridge / HLS / EPG 仍未做真实环境验证。
+
+### 16.5 下一步
+P1.8 后不要再回头审计“PlaybackPage 是否还承担 VOD”——本轮已经确认并删除。
+下一优先级进入 P1.9 / P2：
+1. 稳定 `usePlaybackController` 的 request 生命周期，避免 request object identity 变化导致 controller 不必要重建。
+2. 收敛播放页重复控制：TopBar / PlayerWindow / ConsoleCard / source modal 之间只保留一套主入口。
+3. 自动下一集改成倒计时 + 取消，而不是结束立即跳转。
+4. Live inline preview 与 immersive PlaybackPage 的职责继续拆清：inline 只负责 Preview，不复制完整控制栏。
+5. 若要改名，`PlaybackPage.jsx` → `LivePlaybackPage.jsx` 单独处理，不和 UI 重构混在一起。
+
+### 16.6 不能重复的工作
+- VOD 已确认不再使用 `src/pages/PlaybackPage.jsx`。
+- decoderEngine 假 UI 已移除。
+- MoviePlaybackPage 已接管 VOD playback。
+- usePlaybackController 已作为 VOD / Live 共用生命周期包装层。
+- P1.5 三层 fallback、P1.4 watchProgressService、P1.7 quality/subtitle/audio 基础接线不要重新实现。
+
+### 16.7 潜在回归点
+- `PlaybackPage.jsx` 当前仍沿用旧文件名；任何新代码不要把它误认为 VOD 页面。
+- `SangtianPlayerWindow` 的 Live stream prev/next 回调参数是 index，不是 candidateId。
+- Live 的 HLS/native 能力仍受底层 adapter 实际能力限制。
+- `usePlaybackController` request identity 生命周期问题尚未处理。
+- 本轮未运行真实播放器、build、lint、test。
