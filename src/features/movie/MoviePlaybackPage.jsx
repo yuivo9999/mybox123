@@ -168,6 +168,13 @@ export function MoviePlaybackPage({
         channels={[]}
         activeChannel={null}
         activeStreamIndex={0}
+        playbackCapabilities={controller?.capabilities ?? {}}
+        getAudioTracks={() => controller?.getAudioTracks?.() ?? []}
+        getSubtitleTracks={() => controller?.getSubtitleTracks?.() ?? []}
+        getQualities={() => controller?.getQualities?.() ?? []}
+        selectAudioTrack={id => controller?.selectAudioTrack?.(id) ?? false}
+        selectSubtitleTrack={id => controller?.selectSubtitleTrack?.(id) ?? false}
+        selectQuality={id => controller?.selectQuality?.(id) ?? false}
       >
         <video
           ref={videoRef}
