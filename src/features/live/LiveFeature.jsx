@@ -55,32 +55,21 @@ export async function resolveLiveChannelStreams(channel, { sources = [], signal 
   );
 }
 
-// Global Live State Cache across Tab Navigations
-const globalLiveCache = {
-  tv1Channels: [],
-  selectedChannelId: '',
-  selectedCategory: '全部',
-  resolvedStreams: {},
-  activeStreamIndex: 0,
-  decoderEngine: 'exo',
-  isImmersive: false,
-};
-
 export function LiveFeature({ channels = [], sources = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite, requestedChannelId = null, requestedStreamId = null }) {
   const page = usePageState();
   const videoRef = useRef(null);
   const playerWindowBodyRef = useRef(null);
-  const [selectedChannelId, setSelectedChannelId] = useState(globalLiveCache.selectedChannelId);
-  const [selectedCategory, setSelectedCategory] = useState(globalLiveCache.selectedCategory || '全部');
-  const [activeStreamIndex, setActiveStreamIndex] = useState(globalLiveCache.activeStreamIndex || 0);
-  const [tv1Channels, setTv1Channels] = useState(globalLiveCache.tv1Channels || []);
+  const [selectedChannelId, setSelectedChannelId] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('全部');
+  const [activeStreamIndex, setActiveStreamIndex] = useState(0);
+  const [tv1Channels, setTv1Channels] = useState([]);
   const [tv1Loading, setTv1Loading] = useState(false);
-  const [tv1LoadedCount, setTv1LoadedCount] = useState(globalLiveCache.tv1Channels?.length || 0);
+  const [tv1LoadedCount, setTv1LoadedCount] = useState(0);
   const [tv1Error, setTv1Error] = useState(null);
-  const [resolvedStreams, setResolvedStreams] = useState(globalLiveCache.resolvedStreams || {});
+  const [resolvedStreams, setResolvedStreams] = useState({});
   const [streamLoading, setStreamLoading] = useState(false);
-  const [decoderEngine, setDecoderEngine] = useState(globalLiveCache.decoderEngine || 'exo');
-  const [isImmersive, setIsImmersive] = useState(globalLiveCache.isImmersive || false);
+  const [decoderEngine, setDecoderEngine] = useState('exo');
+  const [isImmersive, setIsImmersive] = useState(false);
 
   // Keep Live playback selection synchronized with the persistent Live workspace.
   // Route changes must not create a second controller or force a reconnect.
@@ -103,7 +92,6 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     [sources],
   );
 
-  // Sync state changes to global Live Cache
   useEffect(() => { globalLiveCache.selectedChannelId = selectedChannelId; }, [selectedChannelId]);
   useEffect(() => { globalLiveCache.selectedCategory = selectedCategory; }, [selectedCategory]);
   useEffect(() => { globalLiveCache.activeStreamIndex = activeStreamIndex; }, [activeStreamIndex]);
@@ -129,16 +117,11 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
       return undefined;
     }
 
-    const loadedSourceIds = new Set(
-      (globalLiveCache.tv1Channels || [])
-        .flatMap(channel => channel?.sourceRefs || [])
-        .map(ref => ref.sourceId)
-        .filter(Boolean),
-    );
+    const loadedSourceIds = new Set(\n      tv1Channels.flatMap(channel => channel?.sourceRefs || []).map(ref => ref.sourceId).filter(Boolean),\n    );
     const sourcesToLoad = enabledTv1Sources.filter(source => !loadedSourceIds.has(source.sourceId));
 
     if (!sourcesToLoad.length) {
-      setTv1LoadedCount(globalLiveCache.tv1Channels?.length || 0);
+      setTv1LoadedCount(tv1Channels.length);
       setTv1Loading(false);
       return undefined;
     }
@@ -156,7 +139,6 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
               setTv1Channels(prev => {
                 if (prev.some(item => item.channelId === channel.channelId && item.sourceRefs?.some(ref => ref.sourceId === source.sourceId))) return prev;
                 const next = [...prev, channel];
-                globalLiveCache.tv1Channels = next;
                 return next;
               });
               setTv1LoadedCount(count => count + 1);
