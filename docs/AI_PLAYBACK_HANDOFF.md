@@ -630,11 +630,11 @@ P1：
 每次完成工作后，必须在本文件追加/更新：
 
 ## 本轮
-- 日期：
-- HEAD SHA：
-- 工作范围：
-- 修改文件：
-- 修改原因：
+- 日期：2026-10-05
+- HEAD SHA：75f786036e6ac4fd257e5374e1e34bda37eb1fac
+- 工作范围：P0 播放异步生命周期竞态的第一处修复 + 建立长期接力文档
+- 修改文件：\`src/playback/playbackCore.js\`、\`docs/AI_PLAYBACK_HANDOFF.md\`
+- 修改原因：旧的 resolve/reconnect 在等待期间可能遇到切台/stop/release；此前没有 generation guard，旧异步操作有机会继续碰新 player 或已释放 task。
 
 ## 已完成
 - [x] ...
@@ -782,3 +782,41 @@ P1：
 下都能形成完整闭环。
 
 **任何一项没有证据，就继续标记为 PENDING。**
+
+
+---
+
+# 23. 本轮新增的 P0 修复：异步 operation generation guard
+
+提交：`75f786036e6ac4fd257e5374e1e34bda37eb1fac`
+
+修改：`src/playback/playbackCore.js`
+
+已加入：
+
+- `operationGeneration`
+- `isCurrentOperation(generation)`
+- `resolveAndLoad()` 在 await 前后检查 generation
+- `recover()` 在 reconnect delay 后再次检查
+- retry/reconnect 完成后检查 operation 是否仍然有效
+- `switchCandidate()` 会递增 generation
+- `stop()` 会递增 generation
+- `release()` 会递增 generation
+
+目的：
+
+> 当旧播放操作已经被新线路、stop 或 release 取代时，旧 async operation 不再继续向 player 执行 load/play，也不会在 reconnect delay 后重新污染当前播放。
+
+### 重要：本修复尚未完成全部验证
+
+当前只是代码级修复，必须继续补：
+
+- [ ] 自动化测试：旧 resolve 在 switch 后完成，不得 load 到新 player
+- [ ] 自动化测试：reconnect delay 期间 release，不得重新 load
+- [ ] 自动化测试：stop 后旧 retry 不得继续
+- [ ] 自动化测试：rapid switch A→B→C 最终只允许 C 生效
+- [ ] 浏览器真实 HLS 验证
+- [ ] Android Native 真实事件验证
+
+下一位 AI **不要删除 generation guard**，除非能用更完整的 AbortSignal/session-token 机制替代并保留同等生命周期保证。
+
