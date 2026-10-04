@@ -84,6 +84,7 @@ export const playbackService = {
       resolveAndLoad: (candidate, options) => core.resolveAndLoad(candidate, options),
       subscribe: listener => core.subscribe(listener),
       switchCandidate: id => core.switchCandidate(id),
+      replaceCandidates: (candidates, preferredCandidateId) => core.replaceCandidates(candidates, preferredCandidateId),
       switchEpisode: (...args) => core.switchEpisode(...args),
       setVideoViewBounds: bounds => core.setVideoViewBounds(bounds),
       pause: () => core.pause(),
