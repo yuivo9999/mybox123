@@ -6,8 +6,10 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
   let state=PlayerState.IDLE,input=null,released=false,buffering=false;
   let hlsInstance=null;
   let hlsRecoveryCount=0;
+  let hlsGeneration=0;
 
   const cleanupHls = () => {
+    hlsGeneration += 1;
     if (hlsInstance) {
       try {
         hlsInstance.detachMedia();
@@ -75,11 +77,15 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
             manifestLoadingTimeOut: 25000,
           });
           hlsInstance = hls;
+          const currentHlsGeneration = ++hlsGeneration;
+          const isCurrentHls = () => !released && hlsGeneration === currentHlsGeneration && hlsInstance === hls;
           hls.attachMedia(video);
           hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+            if (!isCurrentHls()) return;
             hls.loadSource(next.url);
           });
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            if (!isCurrentHls()) return;
             hlsRecoveryCount = 0;
             endBuffering();
             state = PlayerState.PREPARING;
@@ -89,12 +95,14 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
             }
           });
           hls.on(Hls.Events.FRAG_LOADED, () => {
+            if (!isCurrentHls()) return;
             // 首次分片加载起播后，平滑扩大前置缓冲至 60 秒（1分钟提前量）
             if (hls.config.maxBufferLength < 60) {
               hls.config.maxBufferLength = 60;
             }
           });
           hls.on(Hls.Events.ERROR, (event, data) => {
+            if (!isCurrentHls()) return;
             if (data.fatal) {
               switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
