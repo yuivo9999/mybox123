@@ -179,6 +179,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
           const channelId = cacheKey.slice(separator + 1);
           return availableIds.has(channelId) && (sourceId === 'merged' || enabledSourceIds.has(sourceId));
         }),
+      );
       return Object.keys(next).length === Object.keys(prev).length ? prev : next;
     });
     if (selectedChannelId && !availableIds.has(selectedChannelId)) {
