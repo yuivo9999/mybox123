@@ -165,7 +165,7 @@ export function App(){
    if(Object.keys(patch).length)persistent.updateSettings(patch);else persistent.reload?.();
    applySourceResult(result);
  };
- const nav=(key)=>sessionStateStore.patch({tab:key,route:null,selected:null});
+ const nav=(key)=>sessionStateStore.patch({tab:key,route:null,selected:null,livePlayback:null});
 
  // 全局 Android 风格横向导航：顶层五页使用左右切页；下一级页面右滑返回父级。
  const swipeRef = useRef({active:false,startX:0,startY:0,pointerId:null,blocked:false});
@@ -214,7 +214,7 @@ export function App(){
    if (targetTab) nav(targetTab);
  };
  const openSearchHistory=(keyword)=>{pageStateStore.patch('search',{query:keyword});sessionStateStore.patch({tab:'movies',route:'search',selected:null});};
- const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
+ const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,livePlayback:null,route:'live-channel',tab:'live'})};
  const playLive=(channel,streamId=null)=>{
    if(!channel)return;
    const preferredSource=persistent.settings?.defaultLiveSource||null;
