@@ -22,7 +22,7 @@ function nativeAvailable() {
 }
 
 export function createPlaybackCore(task,hooks={}) {
- let player=null,playerElement=null,resourceRelease=null,sessionId=null,released=false;
+ let player=null,playerElement=null,playerEngine=null,engineFallbackAttempted=false,resourceRelease=null,sessionId=null,released=false;
  const eventBus=createPlaybackEventBus();
  const stateMachine=createPlaybackStateMachine(task.request.kind??PlaybackKind.VOD);
  const networkPolicy=createPlaybackNetworkPolicy(hooks.networkPolicy);
@@ -58,9 +58,14 @@ export function createPlaybackCore(task,hooks={}) {
 
  const attachPlayer=(element)=>{
   player?.release?.(); playerElement=element;
-  if(nativeAvailable()) player=createNativePlayerAdapter({onEvent:handlePlayerEvent});
-  else if(element) player=createHtml5PlayerAdapter(element,{onEvent:handlePlayerEvent});
-  else return null;
+  engineFallbackAttempted=false;
+  if(nativeAvailable()) {
+   playerEngine='native';
+   player=createNativePlayerAdapter({onEvent:handlePlayerEvent});
+  } else if(element) {
+   playerEngine='html5';
+   player=createHtml5PlayerAdapter(element,{onEvent:handlePlayerEvent});
+  } else return null;
   return player;
  };
 
@@ -132,6 +137,29 @@ export function createPlaybackCore(task,hooks={}) {
  };
 
  async function recover(error,code){
+  // 播放器引擎兜底独立于 candidate/source 兜底：
+  // native bridge 失败且存在 HTML5 video 元素时，先尝试同一 input 的 HTML5 播放，
+  // 避免一次引擎故障直接把用户带到换源/报错。
+  if(playerEngine==='native' && playerElement && !engineFallbackAttempted
+    && [PlaybackFailureCode.NETWORK,PlaybackFailureCode.PLAYER,PlaybackFailureCode.UNSUPPORTED].includes(code)){
+   engineFallbackAttempted=true;
+   const failedPlayer=player;
+   try{
+    failedPlayer?.release?.();
+    player=createHtml5PlayerAdapter(playerElement,{onEvent:handlePlayerEvent});
+    playerEngine='html5';
+    emit('playerEngineChanged',{engine:'html5',reason:'native-fallback'});
+    const currentInput = task.request.kind===PlaybackKind.LIVE ? await resolve(task.currentCandidate) : await resolve(task.currentCandidate);
+    if(currentInput){
+     await playResolved(currentInput);
+     networkPolicy.resetRetry();
+     return true;
+    }
+   }catch(fallbackError){
+    hooks.onPlayerWarning?.({type:'player-engine-fallback-failed',error:fallbackError,candidate:task.currentCandidate});
+   }
+  }
+
   if(task.request.kind===PlaybackKind.LIVE && networkPolicy.shouldReconnect({code})){
    transition(PlayerState.RECONNECTING);emit('reconnecting',{candidate:task.currentCandidate,reconnectCount:networkPolicy.reconnectCount});
    await new Promise(r=>setTimeout(r,networkPolicy.getReconnectDelay()));
