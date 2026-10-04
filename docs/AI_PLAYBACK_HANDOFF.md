@@ -2138,3 +2138,88 @@ JS 层虽然已有 `operationGeneration/playerGeneration`，但 Android bridge �
 - 不要删除 globalLiveCache；
 - 不要修改 HLS buffer 参数；
 - 不要因为 cache identity 已修复就认为 A→B→C 整体竞态已经验证完成。
+
+# 2026-10-05 本轮执行记录：P0 EPG stale request cancellation
+
+## 本轮实际发现
+
+确认 LiveFeature 与 LiveChannelPanel 的 EPG 请求此前只有 React 层面的 `active` 标记：
+
+- 频道 A 发起 `getEPG(A)`；
+- 快速切到 B/C 后，旧 promise 仍继续执行；
+- 旧结果虽然不能再 setState，但请求本身仍可能继续占用网络/adapter/requestManager；
+- `liveService.getEPG` 已经把 requestManager 的内部 signal 传给 adapter，但上层没有办法把频道 effect 的 AbortController 传到底层。
+
+因此问题不是“旧 EPG 会直接污染 React state”——local active flag 已阻止这一点——而是**取消链没有贯通**。
+
+## 本轮实际修改
+
+### 1. `src/features/live/LiveFeature.jsx`
+
+频道当前节目 effect 改为：
+- 每个 activeChannel 创建独立 `AbortController`；
+- 调用 `liveService.getEPG(activeChannel, {}, { signal })`；
+- cleanup 时 `controller.abort()`；
+- AbortError 不作为页面错误显示；
+- 非 aborted 的请求才允许更新 currentEPG。
+
+`LiveChannelPanel` 的 EPG effect 同样改为 AbortController，避免详情页 A → B 切换时旧节目单请求继续占用资源。
+
+同时 `createLiveFeature().getEPG()` 增加 options 透传。
+
+### 2. `src/services/liveService.js`
+
+`getEPG(channelRef, range, options)` 增加可选 signal：
+- 保留 requestManager 自身 signal；
+- 如果调用方提供 `options.signal`，优先把它传给 adapter；
+- 因此 TVBox/HTTP 等真正支持 AbortSignal 的 adapter 可以在页面切换时立即结束旧请求；
+- 没有网络请求的本地 EPG adapter 不受影响。
+
+## Commit
+
+- `e966c3b4b5fa57b18f9c88b0bdcd7ace5df828b2` — `fix(live): propagate EPG cancellation signal`
+- `279cfa942b986e35d5e8e15095107dcf53117ca6` — `fix(live): cancel stale EPG requests on channel change`
+
+当前 `main` HEAD：`279cfa942b986e35d5e8e15095117ca6`
+
+## 已验证
+
+- [x] 代码静态检查：`LiveFeature` 两处 EPG effect 都创建/cleanup AbortController。
+- [x] `createLiveFeature.getEPG` 已透传 options。
+- [x] `liveService.getEPG` 已将上层 signal 传入 adapter。
+- [x] 当前 commit 的 GitHub combined status 返回无已配置 status checks。
+- [ ] Node 行为测试实际执行
+- [ ] 浏览器 A → B → C 真实切台
+- [ ] 真实 TVBox/HTTP EPG AbortSignal 行为
+- [ ] Android 真实验证
+
+## 当前判断
+
+P0 EPG 竞态从“只防 state 污染”提升为“state 防污染 + 请求取消链”。
+
+但仍有一个边界没有在本轮扩大：
+
+`requestManager.run()` 自身的内部 controller 与调用方 AbortController 不是同一个对象。
+
+当前实现通过把调用方 signal 传给 adapter 达到实际 I/O 取消；如果未来某个 adapter 不消费 signal，requestManager entry 仍会持续到 adapter promise 自己结束。
+
+这应作为后续 requestManager capability/abort-contract 的独立问题，不在本轮混入。
+
+## 下一位 AI 立即执行
+
+1. **P0：检查 `src/services/tv1LiveService.js` 的 `sessions` 生命周期。** 源禁用/删除后是否仍保留旧 sourceId session；重新启用同 sourceId 时是否可能复用过期 metadata。
+2. **P0：检查 `LiveFeature` TV1 metadata effect。** 当前仍只有 `active` flag，没有把 AbortController 传给 `tv1LiveService.loadMetadata`；重点验证 source A → disabled/remove → source B 是否继续网络读取和写入全局缓存。
+3. **P0：补 `tests/live` 行为测试。** 至少覆盖 EPG cleanup abort、deferred A → B → C、source disable/remove。
+4. **P0：再检查 `LiveFeature` ↔ `PlaybackPage` controller/resource owner 边界。**
+5. P1 HTML5 custom headers capability filtering。
+6. P1 HLS live latency 实源验证继续保持 PENDING。
+7. UI/路由继续冻结，除非发现播放闭环必须修复的问题。
+
+## 不要重复做
+
+- 不要重新实现 playbackCore generation；
+- 不要重新实现 Native bridge generation；
+- 不要删除 globalLiveCache；
+- 不要修改 HLS buffer；
+- 不要把 `active` flag 说成已经解决了请求取消问题；
+- 不要因为 EPG 已有 AbortController 就宣称真实网络 Abort 已通过设备/浏览器验证。
