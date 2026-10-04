@@ -800,3 +800,63 @@ P1.8 后不要再回头审计“PlaybackPage 是否还承担 VOD”——本轮�
 1. VOD 选集 / 换源入口去重。
 2. 自动下一集改为 countdown + cancel。
 3. 再考虑把 `PlaybackPage.jsx` 重命名为 `LivePlaybackPage.jsx`，作为独立小提交。
+
+
+## 18. P2.2 已完成：VOD 选集 / 换源入口去重
+
+### 18.1 已确认的重复
+VOD 播放页此前同时暴露：
+- TopBar 的“集数 / 换源”入口；
+- 播放上下文栏的“选集/换源”入口；
+- ConsoleCard 下方完整 EPISODES 选集网格；
+- 全屏模式的选集侧栏与线路设置；
+- 页面级“选择播放源与集数”modal。
+
+这些入口并非都属于同一种上下文：页面级入口负责普通浏览，fullscreen 侧栏负责全屏状态下不离开播放器的操作。因此本轮没有把所有入口机械删除，而是收敛“普通页面”的主入口。
+
+### 18.2 已修改
+文件：src/features/movie/MoviePlaybackPage.jsx
+- 删除播放上下文栏重复的“选集/换源”按钮。
+- 保留 TopBar 的“集数”入口作为普通页面的主 selector trigger。
+- 保留上下文栏上一集 / 下一集作为线性播放快捷操作。
+- 清理因此失去用途的 ListVideo import。
+
+文件：src/components/theme/SangtianPlayerConsole.jsx
+- VOD 的 ConsoleCard 不再渲染完整 episode grid。
+- VOD ConsoleCard 默认进入“信息”视图，只显示当前播放集提示与内容信息/相关推荐。
+- Live ConsoleCard 仍保留频道分类与频道选择，不受本次 VOD 去重影响。
+- 全屏模式仍保留选集侧栏，因为全屏时页面级 modal 不是可靠的主要操作面；这属于“全屏上下文快捷入口”，不是普通页面的第二套 selector。
+- VOD 全屏线路设置仍可切换 candidate，因为它属于全屏内的播放设置上下文。
+
+### 18.3 当前 VOD IA
+普通页面：
+1. TopBar “集数” → 打开统一的“选择播放源与集数” modal（主入口）
+2. 播放上下文栏 → 上一集 / 下一集（线性快捷操作）
+3. 播放窗口 → 基础播放 / 全屏 / More 设置
+4. ConsoleCard → 播放信息 / 相关推荐，不再复制选集列表
+
+全屏：
+- 选集侧栏作为 fullscreen 内的上下文快捷入口
+- 线路设置作为 fullscreen 内的播放设置入口
+
+### 18.4 验证
+已做静态代码回读：
+- MoviePlaybackPage 的普通页面“选集/换源”重复按钮已移除。
+- ConsoleCard 的 VOD episode grid 已移除；Live channel grid 保留。
+- VOD fullscreen episode/source controls 仍有实际 callback，不是死 UI。
+- 本轮没有运行浏览器、npm build、lint、test。
+
+### 18.5 下一步
+直接进入 P2.3：自动下一集 UX。
+当前 MoviePlaybackPage.handleVideoEnded 已经存在自动下一集能力，但它是“播放结束立即跳下一集”。下一步改为：
+- 结束后显示下一集提示卡；
+- 5 秒倒计时；
+- “立即播放”；
+- “取消自动播放”；
+- 尊重现有 autoplay/resume 设置（如果设置语义已存在则复用，不新造第二套设置）。
+
+### 18.6 潜在回归点
+- 不要删除 fullscreen 选集入口后再要求用户退出 fullscreen 才能选集。
+- 不要重新把 ConsoleCard episode grid 加回来。
+- 普通页面 selector 的唯一主入口仍应是 TopBar 的“集数”入口及其 modal。
+- 上一集 / 下一集按钮是线性导航，不算第二套 episode selector。
