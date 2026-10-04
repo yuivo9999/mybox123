@@ -82,6 +82,7 @@ export function createPlaybackCore(task,hooks={}) {
     parserSkipped:true,
     playerHint:{autoplay:true,...(candidate.playerHint??{})},
    };
+   if(operationToken!=null&&!isCurrentOperation(operationToken))return null;
    hooks.onResolvedInput?.(directInput);
    return directInput;
   }
