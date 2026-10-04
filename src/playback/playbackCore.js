@@ -22,7 +22,7 @@ function nativeAvailable() {
 }
 
 export function createPlaybackCore(task,hooks={}) {
- let player=null,playerElement=null,resourceRelease=null,sessionId=null,released=false,operationGeneration=0;
+ let player=null,playerElement=null,resourceRelease=null,sessionId=null,released=false,operationGeneration=0,playerGeneration=0;
  const isCurrentOperation=(generation)=>!released&&generation===operationGeneration;
  const eventBus=createPlaybackEventBus();
  const stateMachine=createPlaybackStateMachine(task.request.kind??PlaybackKind.VOD);
@@ -32,8 +32,8 @@ export function createPlaybackCore(task,hooks={}) {
  const transition=(next)=>{try{stateMachine.transition(next);}catch{stateMachine.reset();if(next!==PlayerState.IDLE)try{stateMachine.transition(next);}catch{}}hooks.onStateChange?.(stateMachine.state);return stateMachine.state;};
  const emit=(event,data={})=>{const normalized=normalizePlaybackEvent({event,requestId:task.request.requestId,taskId:task.request.taskId,...data});return eventBus.emit(normalized);};
 
- const handlePlayerEvent=(event,eventGeneration=operationGeneration)=>{
-  if(!isCurrentOperation(eventGeneration))return;
+ const handlePlayerEvent=(event,eventGeneration=playerGeneration)=>{
+  if(released||eventGeneration!==playerGeneration)return;
   if(event.event==='loading')transition(PlayerState.LOADING);
   if(event.event==='prepared')transition(PlayerState.PREPARING);
   if(event.event==='playing'){transition(PlayerState.PLAYING);networkPolicy.resetRetry();}
@@ -175,7 +175,7 @@ export function createPlaybackCore(task,hooks={}) {
   markPlaying(){return task.markPlaying();},
   retry(options={}){if(!networkPolicy.shouldRetry({code:options.code??'network'}))return null;const candidate=task.retry(options);if(candidate)void resolveAndLoad(candidate);return candidate;},
   fail(error,code=PlaybackFailureCode.UNKNOWN){return failAndResolve(error,code);},
-  switchCandidate(candidateId){operationGeneration+=1;const next=task.switchCandidate(candidateId);hooks.onCandidateChange?.(next);if(next){networkPolicy.reset();transition(PlayerState.LOADING);void resolveAndLoad(next).catch(e=>hooks.onPlayerError?.({error:e,candidate:next}));}return next;},
+  switchCandidate(candidateId){operationGeneration+=1;const next=task.switchCandidate(candidateId);hooks.onCandidateChange?.(next);if(next){networkPolicy.reset();attachPlayer(playerElement);transition(PlayerState.LOADING);void resolveAndLoad(next).catch(e=>hooks.onPlayerError?.({error:e,candidate:next}));}return next;},
   switchEpisode(episodeId,candidate=null,startPositionSeconds=0){emit('episodeChanged',{episodeId,startPositionSeconds});if(candidate)return this.switchCandidate(candidate.candidateId);return episodeId;},
   async handleAppState(state){
    if(state==='background'){if(task.request.kind===PlaybackKind.VOD){await player?.pause?.();}else{player?.pause?.();}}
