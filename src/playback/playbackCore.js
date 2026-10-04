@@ -29,7 +29,7 @@ export function createPlaybackCore(task,hooks={}) {
  const networkPolicy=createPlaybackNetworkPolicy(hooks.networkPolicy);
  const unsubscribe=task.subscribe(e=>{const normalized=normalizePlaybackEvent(e);eventBus.emit(normalized);hooks.onEvent?.(normalized);});
 
- const transition=(next)=>{try{stateMachine.transition(next);}catch{stateMachine.reset();if(next!==PlayerState.IDLE)try{stateMachine.transition(next);}catch{}}hooks.onStateChange?.(stateMachine.state);return stateMachine.state;};
+ const transition=(next)=>{try{stateMachine.transition(next);}catch{stateMachine.reset();if(next!==PlayerState.IDLE)try{stateMachine.transition(next);}catch{}}hooks.onStateChange?.(stateMachine.state);emit('stateChanged',{state:stateMachine.state});return stateMachine.state;};
  const emit=(event,data={})=>{const normalized=normalizePlaybackEvent({event,requestId:task.request.requestId,taskId:task.request.taskId,...data});return eventBus.emit(normalized);};
 
  const handlePlayerEvent=(event,eventGeneration=playerGeneration)=>{
@@ -164,13 +164,22 @@ export function createPlaybackCore(task,hooks={}) {
  }
 
  return {
-  get request(){return task.request;},get task(){return task;},get state(){return stateMachine.state;},get capabilities(){return player?.capabilities??{};},get currentPlayer(){return player;},
+  get request(){return task.request;},get task(){return task;},get state(){return stateMachine.state;},get capabilities(){return player?.capabilities??{};},get currentPlayer(){return player;},getVideoElement(){return playerElement;},
+  getPlaybackState(){
+   const element=playerElement;
+   return {state:stateMachine.state,currentTime:Number(element?.currentTime)||0,duration:Number.isFinite(Number(element?.duration))?Number(element.duration):0,paused:element?Boolean(element.paused):stateMachine.state!==PlayerState.PLAYING,ended:element?Boolean(element.ended):stateMachine.state===PlayerState.COMPLETED,readyState:Number(element?.readyState)||0,playbackRate:Number(element?.playbackRate)||1,volume:Number.isFinite(Number(element?.volume))?Number(element.volume):1};
+  },
+  getBufferState(){
+   const element=playerElement;let forward=0;
+   try{if(element?.buffered?.length){const current=Number(element.currentTime)||0;const end=element.buffered.end(element.buffered.length-1);forward=Math.max(0,end-current);}}catch{}
+   return {forwardSeconds:forward};
+  },
   subscribe(listener){return eventBus.subscribe(listener);},attachPlayer,
   start(){
    if(released)throw new Error('PLAYBACK_CORE_RELEASED');
    playbackTaskRegistry.register({request:task.request,stop:()=>{try{player?.stop?.();}finally{task.stop?.();}},release:()=>{try{player?.release?.();}finally{task.release?.();}}});
    resourceRelease?.();
-   resourceRelease=playbackResourceManager.acquire(task.request.taskId,(previous)=>hooks.onResourceReplaced?.(previous));
+   resourceRelease=playbackResourceManager.acquire(task.request.taskId,task.request.kind,(previous)=>hooks.onResourceReplaced?.(previous));
    // stop() deliberately keeps the adapter/resource ownership so the same controller can be
    // restarted. Rebind the player callback after stop so events from the restarted session are
    // accepted by the new operation generation.
@@ -180,12 +189,24 @@ export function createPlaybackCore(task,hooks={}) {
   async resolveAndLoad(candidate=task.currentCandidate,options={}){return resolveAndLoad(candidate,options);},
   resolve,
   setVideoViewBounds(bounds){return player?.setVideoViewBounds?.(bounds) ?? false;},
+  setPlaybackRate(rate){const value=Number(rate);if(!Number.isFinite(value)||value<=0)return false;if(player?.setPlaybackRate)return player.setPlaybackRate(value);if(playerElement){playerElement.playbackRate=value;return true;}return false;},
+  setVolume(v){return player?.setVolume?.(v) ?? (playerElement ? (playerElement.volume=Math.max(0,Math.min(1,Number(v)||0)),true) : false);},
+  seek(s){return player?.seek?.(s) ?? (playerElement ? (playerElement.currentTime=Number(s)||0,true) : false);},
+  attachPresentation(target){if(target&&playerElement&&playerElement.parentNode!==target)target.appendChild(playerElement);return playerElement;},
+  detachPresentation(){return playerElement;},
   async play(){if(!player)throw new Error('PLAYER_ADAPTER_NOT_ATTACHED');return player.play();},
   pause(){return player?.pause();},seek(s){return player?.seek(s);},setVolume(v){return player?.setVolume(v);},
   getAudioTracks(){return player?.getAudioTracks?.()??[];},getSubtitleTracks(){return player?.getSubtitleTracks?.()??[];},selectAudioTrack(id){return player?.selectAudioTrack?.(id)??false;},selectSubtitleTrack(id){return player?.selectSubtitleTrack?.(id)??false;},getQualities(){return player?.getQualities?.()??[];},selectQuality(id){return player?.selectQuality?.(id)??false;},
   markPlaying(){return task.markPlaying();},
   retry(options={}){if(!networkPolicy.shouldRetry({code:options.code??'network'}))return null;const candidate=task.retry(options);if(candidate)void resolveAndLoad(candidate);return candidate;},
   fail(error,code=PlaybackFailureCode.UNKNOWN){return failAndResolve(error,code);},
+  replaceLiveCandidates(candidates=[],metadata={}){
+   if(task.request.kind!==PlaybackKind.LIVE)return null;
+   operationGeneration+=1;
+   const next=task.replaceCandidates(candidates,{channelId:metadata.channelId,metadata});
+   if(next){transition(PlayerState.LOADING);void resolveAndLoad(next).catch(e=>hooks.onPlayerError?.({error:e,candidate:next}));}
+   return next;
+  },
   switchCandidate(candidateId){operationGeneration+=1;const next=task.switchCandidate(candidateId);hooks.onCandidateChange?.(next);if(next){networkPolicy.reset();attachPlayer(playerElement);transition(PlayerState.LOADING);void resolveAndLoad(next).catch(e=>hooks.onPlayerError?.({error:e,candidate:next}));}return next;},
   switchEpisode(episodeId,candidate=null,startPositionSeconds=0){emit('episodeChanged',{episodeId,startPositionSeconds});if(candidate)return this.switchCandidate(candidate.candidateId);return episodeId;},
   async handleAppState(state){
