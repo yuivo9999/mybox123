@@ -1160,3 +1160,52 @@ Live inline preview 现在改用 `usePlaybackController({ request, videoRef, isL
 - 当前分支：`ai-handoff/playback-phase1`
 - 未合并 main。
 - 本轮没有运行浏览器、build、lint、test。
+
+
+## 25. P2.5 第四小步已完成：Live inline 控件收敛
+
+### 25.1 新发现
+`LiveFeature` 的 inline `SangtianPlayerWindow` 传入 `isLive=true`，而其 `onToggleImmersive` 当前不会把 inline 状态切入沉浸态。因此非全屏 Live 的“全屏播放”按钮属于无效入口。
+
+### 25.2 已修改
+文件：`src/components/theme/SangtianPlayerConsole.jsx`
+
+inline / 非 fullscreen 状态下：
+- Live 保留“停止”控制；
+- Live 隐藏“复制直链”；
+- Live 隐藏“横竖屏”；
+- Live 隐藏“画面比例”；
+- Live 隐藏无效的“全屏播放”按钮。
+
+VOD 原有这些控件全部保留。
+
+Live 正式沉浸播放继续由 `LivePlaybackPage` 负责；页面下方已有明确“沉浸播放”入口，没有再制造第二个入口。
+
+### 25.3 为什么
+职责进一步明确：
+- inline Live = 预览 / 选台上下文；
+- LivePlaybackPage = 完整沉浸播放；
+- VOD = MoviePlaybackPage；
+- 底层播放生命周期 = usePlaybackController / playbackCore。
+
+### 25.4 静态验证
+已回读确认 inline Live toolbar 中复制、方向、比例、全屏均由 `!isLive` 条件包裹；停止按钮仍保留。
+
+尚未验证：
+- 浏览器真实 Live inline；
+- inline → immersive 的真实视觉/状态连续性；
+- build / lint / test。
+
+### 25.5 下一步
+进入 P2.6：History → 播放闭环。
+重点：
+1. 历史记录是否携带 contentId + episodeId + source/position；
+2. 点击历史是否直接恢复对应 episode；
+3. 恢复后的 returnRoute 是否合理；
+4. 是否统一复用 `watchProgressService.getContentResume()`，避免 History 再实现一套 resume 规则。
+
+### 25.6 接力状态
+- 当前代码提交：`1efb57a806efe74cb54c5fd381b018c517cb80b2`
+- 当前分支：`ai-handoff/playback-phase1`
+- 未合并 main。
+- 本轮没有运行浏览器、build、lint、test。
