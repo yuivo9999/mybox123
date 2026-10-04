@@ -54,6 +54,7 @@ export function usePlaybackController({
   const [status, setStatus] = useState('idle');
   const [resolvedInput, setResolvedInput] = useState(null);
   const [error, setError] = useState('');
+  const [playbackMetrics, setPlaybackMetrics] = useState({ currentTime: 0, duration: 0 });
 
   const reportError = useCallback((message) => {
     setError(message || '');
@@ -70,6 +71,7 @@ export function usePlaybackController({
         const currentTime = event.currentTime ?? 0;
         const duration = event.duration ?? null;
         progressRef.current = { ...progressRef.current, currentTime, duration };
+        setPlaybackMetrics({ currentTime, duration: Number.isFinite(duration) ? duration : 0 });
         if (
           currentRequest?.contentId &&
           currentRequest?.episodeId &&
@@ -187,6 +189,9 @@ export function usePlaybackController({
     error,
     setError,
     progressRef,
+    currentTime: playbackMetrics.currentTime,
+    duration: playbackMetrics.duration,
+    isPlaying: status === 'playing',
     switchCandidate,
     retry,
     play: () => controller.play(),
