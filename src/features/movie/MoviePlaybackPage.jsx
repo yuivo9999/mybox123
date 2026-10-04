@@ -26,6 +26,7 @@ export function MoviePlaybackPage({
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sourceModalOpen, setSourceModalOpen] = useState(false);
+  const [nextEpisodeCountdown, setNextEpisodeCountdown] = useState(null);
   const videoRef = useRef(null);
   const videoContainerRef = useRef(null);
 
@@ -63,11 +64,32 @@ export function MoviePlaybackPage({
     }
   };
 
-  const handleVideoEnded = () => {
-    if (episodeIndex < episodes.length - 1) {
-      onEpisode?.(movie, episodeIndex + 1, source, request?.metadata?.returnRoute || 'detail');
-    }
+  const playNextEpisode = () => {
+    if (episodeIndex >= episodes.length - 1) return;
+    setNextEpisodeCountdown(null);
+    onEpisode?.(movie, episodeIndex + 1, source, request?.metadata?.returnRoute || 'detail');
   };
+
+  const handleVideoEnded = () => {
+    if (episodeIndex >= episodes.length - 1) return;
+    setNextEpisodeCountdown(settings?.autoplayNext === false ? -1 : 5);
+  };
+
+  useEffect(() => {
+    if (nextEpisodeCountdown == null || nextEpisodeCountdown < 0) return undefined;
+    if (nextEpisodeCountdown === 0) {
+      playNextEpisode();
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setNextEpisodeCountdown(value => (
+      typeof value === 'number' && value > 0 ? value - 1 : value
+    )), 1000);
+    return () => window.clearTimeout(timer);
+  }, [nextEpisodeCountdown]);
+
+  useEffect(() => {
+    setNextEpisodeCountdown(null);
+  }, [request?.episodeId]);
 
   const candidates = request?.candidates ?? [];
   const relatedMovies = movie ? movieService.getRelated({ movies, movie }) : [];
@@ -183,6 +205,43 @@ export function MoviePlaybackPage({
           className="sangtian-video-element"
           onEnded={handleVideoEnded}
         />
+        {nextEpisodeCountdown != null && episodeIndex < episodes.length - 1 && (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              position: 'absolute',
+              right: 16,
+              bottom: 56,
+              zIndex: 8,
+              width: 'min(320px, calc(100% - 32px))',
+              padding: '14px 16px',
+              borderRadius: 12,
+              background: 'rgba(16, 18, 22, 0.94)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              boxShadow: '0 10px 32px rgba(0,0,0,0.35)',
+              color: '#fff',
+            }}
+          >
+            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>下一集</div>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>
+              {episodes[episodeIndex + 1]?.title || ('第 ' + (episodeIndex + 2) + ' 集')}
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 12 }}>
+              {nextEpisodeCountdown >= 0
+                ? (nextEpisodeCountdown + ' 秒后自动播放')
+                : '已关闭自动下一集'}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" className="secondary" onClick={() => setNextEpisodeCountdown(null)}>
+                取消
+              </button>
+              <button type="button" className="primary" onClick={playNextEpisode}>
+                立即播放
+              </button>
+            </div>
+          </div>
+        )}
         {status === 'error' && (
           <div className="video-error" style={{ display: 'none' }}>
             <span>{error}</span>
