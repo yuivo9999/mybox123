@@ -29,7 +29,7 @@ export function usePlaybackController({
   isLive = false,
   onEvent,
 } = {}) {
-  const progressRef = useRef({ currentTime: 0, duration: null, persistedAt: 0 });
+  const progressRef = useRef({ currentTime: 0, duration: null, persistedAt: 0, completed: false });
   const onEventRef = useRef(onEvent);
   const recordProgressRef = useRef(recordProgress);
   const requestKeyRef = useRef(getPlaybackRequestKey(request));
@@ -43,7 +43,7 @@ export function usePlaybackController({
   useEffect(() => {
     // React runs the previous lifecycle cleanup before this new effect setup.
     // Reset here so the previous episode can persist its final progress first.
-    progressRef.current = { currentTime: 0, duration: null, persistedAt: 0 };
+    progressRef.current = { currentTime: 0, duration: null, persistedAt: 0, completed: false };
     setPlaybackMetrics({ currentTime: 0, duration: 0 });
   }, [requestKey]);
 
@@ -99,6 +99,7 @@ export function usePlaybackController({
         }
       }
       if (!isLive && event.event === 'completed' && currentRequest?.contentId && currentRequest?.episodeId) {
+        progressRef.current = { ...progressRef.current, completed: true };
         const progress = progressRef.current;
         if (progress.currentTime > 0 && typeof recordProgressRef.current === 'function') {
           recordProgressRef.current(
@@ -167,6 +168,7 @@ export function usePlaybackController({
         && currentRequest?.contentId
         && currentRequest?.episodeId
         && progressRef.current.currentTime > 0
+        && !progressRef.current.completed
         && typeof recordProgressRef.current === 'function'
       ) {
         const progress = progressRef.current;
@@ -183,15 +185,7 @@ export function usePlaybackController({
     };
   }, [controller, requestKey, videoRef, isLive, reportError]);
 
-  const switchCandidate = useCallback((candidateId) => {
-    const next = controller.switchCandidate(candidateId);
-    if (next) {
-      setCandidate(next);
-      setResolvedInput(null);
-      setError('');
-    }
-    return next;
-  }, [controller]);
+  const switchCandidate = useCallback((candidateId) => controller.switchCandidate(candidateId), [controller]);
 
   const retry = useCallback(() => {
     setError('');
