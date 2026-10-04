@@ -22,7 +22,8 @@ function nativeAvailable() {
 }
 
 export function createPlaybackCore(task,hooks={}) {
- let player=null,playerElement=null,resourceRelease=null,sessionId=null,released=false;
+ let player=null,playerElement=null,resourceRelease=null,sessionId=null,released=false,operationGeneration=0;
+ const isCurrentOperation=(generation)=>!released&&generation===operationGeneration;
  const eventBus=createPlaybackEventBus();
  const stateMachine=createPlaybackStateMachine(task.request.kind??PlaybackKind.VOD);
  const networkPolicy=createPlaybackNetworkPolicy(hooks.networkPolicy);
@@ -123,7 +124,15 @@ export function createPlaybackCore(task,hooks={}) {
   return input;
  };
 
- const resolveAndLoad=async(candidate=task.currentCandidate,options={})=>{const input=await resolve(candidate,options);if(!input){return null;}await playResolved(input);networkPolicy.resetRetry();return input;};
+ const resolveAndLoad=async(candidate=task.currentCandidate,options={})=>{
+  const generation=operationGeneration;
+  const input=await resolve(candidate,options);
+  if(!input||!isCurrentOperation(generation))return null;
+  await playResolved(input);
+  if(!isCurrentOperation(generation))return null;
+  networkPolicy.resetRetry();
+  return input;
+ };
 
  const failAndResolve=(error,code=PlaybackFailureCode.UNKNOWN)=>{
   const classified=classifyPlaybackError(error,{code});const next=task.fail(error,classified);hooks.onCandidateChange?.(next);networkPolicy.resetRetry();
@@ -135,12 +144,14 @@ export function createPlaybackCore(task,hooks={}) {
   if(task.request.kind===PlaybackKind.LIVE && networkPolicy.shouldReconnect({code})){
    transition(PlayerState.RECONNECTING);emit('reconnecting',{candidate:task.currentCandidate,reconnectCount:networkPolicy.reconnectCount});
    await new Promise(r=>setTimeout(r,networkPolicy.getReconnectDelay()));
-   try{await resolveAndLoad(task.currentCandidate);return true;}catch{}
+   if(!isCurrentOperation(generation))return false;
+   try{await resolveAndLoad(task.currentCandidate);return isCurrentOperation(generation);}catch{}
   }
   if(networkPolicy.shouldRetry({code})){
    const candidate=task.retry({maxRetries:networkPolicy.retryCount+1});
-   if(candidate){emit('retry',{candidate,retryCount:networkPolicy.retryCount});try{await resolveAndLoad(candidate);return true;}catch{}}
+   if(candidate){emit('retry',{candidate,retryCount:networkPolicy.retryCount});if(!isCurrentOperation(generation))return false;try{await resolveAndLoad(candidate);return isCurrentOperation(generation);}catch{}}
   }
+  if(!isCurrentOperation(generation))return false;
   failAndResolve(error,code);return false;
  }
 
@@ -163,13 +174,13 @@ export function createPlaybackCore(task,hooks={}) {
   markPlaying(){return task.markPlaying();},
   retry(options={}){if(!networkPolicy.shouldRetry({code:options.code??'network'}))return null;const candidate=task.retry(options);if(candidate)void resolveAndLoad(candidate);return candidate;},
   fail(error,code=PlaybackFailureCode.UNKNOWN){return failAndResolve(error,code);},
-  switchCandidate(candidateId){const next=task.switchCandidate(candidateId);hooks.onCandidateChange?.(next);if(next){networkPolicy.reset();transition(PlayerState.LOADING);void resolveAndLoad(next).catch(e=>hooks.onPlayerError?.({error:e,candidate:next}));}return next;},
+  switchCandidate(candidateId){operationGeneration+=1;const next=task.switchCandidate(candidateId);hooks.onCandidateChange?.(next);if(next){networkPolicy.reset();transition(PlayerState.LOADING);void resolveAndLoad(next).catch(e=>hooks.onPlayerError?.({error:e,candidate:next}));}return next;},
   switchEpisode(episodeId,candidate=null,startPositionSeconds=0){emit('episodeChanged',{episodeId,startPositionSeconds});if(candidate)return this.switchCandidate(candidate.candidateId);return episodeId;},
   async handleAppState(state){
    if(state==='background'){if(task.request.kind===PlaybackKind.VOD){await player?.pause?.();}else{player?.pause?.();}}
    if(state==='foreground'&&task.request.kind===PlaybackKind.LIVE&&task.currentCandidate){try{await resolveAndLoad(task.currentCandidate);}catch(e){void recover(e,PlaybackFailureCode.NETWORK);}}
   },
-  stop(){player?.stop?.();task.stop();resourceRelease?.();resourceRelease=null;playbackTaskRegistry.unregister(task.request.taskId);},
-  release(){if(released)return;released=true;try{player?.release?.();}finally{player=null;resourceRelease?.();resourceRelease=null;playbackSessionManager.clear(sessionId);sessionId=null;unsubscribe();eventBus.clear();task.release();playbackTaskRegistry.unregister(task.request.taskId);}}
+  stop(){operationGeneration+=1;player?.stop?.();task.stop();resourceRelease?.();resourceRelease=null;playbackTaskRegistry.unregister(task.request.taskId);},
+  release(){if(released)return;operationGeneration+=1;released=true;try{player?.release?.();}finally{player=null;resourceRelease?.();resourceRelease=null;playbackSessionManager.clear(sessionId);sessionId=null;unsubscribe();eventBus.clear();task.release();playbackTaskRegistry.unregister(task.request.taskId);}}
  };
 }
