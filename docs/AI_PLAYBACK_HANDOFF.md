@@ -1101,3 +1101,112 @@ LiveFeature 继续通过它更新：
 - 不要恢复 LiveFeature `onPlayerError → switchCandidate` 的自动 fallback。
 - 不要把 `activeStreamIndex` 加回 controller 的 useMemo dependencies。
 - 下一阶段重点已经明确转到 resource release 链与 Native bridge event identity；不要重复做 fallback owner 审查。
+
+# 26. 本轮继续执行结果：P0-B stop/restart 生命周期收敛
+
+## 本轮
+- 日期：2026-10-05
+- 起始 HEAD：4d3043f37858ff27829a21d2d7566db1ffa46f9f
+- 本轮代码提交：82c5ae2bef97a577d116545f219885c784954f7a
+- 本轮测试提交：0fa62ac14b321094e1b7ac43cf14f92f0bf9f8a6
+- 工作范围：继续执行 P0-B；沿 stop → resource owner → task registry → adapter → start/restart 检查生命周期，修复 stop 后同一 controller 无法可靠 restart 的问题，并增加行为测试。
+- 修改文件：
+  - src/playback/playbackCore.js
+  - tests/playback/playback-lifecycle.test.mjs
+  - docs/AI_PLAYBACK_HANDOFF.md
+
+## 本轮发现
+### P0-B-1：stop() 会过早放弃 resource ownership / registry registration
+旧行为：
+stop()
+→ player.stop()
+→ task.stop()
+→ resourceRelease()
+→ playbackTaskRegistry.unregister(taskId)
+
+这会造成不一致状态：controller 自己仍然存在、player adapter 也仍然存在，但 resource manager 已经认为没有 owner，registry 也无法在后续竞争 acquire 时执行 stopAndRelease(previous)。
+
+更重要的是，同一 controller 后续调用 start() 时，原来的 player callback operation generation 已被 stop 失效，而 start 原先没有重新 attach player，因此 restart 后新的 player event 可能被 core 当成 stale event 忽略。
+
+### P0-B-2：stop 与 release 的职责必须分开
+本轮采用的最小修复原则：
+- stop() = 用户/调用方要求停止当前播放，但保留 controller + adapter + resource owner + registry，允许后续 start() 重启。
+- release() = 真正终结生命周期，释放 adapter、session、event bus、task，并从 registry 移除。
+- 当另一个 controller acquire 同一资源时，resource manager 仍可通过 registry 对旧 controller 执行 stopAndRelease()，因此不会因为旧 controller 处于 stopped 状态而失去最终释放能力。
+
+## 本轮修复
+### P0-B-3：start() 在 stopped 状态重新绑定 player callback
+文件：src/playback/playbackCore.js
+
+当 activePlayerOperationGeneration === null 且 controller 仍有 player context 时，start() 会重新调用 attachPlayer(playerElement)。
+
+这样 restart 会获得新的 playerGeneration / activePlayerOperationGeneration，旧 stop 生命周期不会继续阻断新播放事件。
+
+### P0-B-4：stop() 不再主动 unregister / release resource owner
+这样保证：
+stop → start
+仍是同一个可重启 controller；同时：
+old controller stop → new controller acquire
+仍可走：
+playbackResourceManager → playbackTaskRegistry.stopAndRelease → player.release → task.release
+最终释放旧资源。
+
+## 行为测试
+新增 tests/playback/playback-lifecycle.test.mjs 场景：
+1. A 正常播放；
+2. A stop；
+3. A start；
+4. A 再次 resolve/load/play；
+5. 确认第二次 playMedia 成功进入调用链；
+6. 最后 release。
+
+## 验证状态
+- [x] 代码已提交到 main。
+- [x] GitHub main HEAD 已重新读取，当前为 0fa62ac14b321094e1b7ac43cf14f92f0bf9f8a6。
+- [x] commit status 已查询；当前没有任何 status/check 返回，因此不能据此声称测试通过。
+- [ ] npm run test:playback-lifecycle：仍未在真实 Node 22 + 完整依赖环境执行。
+- [ ] npm test：仍未执行。
+- [ ] 浏览器真实 HLS：PENDING。
+- [ ] Android Native 真实播放：PENDING。
+- [ ] 真机 rapid switch：PENDING。
+
+## 当前 P0
+### P0-B
+- [x] stop/restart controller 生命周期代码级闭环已补齐。
+- [ ] A→B acquire 后旧 stopped controller 是否在真实运行时稳定执行 stop + release。
+- [ ] HTML5 HLS destroy/rebind 的真实行为。
+- [ ] Native releaseMedia 后 Android 侧是否真正释放旧 surface/player。
+
+### P0-C
+- [ ] Native bridge event identity 仍 UNKNOWN。
+  - 必须继续搜索 TVBoxWebView.onPlayerEvent、onPlayerEvent、loadMedia、releaseMedia。
+  - 当前仓库代码只能证明 adapter callback generation isolation，不能证明 bridge payload identity。
+
+### P0-D
+- [ ] candidate switch reattach 的真实设备成本仍 PENDING。
+
+## P1
+- [ ] HTML5 custom headers / candidate capability filtering
+- [ ] HLS live latency/buffer 策略
+- [ ] PlaybackPage / LiveFeature 双入口资源与导航边界
+- [ ] live channel / stream / candidate identity
+- [ ] EPG stale request isolation
+
+## 当前不能确定
+- PENDING：行为测试是否通过；必须在有依赖的环境执行，不得把代码检查当测试 PASS。
+- PENDING：Native bridge 是否携带 session/player identity。
+- PENDING：candidate switch reattach 对真实 HLS/Native 的性能、副作用。
+
+## 下一位 AI 立即执行
+1. tests/playback/playback-lifecycle.test.mjs：运行 npm run test:playback-lifecycle；如果失败先区分环境失败与代码失败。
+2. src/playback/playbackCore.js + src/playback/playbackResourceManager.js + src/playback/playbackTaskRegistry.js：补一个“stopped A 被 B acquire 后必须 release A”的行为测试，证明 stop 后 registry ownership 仍有意义。
+3. 全仓搜索 TVBoxWebView.onPlayerEvent / onPlayerEvent / loadMedia / releaseMedia，继续确认 Native bridge 来源。
+4. src/player/nativePlayerAdapter.js：若没有 payload identity，设计最小 bridge-safe isolation，不要假设 Android 能配合新字段。
+5. src/player/html5PlayerAdapter.js：检查 HLS destroy()、DOM listener cleanup、stale HLS events 在 switch/release 后是否仍可能 emit。
+6. P0 未闭环前继续禁止 UI 美化、路由大重构、HLS 参数调整。
+
+## 给下下一位 AI 留的资料
+- 本轮不是重新做 generation guard；已有三层 guard：operation generation、player generation、active player operation generation。
+- 新确认的架构事实：stop 与 release 不能混为一谈。stop 需要保持 controller 可 restart，同时保留 resource registry ownership，等待新 controller acquire 时再由 registry 完成最终 release。
+- 目前最值得继续验证的不是“有没有 release 调用”，而是“旧 stopped controller 是否仍可被 resource manager 找到并彻底释放”。
+- Native bridge 的 payload identity 仍没有代码证据，继续保持 UNKNOWN/PENDING。
