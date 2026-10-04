@@ -209,7 +209,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   const [playbackStatus, setPlaybackStatus] = useState('idle');
   const [playbackError, setPlaybackError] = useState('');
   const [resolvedPlaybackInput, setResolvedPlaybackInput] = useState(null);
-  const playbackController = useMemo(() => playbackService.getLivePlayerController(), []);
+  const playbackController = useMemo(() => livePlaybackRequest ? playbackService.getLivePlayerController(livePlaybackRequest) : null, [Boolean(livePlaybackRequest)]);
 
   // Load current EPG program details when active channel changes
   useEffect(() => {
@@ -339,6 +339,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   }, [playbackController]);
 
   useEffect(() => {
+    if (!playbackController) return undefined;
     const unsubscribe = playbackController.subscribe?.(event => {
       if (event.event === 'stateChanged') setPlaybackStatus(event.state);
       if (event.event === 'sourceChanged' && event.candidate) {
@@ -352,7 +353,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   }, [playbackController, livePlaybackRequest]);
 
   useEffect(() => {
-    if (!activeChannel?.streams?.length) return undefined;
+    if (!playbackController || !activeChannel?.streams?.length) return undefined;
     const request = playbackService.createLiveRequest({ channel: activeChannel });
     playbackController.ensureRequest(request);
     const body = playerWindowBodyRef.current;
@@ -368,6 +369,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   }, [activeChannel, playbackController]);
 
   useEffect(() => {
+    if (!playbackController) return undefined;
     const video = playbackController.getVideoElement();
     videoRef.current = video;
     const body = playerWindowBodyRef.current;
