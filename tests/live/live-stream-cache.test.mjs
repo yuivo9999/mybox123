@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { getLiveStreamCacheKey } from '../../src/features/live/LiveFeature.jsx';
+import { getLiveStreamCacheKey } from '../../src/features/live/liveStreamCache.js';
 
 test('deferred stream cache key is source-aware for merged channels', () => {
   const channel = {
