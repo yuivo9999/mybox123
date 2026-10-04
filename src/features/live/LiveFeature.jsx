@@ -226,28 +226,36 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   const [playbackError, setPlaybackError] = useState('');
   const [resolvedPlaybackInput, setResolvedPlaybackInput] = useState(null);
 
-  const playbackController = useMemo(() => livePlaybackRequest
-    ? playbackService.createController(livePlaybackRequest, {
-        onStateChange: setPlaybackStatus,
-        onCandidateChange: next => {
-          setPlaybackCandidate(next);
-          if (next) {
-            setPlaybackError('');
-            const index = livePlaybackRequest.candidates.findIndex(item => item.candidateId === next.candidateId);
-            if (index >= 0) setActiveStreamIndex(index);
-          }
-        },
-        onResolvedInput: setResolvedPlaybackInput,
-        onPlayerError: ({ error }) => {
-          // Automatic fallback is owned by playbackCore/task. The feature layer only
-          // surfaces an error that escaped the core recovery pipeline; it must not
-          // switch candidates again or recreate the controller.
-          setPlaybackError(error?.message || '播放器加载失败');
-        },
-        onParserError: ({ code }) => setPlaybackError('解析失败：' + code),
-        onExhausted: () => setPlaybackStatus('error'),
-      })
-    : null, [livePlaybackRequest]);
+  // Live is a persistent playback workspace. The controller is created once
+  // for the workspace and channel changes replace its candidates in-place.
+  const [playbackController, setPlaybackController] = useState(null);
+
+  useEffect(() => {
+    if (playbackController || !livePlaybackRequest) return undefined;
+    const controller = playbackService.createController(livePlaybackRequest, {
+      onStateChange: setPlaybackStatus,
+      onCandidateChange: next => {
+        setPlaybackCandidate(next);
+        if (next) setPlaybackError('');
+      },
+      onResolvedInput: setResolvedPlaybackInput,
+      onPlayerError: ({ error }) => setPlaybackError(error?.message || '播放器加载失败'),
+      onParserError: ({ code }) => setPlaybackError('解析失败：' + code),
+      onExhausted: () => setPlaybackStatus('error'),
+    });
+    setPlaybackController(controller);
+    return undefined;
+  }, [livePlaybackRequest, playbackController]);
+
+  useEffect(() => {
+    if (!playbackController || !livePlaybackRequest) return undefined;
+    if (playbackController.request.channelId === livePlaybackRequest.channelId) return undefined;
+    const preferred = livePlaybackRequest.candidates[activeStreamIndex]?.candidateId
+      || livePlaybackRequest.candidates[0]?.candidateId
+      || null;
+    playbackController.replaceCandidates(livePlaybackRequest.candidates, preferred);
+    return undefined;
+  }, [playbackController, livePlaybackRequest, activeStreamIndex]);
 
   // Load current EPG program details when active channel changes
   useEffect(() => {
