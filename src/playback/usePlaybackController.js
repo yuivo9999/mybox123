@@ -35,6 +35,7 @@ export function usePlaybackController({
   const requestRef = useRef(request);
   const requestKeyRef = useRef(getPlaybackRequestKey(request));
   const requestKey = getPlaybackRequestKey(request);
+  const requestSnapshot = request;
 
   if (requestKeyRef.current !== requestKey) {
     requestKeyRef.current = requestKey;
@@ -64,10 +65,13 @@ export function usePlaybackController({
     setError(message || '');
   }, []);
 
-  const controller = useMemo(() => playbackService.createController(requestRef.current, {
+  const controller = useMemo(() => playbackService.createController(requestSnapshot, {
     onEvent: event => {
+      // A controller can finish an async parse/load after the page has already
+      // switched to another request. Ignore late events from the old lifecycle.
+      if (requestKeyRef.current !== requestKey) return;
       onEventRef.current?.(event);
-      const currentRequest = requestRef.current;
+      const currentRequest = requestSnapshot;
       if (event.event === 'error') {
         reportError(event.error || '播放候选失败');
       }
@@ -115,7 +119,7 @@ export function usePlaybackController({
     onParserError: ({ code }) => reportError('解析失败：' + code),
     onPlayerError: ({ error: playerError }) => reportError(playerError?.message || '播放器加载失败'),
     onExhausted: () => setStatus('error'),
-  }), [requestKey, isLive, reportError]);
+  }), [requestKey, requestSnapshot, isLive, reportError]);
 
   useEffect(() => {
     if (!request || !videoRef?.current || !controller) return undefined;
@@ -141,7 +145,7 @@ export function usePlaybackController({
     return () => {
       active = false;
       document.removeEventListener('visibilitychange', onVisibility);
-      const currentRequest = requestRef.current;
+      const currentRequest = requestSnapshot;
       if (
         !isLive
         && currentRequest?.contentId
@@ -161,7 +165,7 @@ export function usePlaybackController({
       controller.leave();
       void player;
     };
-  }, [controller, requestKey, videoRef, isLive, reportError]);
+  }, [controller, requestKey, requestSnapshot, videoRef, isLive, reportError]);
 
   const switchCandidate = useCallback((candidateId) => {
     const next = controller.switchCandidate(candidateId);
