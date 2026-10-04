@@ -22,7 +22,7 @@ function nativeAvailable() {
 }
 
 export function createPlaybackCore(task,hooks={}) {
- let player=null,playerElement=null,resourceRelease=null,sessionId=null,released=false,operationGeneration=0,playerGeneration=0;
+ let player=null,playerElement=null,resourceRelease=null,sessionId=null,released=false,operationGeneration=0,playerGeneration=0,activePlayerOperationGeneration=null;
  const isCurrentOperation=(generation)=>!released&&generation===operationGeneration;
  const eventBus=createPlaybackEventBus();
  const stateMachine=createPlaybackStateMachine(task.request.kind??PlaybackKind.VOD);
@@ -33,7 +33,7 @@ export function createPlaybackCore(task,hooks={}) {
  const emit=(event,data={})=>{const normalized=normalizePlaybackEvent({event,requestId:task.request.requestId,taskId:task.request.taskId,...data});return eventBus.emit(normalized);};
 
  const handlePlayerEvent=(event,eventGeneration=playerGeneration)=>{
-  if(released||eventGeneration!==playerGeneration)return;
+  if(released||eventGeneration!==playerGeneration||activePlayerOperationGeneration!==operationGeneration)return;
   if(event.event==='loading')transition(PlayerState.LOADING);
   if(event.event==='prepared')transition(PlayerState.PREPARING);
   if(event.event==='playing'){transition(PlayerState.PLAYING);networkPolicy.resetRetry();}
@@ -61,6 +61,7 @@ export function createPlaybackCore(task,hooks={}) {
  const attachPlayer=(element)=>{
   playerGeneration+=1;
   const currentPlayerGeneration=playerGeneration;
+  activePlayerOperationGeneration=operationGeneration;
   player?.release?.(); playerElement=element;
   if(nativeAvailable()) player=createNativePlayerAdapter({onEvent:(event)=>handlePlayerEvent(event,currentPlayerGeneration)});
   else if(element) player=createHtml5PlayerAdapter(element,{onEvent:(event)=>handlePlayerEvent(event,currentPlayerGeneration)});
@@ -186,7 +187,7 @@ export function createPlaybackCore(task,hooks={}) {
    if(state==='background'){if(task.request.kind===PlaybackKind.VOD){await player?.pause?.();}else{player?.pause?.();}}
    if(state==='foreground'&&task.request.kind===PlaybackKind.LIVE&&task.currentCandidate){try{await resolveAndLoad(task.currentCandidate);}catch(e){void recover(e,PlaybackFailureCode.NETWORK);}}
   },
-  stop(){operationGeneration+=1;player?.stop?.();task.stop();resourceRelease?.();resourceRelease=null;playbackTaskRegistry.unregister(task.request.taskId);},
-  release(){if(released)return;operationGeneration+=1;released=true;try{player?.release?.();}finally{player=null;resourceRelease?.();resourceRelease=null;playbackSessionManager.clear(sessionId);sessionId=null;unsubscribe();eventBus.clear();task.release();playbackTaskRegistry.unregister(task.request.taskId);}}
+  stop(){operationGeneration+=1;activePlayerOperationGeneration=null;player?.stop?.();task.stop();resourceRelease?.();resourceRelease=null;playbackTaskRegistry.unregister(task.request.taskId);},
+  release(){if(released)return;operationGeneration+=1;activePlayerOperationGeneration=null;released=true;try{player?.release?.();}finally{player=null;resourceRelease?.();resourceRelease=null;playbackSessionManager.clear(sessionId);sessionId=null;unsubscribe();eventBus.clear();task.release();playbackTaskRegistry.unregister(task.request.taskId);}}
  };
 }
