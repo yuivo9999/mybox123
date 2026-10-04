@@ -46,7 +46,7 @@ export function usePlaybackController({
   useEffect(() => {
     requestRef.current = request;
     progressRef.current = { currentTime: 0, duration: null, persistedAt: 0 };
-  }, [requestKey, request]);
+  }, [requestKey]);
 
   const [candidate, setCandidate] = useState(request?.candidates?.[0] ?? null);
   const [status, setStatus] = useState('idle');
