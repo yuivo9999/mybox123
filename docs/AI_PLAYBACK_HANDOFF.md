@@ -820,3 +820,139 @@ P1：
 
 下一位 AI **不要删除 generation guard**，除非能用更完整的 AbortSignal/session-token 机制替代并保留同等生命周期保证。
 
+
+
+---
+
+# 24. 本轮继续执行结果：P0 生命周期竞态进入“有行为测试”阶段
+
+## 本轮
+- 日期：2026-10-05
+- HEAD SHA：`4135e676e8c4ad2021e2dac03d5888292e182822`
+- 工作范围：继续完成 P0-2/P0-3；围绕 rapid channel/candidate switch、stop、release、Native stale callback 建立可执行行为测试，并修正上一轮 generation guard 中发现的实际竞态缺口。
+- 修改文件：
+  - `src/playback/playbackCore.js`
+  - `tests/playback/playback-lifecycle.test.mjs`
+  - `package.json`
+  - `tests/architecture/test-runner.mjs`
+  - `docs/AI_PLAYBACK_HANDOFF.md`
+
+## 本轮发现并修复
+
+### P0-1：上一版 recover 使用了不存在的 generation 变量
+- 文件：`src/playback/playbackCore.js`
+- 现象：`recover()` 使用 `generation`，但函数原先没有参数/局部定义。
+- 修复：`recover(error, code, generation=operationGeneration)`，并在进入、delay 后、retry 后、fail 前持续检查 generation。
+- 状态：已修复，待执行测试确认。
+
+### P0-2：旧 Native player callback 会与新 candidate 共用生命周期
+- 文件：`src/playback/playbackCore.js`
+- 修复：
+  - 增加 `playerGeneration`
+  - 每次 `attachPlayer()` 创建新的 callback generation
+  - candidate switch 时重新 attach player，使旧 Native/HLS callback 失效
+  - callback 同时检查 `playerGeneration` 与 `activePlayerOperationGeneration`
+- 目的：A 线路旧事件不能污染 B/C 线路。
+- 状态：代码完成，待真实 Native 验证。
+
+### P0-3：stop 后旧 player event 仍可能触发 recover
+- 文件：`src/playback/playbackCore.js`
+- 修复：stop/release 时让 `activePlayerOperationGeneration` 失效；下一次 start 再重新激活当前 operation。
+- 状态：代码完成，待行为测试确认。
+
+### P0-4：旧 resolve 在 Live direct branch 中仍可能先触发 onResolvedInput
+- 文件：`src/playback/playbackCore.js`
+- 修复：Live direct resolve 也使用 `__operationGeneration` token，在调用 `onResolvedInput` 前检查 operation 是否仍有效。
+- 同时 parser/VOD branch 的 stale resolved input 也受到同一 token 保护。
+- 状态：代码完成。
+
+## P0-3 行为测试已建立
+
+新增：
+- `tests/playback/playback-lifecycle.test.mjs`
+
+覆盖：
+1. Resource manager：A owner → B owner，A 必须 stop + release。
+2. A 加载未完成 → switch B，A 不得 prepare/play。
+3. A → B → C 快速切换，只有 C 可以到 prepare/play。
+4. stop 后 pending load 不得继续 prepare/play。
+5. release 后 pending load 不得继续 prepare/play。
+6. 旧 Native callback 在 switch 后必须被忽略。
+
+新增脚本：
+- `npm run test:playback-lifecycle`
+
+架构测试也已调整：
+- `test:playback` 不再被强制伪装成 architecture runner；
+- architecture runner 改为检查真正的 `test:playback-lifecycle` 行为测试脚本存在。
+
+## 验证状态
+
+### 已完成
+- [x] 当前 main HEAD 已重新读取，确认本轮提交没有被其他 AI 插入覆盖。
+- [x] P0 generation guard 代码已继续收敛。
+- [x] 行为测试文件已加入仓库。
+- [x] `package.json` 已有独立 playback lifecycle test script。
+- [x] architecture runner 已与独立行为测试脚本对齐。
+
+### 尚未执行
+- [ ] `npm run test:playback-lifecycle`
+- [ ] `npm test`
+- [ ] 浏览器真实 HLS
+- [ ] Android Native 真实播放
+- [ ] HLS 实源 rapid switch
+- [ ] 真机后台/前台恢复
+- [ ] 弱网 reconnect
+
+本轮执行环境无法从 GitHub clone 仓库，因此**没有伪造“测试通过”结论**。以上行为测试属于已提交、待运行状态。
+
+## 当前剩余问题
+
+### P0
+- [ ] **P0-A：LiveFeature fallback ownership 未完成闭环**
+  - 文件：`src/features/live/LiveFeature.jsx`
+  - 现象：需要继续确认 UI 层 `onPlayerError`/线路切换 与 core `recover/failAndResolve` 是否会双重 fallback。
+  - 下一步：沿 event → hook → controller → task.fail → resolveAndLoad 路径逐调用链确认。
+  - 验收：同一次 player error 最多发生一次自动 candidate transition。
+
+- [ ] **P0-B：Resource manager → controller → adapter release 真实链尚未设备验证**
+  - 文件：`src/playback/playbackResourceManager.js`、`src/playback/playbackTaskRegistry.js`、`src/playback/playbackCore.js`、`src/player/nativePlayerAdapter.js`、`src/player/html5PlayerAdapter.js`
+  - 验收：A→B 切换后 A 的 HLS instance、DOM listeners、Native callback、task 都已失效。
+
+- [ ] **P0-C：Native bridge 的事件身份仍未知**
+  - 文件：`src/player/nativePlayerAdapter.js`
+  - 当前只能证明旧 adapter callback 自身可以被 generation 隔离；尚未证明 Android bridge event payload 是否带 task/session/player identity。
+  - 验收：拿到 bridge 实际 event payload 或 Android 实现后，明确是否需要 payload-level session token。
+
+### P1
+- [ ] HTML5 custom headers / candidate capability filtering
+- [ ] HLS live latency/buffer 策略
+- [ ] PlaybackPage / LiveFeature 两套播放入口的资源与导航边界
+- [ ] live channel / stream / candidate identity
+- [ ] EPG stale request isolation
+
+### P2
+- [ ] URL/deep-link/back stack
+- [ ] Web/Android/TV capability matrix
+- [ ] UI/UX polish
+
+## 当前不能确定
+- **PENDING**：行为测试是否在真实 Node 22 + 完整依赖环境通过；需要执行 `npm install` 后运行 `npm run test:playback-lifecycle`。
+- **PENDING**：Android bridge 是否能提供 session/player identity；需要真实 bridge payload 或 Android 侧代码。
+- **PENDING**：切换 candidate 时重建 adapter 对实际 HLS/Native 的成本与副作用；需要浏览器/真机验证。
+- **PENDING**：LiveFeature 与 playbackCore 是否双重 fallback；目前不能仅凭代码片段断言。
+
+## 下一位 AI 立即执行
+1. `tests/playback/playback-lifecycle.test.mjs`：先实际运行 `npm run test:playback-lifecycle`，修测试本身的环境/断言问题，不要把未运行写成 PASS。
+2. `src/features/live/LiveFeature.jsx` + `src/playback/playbackCore.js`：完整追踪一次 `onPlayerError → recover → failAndResolve → onCandidateChange`，确认 fallback 唯一 owner。
+3. `src/playback/playbackResourceManager.js` + `src/playback/playbackTaskRegistry.js` + `src/playback/playbackCore.js`：验证 A→B 释放顺序与 registry owner 是否可能出现旧 task 残留。
+4. `src/player/nativePlayerAdapter.js`：确认 Android event payload 是否带 task/session/player identity；没有则评估 bridge-safe token。
+5. `src/player/html5PlayerAdapter.js`：继续检查 candidate switch 重建 HLS 的 listener/destroy 完整性。
+6. 只有 P0 闭环后，再进入 EPG、路由、能力矩阵与 UI。
+
+## 给下下一位 AI 留的资料
+- 不要重复建立 generation guard；当前已经有 operation generation + player generation + active operation generation 三层保护。
+- 不要删除 candidate switch 时的 adapter reattach，除非找到更可靠的 session identity/AbortSignal 机制。
+- 不要把行为测试脚本重新指回 architecture runner；这正是本轮修复的测试基础设施问题。
+- 当前最大未知不是“有没有 generation guard”，而是**fallback owner 是否唯一、Native bridge 是否有可区分 session、以及实际测试是否通过**。
+- 浏览器/Android 真机验证仍然没有完成，不能把代码级 PASS 当成产品级 PASS。
