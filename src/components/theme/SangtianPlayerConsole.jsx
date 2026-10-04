@@ -1016,8 +1016,10 @@ export function SangtianConsoleCard({
         {activeTab === 'episodes' && (
           <div className="console-episodes-section">
             <div className="console-section-header">
-              <span className="section-eyebrow">
-                {isLive ? (
+              <span className="section-eyebrow">{isLive ? 'LIVE CHANNELS · 频道切换' : 'EPISODES · 当前播放'}</span>
+              <h4>{title}</h4>
+            </div>
+            {isLive ? (
               <div className="sangtian-channel-selector-wrapper">
                 {liveCategories.length > 1 && (
                   <div className="sangtian-console-category-scroll">
@@ -1052,7 +1054,6 @@ export function SangtianConsoleCard({
             )}
           </div>
         )}
-
         {/* Tab 2: Information & Synopsis (视频信息与简介) */}
         {activeTab === 'info' && (
           <div className="console-info-section">
