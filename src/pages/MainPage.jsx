@@ -7,10 +7,13 @@ import { FONT_CATALOG, getFontById } from '../config/fontCatalog.js';
 import { ensureFont } from '../services/fontLoader.js';
 import { MovieCarousel } from '../components/media/MovieCarousel.jsx';
 
-function Main({tab,movies,channels,favorites,history,sources,searches,progress,settings,onTab,onMovie,onLive,onLiveChannel,onSearchHistory,toggleFavorite,onClearData,onClearHistory,onSaveSources,onClearSearches,onRemoveSearch,onClearCache,onSourceEnabled,onSourceActive,onTestSource,onRemoveSource,onUpdateSettings}){
+function Main({tab,route,selected,movies,channels,favorites,history,sources,searches,progress,settings,onTab,onMovie,onLive,onLiveChannel,onSearchHistory,toggleFavorite,onClearData,onClearHistory,onSaveSources,onClearSearches,onRemoveSearch,onClearCache,onSourceEnabled,onSourceActive,onTestSource,onRemoveSource,onUpdateSettings}){
  const [favoriteSection,setFavoriteSection]=useState('movies'); const [fontPicker,setFontPicker]=useState(false);
  const [confirm,setConfirm]=useState(null); const [sourceForm,setSourceForm]=useState(null); const [batchMode,setBatchMode]=useState(false);
- if(tab==='live') return <LiveFeature channels={channels} sources={sources} favorites={favorites} onChannel={onLiveChannel} onPlay={onLive} onTab={onTab} toggleFavorite={toggleFavorite}/>;
+ if(tab==='live') return <>
+  <LiveFeature channels={channels} sources={sources} favorites={favorites} requestedChannelId={selected?.channelId || null} onChannel={onLiveChannel} onPlay={onLive} onTab={onTab} toggleFavorite={toggleFavorite}/>
+  {route==='live-channel' && selected && <LiveChannelPanel channel={selected} channels={channels} sources={sources} favorites={favorites} onBack={()=>onTab('live')} onPlay={onLive} onChannel={onLiveChannel} toggleFavorite={toggleFavorite}/>} 
+ </>;
  if(tab==='favorites'){
   const favoriteContentRecords=favorites.filter(i=>i.targetType==='content');
   const favMovies=favoriteContentRecords.map(record=>movies.find(m=>m.contentId===record.targetId)||{contentId:record.targetId,title:'暂时无法找到来源',year:'',category:'',poster:'',unresolved:true});
