@@ -418,96 +418,62 @@ VOD 正式页面是：
 
 ---
 
-## 当前状态
-本轮已完成：播放上下文 + 返回行为 + preferred source 排序兜底 + 共享 PlaybackController 生命周期 + 内容级续播计算。
+## 13. 本轮继续完成：P1.5 fallback 三层语义
 
-### 9. 本轮新增完成（P1.1 / P1.4）
+### 13.1 已确认的真实问题
+检查 src/services/playbackService.js 与 src/playback/playbackCore.js 后确认：
+- 之前候选是一个平面队列，自动失败只按数组顺序寻找下一个 candidate。
+- “同 source candidate fallback”和“跨 source fallback”没有显式语义。
+- 自动失败后的候选会进入 failedCandidates，原 switchCandidate() 会拒绝再次选择失败 candidate。
+- Native bridge 可用时直接选择 Native；Native 播放失败后原流程没有独立的 player-engine fallback。
 
-新增：
-- `src/playback/usePlaybackController.js`
-- `src/services/watchProgressService.js`
+### 13.2 已完成修改
+文件：src/services/playbackService.js
+- createPlaybackTask().next() 现在先尝试同 source 的未失败、未过期 candidate。
+- 同 source 候选耗尽后才跨 source。
+- sourceChanged 事件附带 fallbackLevel=candidate 或 fallbackLevel=source。
+- 手动 switchCandidate() 会清除该 candidate 的自动失败标记，因此用户可以手动重新尝试此前失败的 candidate；已过期 candidate 仍拒绝。
 
-已接入：
-- `src/features/movie/MoviePlaybackPage.jsx`
-- `src/pages/PlaybackPage.jsx`
-- `src/features/movie/MovieFeature.jsx`
+文件：src/playback/playbackCore.js
+- 记录当前 player engine：native / html5。
+- Native 播放出现 network/player/unsupported 类失败，并且存在 HTML5 video element 时，先 release Native，再对同一 candidate 创建 HTML5 adapter 并重新 resolve/load/play。
+- engine fallback 成功则不进入换源；失败后才继续 retry → candidate/source fallback。
+- 发出 playerEngineChanged(engine=html5, reason=native-fallback)。
+- 每个 controller 生命周期只尝试一次 engine fallback，避免循环。
 
-共享播放生命周期现在统一处理：
-- createController
-- attachPlayer
-- start / resolveAndLoad
-- visibility background/foreground
-- progress 15 秒持久化
-- completed 持久化
-- unmount 持久化
-- retry
-- candidate change
-- leave/release
+### 13.3 三层责任边界
+player engine fallback：同一 candidate / 同一 resolved media，换播放器实现。
+candidate fallback：同一 source，换另一个 candidate / URL。
+source fallback：当前 source 候选耗尽后，换其他 source。
+不要把三层继续合并成一个“换源按钮”。
 
-续播服务现在统一提供：
-- getEpisodeProgress()
-- getContentProgress()
-- getContentResume()
-- getContinueWatching()
+### 13.4 本轮验证
+已做静态回读确认：
+- playbackService.js 已包含同源优先、跨源其次。
+- 手动 switchCandidate() 可以重新尝试此前自动失败的 candidate。
+- playbackCore.js 已包含 Native → HTML5 engine fallback。
+- 原有 parser / retry / exhausted 流程仍保留。
 
-详情页已经不再直接：
-`progress.find(item => item.contentId === movie.contentId)`
+尚未验证：
+- 浏览器真实播放
+- Native bridge 真实失败后 HTML5 接管
+- A source 多 candidate 全失败后是否真实进入 B source
+- HLS parser failure 是否按预期进入 candidate/source fallback
+- build / lint / test
 
-而是根据：
-- contentId
-- episodeId
-- updatedAt
-- completed
-- positionSeconds
-- episodes 顺序
+### 13.5 下一位 AI 第一任务
+不要重新做 fallback 架构调查。
+1. 静态检查本轮两个文件。
+2. 如果能运行项目，优先验证 A1→A2、A1/A2→B1、失败 A1 手动重新选择、Native→HTML5。
+3. 修复验证中发现的实际问题。
+4. 然后进入 P1.6：decoderEngine 假 UI。当前 MoviePlaybackPage.jsx 仍有 decoderEngine local state；如果不能真正驱动 adapter 切换，就先隐藏/移除 UI，不要制造假功能。
+5. P1.6 后进入 P1.7：quality / subtitle / audio 能力接线。
 
-计算真正的继续播放集数。
+### 13.6 不能重复的工作
+Home / Movies / Search / Detail 返回上下文、preferred source 保留其他候选、shared usePlaybackController、watchProgressService、以及本轮三层 fallback 基础责任划分均已完成。
 
-特殊规则：
-- 当前集未完成且有有效进度 → 从该集继续。
-- 当前最近观看集已完成且存在下一集 → “继续播放”指向下一集并从 0 秒开始。
-- 没有进度 → 第一集。
-- 不修改底层 persistent progress 数据格式。
-
-### 10. 当前验证状态
-
-已通过静态代码检查：
-- VOD 页不再直接 import `playbackService` 创建 controller。
-- PlaybackPage 不再直接 import `playbackService` 创建 controller。
-- 两页均通过 `usePlaybackController` 管理生命周期。
-- shared hook 使用 ref 保存最新 onEvent，避免页面 render 导致 controller 重建。
-- MovieFeature 已移除旧的 contentId 第一条 progress 查找。
-- watchProgressService 已建立集中 resume 规则。
-
-尚未完成：
-- 浏览器真实播放验证
-- npm build / architecture tests
-- 自动下一集 UX
-- source/candidate/player-engine 三层 fallback 完整语义
-- decoderEngine 真切换
-- HLS quality/subtitle/audio UI
-- PlaybackPage 的 VOD-like UI 清理
-- 最终播放器 UI 去重
-
-### 11. 当前分支接力信息
-
-当前分支：`ai-handoff/playback-phase1`
-
-本轮关键提交：
-- `34beefb2`：新增 shared playback lifecycle hook
-- `86704ab2`：稳定 shared event callback，避免 render 重建 controller
-- `e00b371a`：VOD / immersive PlaybackPage 接入 shared lifecycle
-- `83c00bbe`：新增 watchProgressService
-- `28c0a0e8`：MovieFeature 接入集中续播规则
-- 本次交接文档更新提交会是分支最新 HEAD
-
-### 12. 下一位第一任务
-
-**先验证上述两个逻辑模块，再进入 P1.5：把 source fallback / candidate fallback / player engine fallback 三层语义明确化，并确认 playbackCore 实际失败路径是否会自动跨 source。**
-
-之后才处理：
-1. decoderEngine 假 UI
-2. quality/subtitle/audio
-3. VOD / Live 播放页职责收敛
-4. 播放 UI 去重
-5. auto-next countdown/cancel
+### 13.7 潜在回归点
+- usePlaybackController 不要因 request identity 每次 render 变化而重建 controller。
+- Native fallback 依赖 HTML5 video element。
+- HTML5 quality selection 仍依赖 resolved input 中已有 manifest.variants，尚未确认 parser 是否稳定提供。
+- 自动 fallback 与 Live reconnect 是不同语义，Live 仍优先使用 reconnect policy。
