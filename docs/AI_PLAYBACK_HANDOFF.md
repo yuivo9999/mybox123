@@ -912,3 +912,12 @@ P2.3 后进入 P2.4：继续收敛 `SangtianPlayerConsole.jsx` 的职责与重�
 - 不要让倒计时 timer 在 episode 已经切换后继续触发旧 onEpisode。
 - 不要删除最后一集的无意义下一集卡片。
 - 不要重新恢复 ConsoleCard 的 VOD episode grid。
+
+
+### 19.8 静态回读修正
+在 P2.3 后的低风险死参数清理中，ConsoleCard 的自动文本替换曾短暂命中 section eyebrow 内部；随后已立即重建整个 Episodes 区块并提交修正。
+当前结构已恢复为：section header → Live channel selector / VOD 当前播放提示 → Tab 2 信息区。
+这次回归仅发生在提交脚本的文本替换阶段，未声称已通过 build/lint；因此后续第一验证动作仍应是运行 lint/build 或至少 JSX 编译检查。
+
+当前最新代码提交：46632b2a806a7fb3404f59cb104a98d12145ef16
+当前分支：ai-handoff/playback-phase1
