@@ -8,6 +8,7 @@ import { SmartImage, EmptyState } from '../../components/StateViews.jsx';
 import { MovieCarousel } from '../../components/media/MovieCarousel.jsx';
 import { MovieCard } from '../../components/media/MovieCard.jsx';
 import { MoviePlaybackPage } from './MoviePlaybackPage.jsx';
+import { watchProgressService } from '../../services/watchProgressService.js';
 
 export function MovieFeature(props){
  const { route,tab,selected,movies=[],channels=[],history,progress,selectedSources={},sources=[],favorites,onMovie,onPlay,onTab,onBack,onLive,recordSearch,toggleFavorite,onSelectMovieSource,movieCategories=[],movieActiveCategory=null,movieCategoryLoading=false,onLoadMovieCategory }=props;
@@ -700,19 +701,16 @@ function MovieDetail({movie,movies,sources=[],selectedSourceId,onMovie,onBack,on
     }];
   }, [movie]);
 
-  const movieProgress = useMemo(() => {
-    if (!movie?.contentId || !Array.isArray(progress)) return null;
-    return progress.find(item => item.contentId === movie.contentId) || null;
-  }, [movie?.contentId, progress]);
-
-  const lastWatchedEpisodeIndex = useMemo(() => {
-    if (!movieProgress?.episodeId || !episodes.length) return 0;
-    const idx = episodes.findIndex(e => e.episodeId === movieProgress.episodeId);
-    return idx >= 0 ? idx : 0;
-  }, [movieProgress, episodes]);
-
-  const hasWatchProgress = movieProgress && movieProgress.positionSeconds > 5 && !movieProgress.completed;
-  const watchedPercent = movieProgress?.duration ? Math.min(100, Math.round((movieProgress.positionSeconds / movieProgress.duration) * 100)) : 0;
+  const movieResume = useMemo(
+    () => watchProgressService.getContentResume(progress, movie?.contentId, episodes),
+    [progress, movie?.contentId, episodes],
+  );
+  const movieProgress = movieResume.progress;
+  const lastWatchedEpisodeIndex = movieResume.episodeIndex;
+  const hasWatchProgress = movieResume.hasProgress && !movieResume.completed;
+  const watchedPercent = movieProgress?.durationSeconds
+    ? Math.min(100, Math.round((movieProgress.positionSeconds / movieProgress.durationSeconds) * 100))
+    : 0;
 
   const groups=[];for(let i=0;i<episodes.length;i+=50)groups.push(episodes.slice(i,i+50));
   const currentEpisodes=groups[episodePage]??episodes;
