@@ -95,7 +95,7 @@ export function App(){
    if(movie.contentId) persistent.touchFavorite?.('content', movie.contentId);
    sessionStateStore.patch({selected:movie,route:'detail',tab:'movies'});
  };
- const playMovie=(movie,episodeIndex=0,sourceId=null,returnRoute='detail')=>{
+ const playMovie=(movie,episodeIndex=0,sourceId=null,returnRoute=null)=>{
    if(!movie)return;
    const episodes=(Array.isArray(movie.episodes)&&movie.episodes.length>0)
      ? movie.episodes
