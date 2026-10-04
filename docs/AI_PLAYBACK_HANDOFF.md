@@ -2064,3 +2064,77 @@ JS 层虽然已有 `operationGeneration/playerGeneration`，但 Android bridge �
 - 不要删除 `globalLiveCache`；它仍需要在业务层竞态完成后再判断是否收敛。
 - Native bridge generation 现在已经存在，后续重点是验证，不是继续堆第二个 generation。
 - Android bridge 的 generation 是 logical playback/engine replacement 级别；JS core generation 仍是 controller operation 级别，两者职责不同。
+
+
+# 2026-10-05 本轮执行记录：P0-2 deferred stream cache source identity
+
+## 本轮实际发现
+
+确认 LiveFeature 的 resolvedStreams 原先只用 channelId 作为缓存键。
+
+这里存在一个真实的业务层风险：normalizeLiveChannel 会把相同 canonical channel 合并成一个频道，同时保留多个 sourceRefs。如果某个来源被禁用，而另一个来源仍提供同一频道，旧 deferred stream 缓存可能仍以同一个 channelId 命中，从而继续使用已经失效来源的播放地址。
+
+因此这不是简单的“缓存重复”问题，而是 merged channel + source enable/disable + deferred stream cache 的身份问题。
+
+## 本轮实际修改
+
+### 新增
+
+- src/features/live/liveStreamCache.js
+  - 提供纯函数 getLiveStreamCacheKey(channel, sources)
+  - cache identity 现在由当前可用 sourceId + channelId 组成
+  - 使用内部 NUL 分隔符避免普通冒号拼接产生歧义。
+
+### 修改
+
+- src/features/live/LiveFeature.jsx
+  - deferred stream cache 改为 source-aware；
+  - active channel 读取 cache 时使用同一 identity；
+  - lazy load 写入 cache 时使用同一 identity；
+  - source 被禁用后，会清理对应 source 的 resolved stream cache；
+  - UI 的线路数量显示也使用 source-aware cache。
+
+### 测试
+
+新增：
+
+- tests/live/live-stream-cache.test.mjs
+
+覆盖：
+
+1. 同一个 merged channel 在 source A / source B 之间不会共享同一个 deferred cache key；
+2. source A 禁用、source B 启用时，会选择 source B 的 cache identity。
+
+## Commit
+
+- a938f25bc4cb614af85539a30aa8233c8f5e5ee0 — source-aware deferred stream cache
+- 927099bddf2154d2981a8722370d8cd1e8c88ae5 — extract pure cache identity helper
+- d78cdd0632365e029f0bedffa3274234521e0e61 — wire helper into LiveFeature
+- c4a313299e02fbc5f84f3dee8a2679ce21119d0a — add pure helper tests
+
+## 当前状态
+
+- [x] deferred cache identity source-aware
+- [x] disabled source cache invalidation
+- [x] helper extracted to pure JS module
+- [x] behavior-level helper tests added
+- [ ] Node 22 实际执行测试
+- [ ] React 浏览器快速 A→B→C 验证
+- [ ] source A disable → source B fallback 的真实页面验证
+
+## 下一步严格顺序
+
+1. 先执行 node --test tests/live/live-stream-cache.test.mjs，确认 helper 测试真实通过。
+2. 再检查 LiveFeature 的 deferred A→B→C 请求取消是否还存在第二个状态污染点。
+3. 重点审查 EPG A→B→C：当前只有 local active flag，没有 request cancellation；确认旧请求虽然不会 setState，但是否仍浪费网络/占用 requestManager。
+4. 检查 source disable/remove 时 TV1 metadata session 是否继续保留旧频道，导致重新启用/切源后的数据身份问题。
+5. 完成后再进入 PlaybackPage / LiveFeature owner overlap。
+6. HLS 参数、UI polish、路由大改继续保持冻结。
+
+## 不要重复做
+
+- 不要重新实现 JS playback generation；
+- 不要重新实现 Native bridge generation；
+- 不要删除 globalLiveCache；
+- 不要修改 HLS buffer 参数；
+- 不要因为 cache identity 已修复就认为 A→B→C 整体竞态已经验证完成。
