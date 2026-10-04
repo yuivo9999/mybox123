@@ -40,6 +40,9 @@ export function MoviePlaybackPage({
     controller,
     candidate,
     status,
+    currentTime,
+    duration,
+    isPlaying,
     resolvedInput,
     error,
     switchCandidate,
@@ -168,6 +171,9 @@ export function MoviePlaybackPage({
           if (next) handleSelectCandidate(next.candidateId);
         }}
         playbackRate={playbackRate}
+        currentTime={currentTime}
+        duration={duration}
+        isPlaying={isPlaying}
         onChangePlaybackRate={handleChangePlaybackRate}
         onTogglePlayback={() => {
           if (status === 'playing') controller?.pause?.();
