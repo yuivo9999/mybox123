@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, startTransition } from 're
 import { ChevronLeft, Heart, Play, Radio } from 'lucide-react';
 import { liveService } from '../../services/liveService.js';
 import { playbackService } from '../../services/playbackService.js';
+import { usePlaybackController } from '../../playback/usePlaybackController.js';
 import { requestManager } from '../../services/requestManager.js';
 import { tv1LiveService } from '../../services/tv1LiveService.js';
 import { usePageState, pageStateStore } from '../../state/pageStateStore.js';
@@ -170,40 +171,27 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     return playbackService.createLiveRequest({ channel: activeChannel });
   }, [activeChannel]);
 
-  const [playbackCandidate, setPlaybackCandidate] = useState(null);
-  const [playbackStatus, setPlaybackStatus] = useState('idle');
-  const [playbackError, setPlaybackError] = useState('');
-  const [resolvedPlaybackInput, setResolvedPlaybackInput] = useState(null);
+  const {
+    controller: playbackController,
+    candidate: playbackCandidate,
+    status: playbackStatus,
+    resolvedInput: resolvedPlaybackInput,
+    error: playbackError,
+    switchCandidate: switchPlaybackCandidate,
+  } = usePlaybackController({
+    request: livePlaybackRequest,
+    videoRef,
+    isLive: true,
+    onEvent: event => {
+      if (event.event === 'exhausted') return;
+    },
+  });
 
-  const playbackController = useMemo(() => livePlaybackRequest
-    ? playbackService.createController(livePlaybackRequest, {
-        onStateChange: setPlaybackStatus,
-        onCandidateChange: next => {
-          setPlaybackCandidate(next);
-          if (next) {
-            setPlaybackError('');
-            const index = livePlaybackRequest.candidates.findIndex(item => item.candidateId === next.candidateId);
-            if (index >= 0) setActiveStreamIndex(index);
-          }
-        },
-        onResolvedInput: setResolvedPlaybackInput,
-        onPlayerError: ({ error }) => {
-          const errMsg = error?.message || '播放器加载失败';
-          setPlaybackError(errMsg);
-          // Automatic stream fallback retry for live channels with multiple lines
-          if (activeChannel?.streams?.length > 1 && activeStreamIndex + 1 < activeChannel.streams.length) {
-            const nextIndex = activeStreamIndex + 1;
-            setActiveStreamIndex(nextIndex);
-            const candidate = livePlaybackRequest?.candidates?.[nextIndex];
-            if (candidate && playbackController) {
-              playbackController.switchCandidate(candidate.candidateId);
-            }
-          }
-        },
-        onParserError: ({ code }) => setPlaybackError('解析失败：' + code),
-        onExhausted: () => setPlaybackStatus('error'),
-      })
-    : null, [livePlaybackRequest, activeChannel, activeStreamIndex]);
+  useEffect(() => {
+    if (!playbackCandidate?.candidateId || !livePlaybackRequest?.candidates?.length) return;
+    const index = livePlaybackRequest.candidates.findIndex(item => item.candidateId === playbackCandidate.candidateId);
+    if (index >= 0 && index !== activeStreamIndex) setActiveStreamIndex(index);
+  }, [playbackCandidate, livePlaybackRequest, activeStreamIndex]);
 
   // Load current EPG program details when active channel changes
   useEffect(() => {
@@ -322,30 +310,6 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   }, [playbackController]);
 
   useEffect(() => {
-    if (!playbackController) {
-      setPlaybackCandidate(null);
-      setResolvedPlaybackInput(null);
-      setPlaybackStatus('idle');
-      setPlaybackError('');
-      return undefined;
-    }
-    const player = playbackController.attachPlayer(videoRef.current);
-    const initial = playbackController.start();
-    setPlaybackCandidate(initial);
-    setResolvedPlaybackInput(null);
-    if (initial) {
-      playbackController.resolveAndLoad(initial).catch(error => setPlaybackError(error?.message || '播放初始化失败'));
-    } else {
-      setPlaybackStatus('error');
-      setPlaybackError('没有可用的播放候选');
-    }
-    return () => {
-      void player;
-      playbackController.leave();
-    };
-  }, [playbackController]);
-
-  useEffect(() => {
     const top = Number(page.live.scrollTop) || 0;
     requestAnimationFrame(() => window.scrollTo(0, top));
     const save = () => pageStateStore.patch('live', { scrollTop: window.scrollY });
@@ -391,7 +355,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
         onSwitchStreamIndex={idx => {
           setActiveStreamIndex(idx);
           const candidate = livePlaybackRequest?.candidates?.[idx];
-          if (candidate && playbackController) playbackController.switchCandidate(candidate.candidateId);
+          if (candidate) switchPlaybackCandidate(candidate.candidateId);
         }}
         onStop={() => {
           playbackController?.stop();
