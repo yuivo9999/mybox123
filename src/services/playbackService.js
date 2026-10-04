@@ -50,22 +50,24 @@ export const playbackService = {
     })));
   },
 
-  createVODRequest({ content, episode, episodeIndex = 0, preferredSource = null, metadata } = {}) {
+  createVODRequest({ content, episode, episodeIndex = 0, preferredSource = null, metadata, context } = {}) {
     return createPlaybackRequest({
       kind: PlaybackKind.VOD,
       contentId: content?.contentId,
       episodeId: episode?.episodeId,
       candidates: this.getVODCandidates({ content, episode, episodeIndex, preferredSource }),
       metadata: { episodeIndex, episodes: content?.episodes?.map((item) => ({ episodeId: item.episodeId, title: item.title })) ?? [], ...(metadata ?? {}) },
+      context,
     });
   },
 
-  createLiveRequest({ channel, preferredSource = null, metadata } = {}) {
+  createLiveRequest({ channel, preferredSource = null, metadata, context } = {}) {
     return createPlaybackRequest({
       kind: PlaybackKind.LIVE,
       channelId: channel?.channelId,
       candidates: this.getLiveCandidates(channel).sort((a, b) => (preferredSource && a.sourceId === preferredSource ? -1 : 0) - (preferredSource && b.sourceId === preferredSource ? -1 : 0)),
       metadata,
+      context,
     });
   },
 
