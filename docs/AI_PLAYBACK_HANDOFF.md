@@ -1950,3 +1950,117 @@ Android 侧 `NativePlaybackBridge` 本身也是单 playback owner。
 > **先证明竞态，再改代码；先完成一个闭环，再更新 handoff；任何未知都保留 UNKNOWN/PENDING。**
 
 每一位 AI 都必须继续把未完成资料留在本文件，使下下一位 AI 能从具体文件、具体函数、具体验证目标继续，而不是重新审查整个仓库。
+
+
+# 2026-10-05 本轮执行记录：P0 Native engine stale callback 隔离
+
+## 本轮审核结论
+
+重新审核现有方案后，确认大方向仍然正确，但可以继续做，而且下一步不应再重复 JS generation guard。当前最值得立即处理的是 Android Native bridge 自身的异步 engine callback 隔离。
+
+### 仍值得做，按优先级
+1. **P0：Native engine callback generation 隔离** — 已本轮完成。
+2. **P0：LiveFeature A→B→C deferred stream 竞态行为测试** — 下一步。
+3. **P0：EPG 请求竞态 / source disable-remove 竞态** — 下一步。
+4. **P0：LiveFeature 与 PlaybackPage 播放 owner 边界证明** — 先测试再决定是否收敛，不直接删入口。
+5. **P1：HTML5 custom headers capability filtering** — 明确 Web 与 Native 能力差异。
+6. **P1：HLS live latency/buffer 实源验证** — 没有真实流证据前保持 PENDING，不调参。
+7. **P1：channel/source/stream/candidate identity 与历史/收藏闭环**。
+8. **P2：URL/deep-link 与 UI/UX 收敛** — P0/P1 播放稳定后再做。
+
+## 本轮实际修改
+
+文件：`android/app/src/main/java/com/yuivo9999/mybox123/NativePlaybackBridge.java`
+
+提交：`bb8ad63bd49e35c4d1510a4eafb5e0950f6d4dcf`
+
+### 已确认的真实问题
+JS 层虽然已有 `operationGeneration/playerGeneration`，但 Android bridge 内部仍存在一个更深层的竞态：
+
+- bridge 是长期存在的单实例；
+- `loadMedia()` 会 release 当前 Exo/IJK/Native engine，再创建新 engine；
+- 各 engine 的 listener 是异步回调；
+- `emit()` 原先没有 engine identity；
+- 旧 engine 在 release 后如果仍回调，可能通过 bridge 当前的全局 `window.TVBoxWebView.onPlayerEvent` 把旧事件送给新 JS adapter。
+
+这不是理论上的“多个 JS adapter 覆盖 callback”问题，而是 **同一个 Android bridge 内 engine replacement 的事件身份缺失**。
+
+### 本轮修复
+增加 bridge 内部单调递增的：
+
+`playbackGeneration`
+
+并让每次 engine 创建时捕获：
+
+`final long engineGeneration = playbackGeneration`
+
+以下异步 engine callback 均带 generation：
+
+- ExoPlayer：buffering / prepared / playing / paused / completed / error
+- IJK：prepared / decoderChanged / completed / buffering / error
+- Android MediaPlayer：prepared / completed / buffering / error
+
+同时：
+
+- `loadMedia()` 创建新 logical playback 前递增 generation；
+- engine fallback 替换 engine 前递增 generation；
+- `releaseMedia()` 递增 generation；
+- `emit(event,data,generation)` 在转发前检查 generation 与当前值是否一致；
+- stale generation 直接丢弃；
+- `fallbackOrError(reason,generation)` 同样拒绝 stale callback 触发 fallback。
+
+### 设计理由
+目标不是增加更多 JS 防御，而是把事件身份隔离下沉到真正产生异步事件的边界：
+
+`Android engine callback → NativePlaybackBridge generation gate → JS adapter generation gate → playbackCore operation gate`
+
+这样形成两层不同责任的防线：
+
+- Android bridge：防旧 engine 事件污染当前 engine；
+- JS playbackCore：防旧 controller/operation 污染当前页面 session。
+
+## 当前状态
+
+- [x] 已确认 Android bridge 实现与 JS adapter 的真实事件合约。
+- [x] 已发现 bridge 没有 engine/session identity。
+- [x] 已在 Native bridge 增加 engine generation guard。
+- [x] 已让 fallback callback 同样受 generation guard 保护。
+- [ ] Android Gradle 真机/模拟器编译验证。
+- [ ] Android 真机 rapid switch/release 验证。
+- [ ] GitHub Actions Android workflow 真实结果。
+
+## 当前仍不能确定
+
+### PENDING：Android engine callback 的实际晚到路径
+代码现在已经对 stale callback 做了拒绝，但还没有真实设备证明：
+
+- Exo release 后是否一定还会回调；
+- IJK release 后是否可能继续回调；
+- fallback/reload 的具体线程交错时序。
+
+因此本轮可以确认 **防御已存在**，但不能宣称“真机已验证”。
+
+### PENDING：LiveFeature deferred A→B→C
+当前已有生产修复：
+
+- selectChannel 会 abort 前一个 deferred stream request；
+- streamLoading 会立即归零；
+- 新频道重新决定是否需要 lazy load。
+
+但还缺少行为测试证明 A/B/C 的 promise completion 顺序不会污染 `resolvedStreams` / `selectedChannelId` / playback state。
+
+## 下一位 AI 立即执行
+
+1. **先确认 HEAD 已进入 `bb8ad63bd49e35c4d1510a4eafb5e0950f6d4dcf`。**
+2. 给 `LiveFeature` 增加 deferred A→B→C 行为测试；重点断言旧请求即使晚完成也不能改变当前频道状态。
+3. 检查 `resolvedStreams` 的 cache key：当前只按 `channelId`，需要确认多 source 同 channelId 时是否会串缓存；如果会，修为 source-aware identity。
+4. 检查 EPG：`LiveFeature` 当前 channel change 后异步 `getEPG(activeChannel)` 只用 local active flag；继续确认 rapid A→B→C 与 source disable/remove 时不会污染。
+5. 检查 `PlaybackPage` 与 `LiveFeature` 的 controller 生命周期是否可能在 route transition 短时间重叠；用行为测试证明 resource owner，而不是先删页面。
+6. P0 真实验证未完成前，不修改 HLS buffer 参数，不做 UI 大改，不做 React Router 大迁移。
+
+## 给下下一位 AI 的资料
+
+- 不要重新实现 JS `operationGeneration/playerGeneration`，已有并已有行为测试。
+- 不要删除 `globalLiveCache`；它仍需要在业务层竞态完成后再判断是否收敛。
+- Native bridge generation 现在已经存在，后续重点是验证，不是继续堆第二个 generation。
+- Android bridge 的 generation 是 logical playback/engine replacement 级别；JS core generation 仍是 controller operation 级别，两者职责不同。
