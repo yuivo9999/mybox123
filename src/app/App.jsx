@@ -215,18 +215,7 @@ export function App(){
  };
  const openSearchHistory=(keyword)=>{pageStateStore.patch('search',{query:keyword});sessionStateStore.patch({tab:'movies',route:'search',selected:null});};
  const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
-  const handleLiveBack = () => {
-    const returnRoute = selected?.metadata?.returnRoute;
-    if (returnRoute === 'live-channel') {
-      const channelObj = selected?.metadata?.channel || contentState.channels.find(c => c.channelId === selected?.channelId) || null;
-      if (channelObj) {
-        sessionStateStore.patch({ route: 'live-channel', selected: channelObj });
-        return;
-      }
-    }
-    sessionStateStore.patch({ route: null, selected: null, tab: 'live' });
-  };
- const playLive=(channel,streamId=null,returnRoute=null)=>{
+ const playLive=(channel,streamId=null)=>{
    if(!channel)return;
    const preferredSource=persistent.settings?.defaultLiveSource||null;
    const request=playbackService.createLiveRequest({channel,preferredSource});
@@ -242,9 +231,6 @@ export function App(){
  const movieActive=['detail','movie-play','search'].includes(route)||tab==='home'||tab==='movies';
  const isManagementTab = ['sources', 'settings', 'appearance', 'me', 'about', 'data-management', 'history', 'search-history'].includes(tab);
 
- useEffect(()=>{
-   if(tab==='live' && route==='live-play') sessionStateStore.patch({route:null});
- },[tab,route]);
  useEffect(()=>{ void ensureFont(getFontById(persistent.settings?.fontFamily)); },[persistent.settings?.fontFamily]);
 
  if(!persistent.settings?.initialized) return <FirstLaunch onLater={()=>persistent.saveSettings({...persistent.settings,initialized:true,initializedAt:Date.now()})} onSources={()=>{persistent.saveSettings({...persistent.settings,initialized:true,initializedAt:Date.now()});nav('sources')}}/>;
@@ -308,9 +294,7 @@ export function AppRoot(){
      sessionStateStore.patch({tab:'movies',route:returnRoute,selected:returnRoute==='detail'?selected:null});
    }else if(route==='detail'||route==='search'){
      sessionStateStore.patch({tab:'movies',route:null,selected:null});
-   }else if(route==='live-play'){
-     sessionStateStore.patch({tab:'live',route:null,selected:null});
-   }else if(route==='live-channel'){
+    }else if(route==='live-channel'){
      sessionStateStore.patch({tab:'live',route:null,selected:null});
    }else if(route==='appearance'){
      sessionStateStore.patch({tab:'settings',route:null,selected:null});
