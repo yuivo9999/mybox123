@@ -78,7 +78,7 @@ export function createLivePlayerSession({ onReleased } = {}) {
 
     setChannel(channel, nextRequest) {
       if (released || !nextRequest) return null;
-      currentChannel = channel || nextRequest.metadata?.channel || currentChannel;
+      currentChannel = channel || nextRequest.metadata?.channel || (nextRequest.channelId ? { channelId: nextRequest.channelId } : currentChannel);
       if (!session.core) {
         session.createPlayback(nextRequest);
         return session.start();
