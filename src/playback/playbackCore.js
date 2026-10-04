@@ -197,7 +197,15 @@ export function createPlaybackCore(task,hooks={}) {
    if(state==='background'){if(task.request.kind===PlaybackKind.VOD){await player?.pause?.();}else{player?.pause?.();}}
    if(state==='foreground'&&task.request.kind===PlaybackKind.LIVE&&task.currentCandidate){try{await resolveAndLoad(task.currentCandidate);}catch(e){void recover(e,PlaybackFailureCode.NETWORK);}}
   },
-  stop(){player?.stop?.();task.stop();resourceRelease?.();resourceRelease=null;playbackTaskRegistry.unregister(task.request.taskId);},
+  stop(){
+   if(released) return;
+   if(task.status==='stopped') return;
+   player?.stop?.();
+   task.stop();
+   resourceRelease?.();
+   resourceRelease=null;
+   playbackTaskRegistry.unregister(task.request.taskId);
+  },
   release(){if(released)return;released=true;try{player?.release?.();}finally{player=null;resourceRelease?.();resourceRelease=null;playbackSessionManager.clear(sessionId);sessionId=null;unsubscribe();eventBus.clear();task.release();playbackTaskRegistry.unregister(task.request.taskId);}}
  };
 }
