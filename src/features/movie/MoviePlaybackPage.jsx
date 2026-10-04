@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Heart, Film, RotateCw, Ratio, Play } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Heart } from 'lucide-react';
 import { movieService } from '../../services/movieService.js';
 import { usePlaybackController } from '../../playback/usePlaybackController.js';
 import { usePersistentState } from '../../state/usePersistentState.js';
@@ -38,12 +38,9 @@ export function MoviePlaybackPage({
   const {
     controller,
     candidate,
-    setCandidate,
     status,
     resolvedInput,
     error,
-    setError,
-    progressRef,
     switchCandidate,
     retry: handleRetry,
   } = usePlaybackController({
@@ -182,7 +179,6 @@ export function MoviePlaybackPage({
         onNextEpisode={episodeIndex < episodes.length - 1 ? () => onEpisode?.(movie, episodeIndex + 1, source, request?.metadata?.returnRoute || 'detail') : undefined}
         candidates={candidates}
         onSelectCandidate={switchCandidate}
-        onOpenSourceModal={() => setSourceModalOpen(true)}
         videoContainerRef={videoContainerRef}
         terminalTag="VOD DECODE"
         isLive={false}
