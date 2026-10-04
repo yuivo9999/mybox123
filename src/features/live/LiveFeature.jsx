@@ -185,7 +185,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
       setSelectedChannelId('');
       setActiveStreamIndex(0);
     }
-  }, [allChannels, selectedChannelId]);
+  }, [allChannels, selectedChannelId, sources]);
   const activeChannelBase = useMemo(
     () => allChannels.find(channel => channel.channelId === selectedChannelId) || null,
     [allChannels, selectedChannelId],
@@ -194,7 +194,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     if (!activeChannelBase) return null;
     const lazyStreams = resolvedStreams[getLiveStreamCacheKey(activeChannelBase, sources)];
     return lazyStreams ? { ...activeChannelBase, streams: lazyStreams } : activeChannelBase;
-  }, [activeChannelBase, resolvedStreams]);
+  }, [activeChannelBase, resolvedStreams, sources]);
 
   const activeStream = activeChannel?.streams?.[activeStreamIndex] || activeChannel?.streams?.[0] || null;
   const [currentEPG, setCurrentEPG] = useState(null);
