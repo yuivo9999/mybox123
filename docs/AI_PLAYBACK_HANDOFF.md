@@ -1800,3 +1800,65 @@ P3.8：如果能取得本地执行环境，优先实际运行 build + test:react
 
 ### 下一优先级
 P3.9：继续审计 candidate/status 在手动切源、自动 fallback、retry、stop/leave 后的状态同步，并重点检查 VOD 自动下一集与 progress persistence 是否存在重复导航/重复 teardown。若环境能提供本地 Node/npm，再优先实际执行 `npm run build`、`npm run test:react`、`npm test`。
+
+
+## P3.9 已完成：候选状态同步、完成进度与 stop/leave 幂等性
+
+### 本轮实际发现
+静态回读 VOD / Live 播放链后确认了两个真实生命周期问题：
+
+1. **VOD completed 后切集/离开可能被 cleanup 的未完成进度覆盖**
+   - PlaybackCore 会在播放器完成时发出 `completed`。
+   - usePlaybackController 收到后先写入 `completed=true`。
+   - 但随后自动下一集或手动离开会触发旧 lifecycle cleanup；cleanup 原先无条件再写一次 `completed=false`。
+   - 这会让“刚看完这一集”的状态在最终持久化时被覆盖，直接影响继续观看/下一集推断。
+
+2. **Live/VOD stop + leave 可能重复触发 stopped teardown**
+   - 页面主动 `controller.stop()` 后，卸载 cleanup 还会调用 `controller.leave()`。
+   - PlaybackCore 原来的 `stop()` 每次都会再次调用 player.stop / task.stop / unregister。
+   - 虽然多数底层实现最终可恢复，但这会制造重复 stopped 事件与重复资源清理的噪声。
+
+### 已实施
+文件：`src/playback/usePlaybackController.js`
+- `progressRef` 增加当前 lifecycle 的 `completed` 标记。
+- 收到 VOD `completed` 事件时先标记 `completed=true`，再写入一次 completed progress。
+- lifecycle cleanup 只有在本集尚未完成时才写 `completed=false` 的最终进度。
+- candidate 手动切换不再在 hook 层重复 setCandidate / clear resolvedInput / clear error；正式状态更新统一依赖 PlaybackCore 的 `onCandidateChange` 回调，避免 controller → hook 双写。
+
+文件：`src/playback/playbackCore.js`
+- 引入 `PlaybackRequestStatus`。
+- `stop()` 对已释放或已经 STOPPED 的 task 直接返回，形成幂等 stop。
+- 页面主动 stop 后再由 leave cleanup 执行时，不再重复发 stopped / 重复 unregister。
+
+### 状态责任边界
+- 手动换源：PlaybackCore `switchCandidate()` 更新 task candidate，并通过 `onCandidateChange` 驱动 React state。
+- 自动 fallback：PlaybackCore `failAndResolve()` 更新 candidate，并通过同一 callback 驱动 React state；不由页面自行猜测 fallback 结果。
+- retry：controller 重新 start + resolveAndLoad；候选仍由 task/core 作为权威来源。
+- stop/leave：PlaybackCore 负责底层 stop/release，页面只发意图；stop 已具备幂等保护。
+- VOD completed：completed progress 一旦写入，本 lifecycle cleanup 不再覆盖成 unfinished。
+
+### 静态验证
+已回读确认：
+- `createPlaybackTask` 暴露 `status` getter，`PlaybackRequestStatus.STOPPED` 可用于 Core 幂等判断。
+- `switchCandidate()` 的候选更新已经有 Core → hook 的单一 callback 通道。
+- VOD 自动下一集仍只有 `handleVideoEnded` 负责导航；PlaybackCore completed 事件只负责完成状态与进度持久化，不重复导航。
+- 自动下一集倒计时在 request episodeId 改变时清理，不会跨集继续计时。
+
+### 尚未验证
+- 未运行浏览器、Android/iOS 真机。
+- 未运行 `npm run build`、`npm run test:react`、`npm test`。
+- 未做真实网络故障注入验证 A1→A2→B1。
+- 未验证 Native bridge stop/release 的真实幂等行为。
+
+### 当前潜在回归点
+- `completed` 事件依赖 PlaybackCore/player adapter 的事件顺序；真实播放器仍需验证在 React `onEnded` 导航前是否稳定发出 completed。
+- `requestKey` 仍是 controller lifecycle identity；如果未来需要在“不换集但改变关键 playback metadata”时重建 controller，必须同步扩充 requestKey。
+- 普通移动端非 fullscreen 的 aspect-ratio CSS 仍需要真实设备验证，暂不继续改动。
+
+### 下一优先级
+**P3.10 / 最终验证优先**：停止继续堆播放功能，优先取得可执行环境并实际运行：
+1. `npm run build`
+2. `npm run test:react`
+3. `npm test`
+4. 如能启动应用，再验证 Home/Movies/Search/Detail → Play → Back、续播、completed → 下一集、A1→A2→B1 fallback、手动切源、retry、stop/leave、Fullscreen/portrait/landscape。
+5. 只有运行验证通过后，再做最后一轮 UI polish / 清理重复信息。
