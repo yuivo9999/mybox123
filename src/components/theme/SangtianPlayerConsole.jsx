@@ -9,7 +9,7 @@ import {
 export function SangtianPlayerWindow({
   videoRef, status, error, resolvedInput, candidate, request, onRetry, onSwitchCandidate, onStop,
   onFullscreen, terminalTag = 'BASH', children, videoContainerRef, isLive = false,
-  playbackRate = 1.0, onChangePlaybackRate,
+  playbackRate = 1.0, onChangePlaybackRate, onTogglePlayback, onSeek,
   channels = [], activeChannel = null, activeStreamIndex = 0, onSelectChannel, onSwitchStreamIndex,
   isImmersive = false, onToggleImmersive,
   title = '', episodeLabel = '', sourceLabel = '',
@@ -279,15 +279,14 @@ export function SangtianPlayerWindow({
   const handleSeek = value => {
     const video = videoRef?.current;
     if (!video || !Number.isFinite(video.duration)) return;
-    video.currentTime = Number(value);
+    onSeek?.(Number(value));
     setCurrentTime(Number(value));
     resetControlsTimeout();
   };
 
   const handlePlayPause = () => {
-    const video = videoRef?.current;
-    if (!video) return;
-    if (video.paused) video.play().catch(() => {}); else video.pause();
+    if (!onTogglePlayback) return;
+    onTogglePlayback();
     resetControlsTimeout();
   };
 
@@ -296,7 +295,7 @@ export function SangtianPlayerWindow({
     const video = videoRef?.current;
     if (!video || !Number.isFinite(video.duration)) return;
     const nextTime = Math.max(0, Math.min(video.duration, (Number(video.currentTime) || 0) + seconds));
-    video.currentTime = nextTime;
+    onSeek?.(nextTime);
     setCurrentTime(nextTime);
     resetControlsTimeout();
   };
@@ -307,7 +306,6 @@ export function SangtianPlayerWindow({
     const nextIndex = (currentIndex + 1) % rates.length;
     const nextRate = rates[nextIndex];
     onChangePlaybackRate?.(nextRate);
-    if (videoRef?.current) videoRef.current.playbackRate = nextRate;
     resetControlsTimeout();
   };
 
@@ -378,7 +376,7 @@ export function SangtianPlayerWindow({
                       onClick={() => {
                         setIsStoppedManually(false);
                         if (onRetry) onRetry();
-                        else if (videoRef?.current) videoRef.current.play?.();
+                        else onTogglePlayback?.();
                       }}
                       style={{
                         width: 48,
