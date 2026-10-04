@@ -185,6 +185,31 @@ test('stop invalidates a pending load before it can prepare or play', async () =
   delete globalThis.window;
 });
 
+test('stop keeps the controller restartable and rebinds player events', async () => {
+  const { calls } = installNativeBridge();
+  const errors = [];
+  const { task, core } = createLiveCore({
+    onPlayerError: ({ error }) => errors.push(error),
+  });
+
+  core.attachPlayer(null);
+  const first = core.start();
+  await core.resolveAndLoad(first);
+  assert.equal(calls.filter((item) => item.method === 'playMedia').length, 1);
+
+  core.stop();
+  const restarted = core.start();
+  await core.resolveAndLoad(restarted);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(calls.filter((item) => item.method === 'playMedia').length, 2);
+  assert.deepEqual(errors, []);
+  assert.ok(task.status !== 'released');
+
+  core.release();
+  delete globalThis.window;
+});
+
 test('release while loading prevents late prepare and play', async () => {
   const { calls, loadWaiters } = installNativeBridge();
   const aLoad = deferred();
