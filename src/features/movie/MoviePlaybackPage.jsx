@@ -44,6 +44,7 @@ export function MoviePlaybackPage({
     error,
     switchCandidate,
     retry: handleRetry,
+    setPlaybackRate: setControllerPlaybackRate,
   } = usePlaybackController({
     request,
     videoRef,
@@ -57,9 +58,7 @@ export function MoviePlaybackPage({
 
   const handleChangePlaybackRate = rate => {
     setPlaybackRate(rate);
-    if (videoRef.current) {
-      videoRef.current.playbackRate = rate;
-    }
+    setControllerPlaybackRate(rate);
   };
 
   const playNextEpisode = () => {
@@ -170,6 +169,11 @@ export function MoviePlaybackPage({
         }}
         playbackRate={playbackRate}
         onChangePlaybackRate={handleChangePlaybackRate}
+        onTogglePlayback={() => {
+          if (status === 'playing') controller?.pause?.();
+          else controller?.play?.();
+        }}
+        onSeek={seconds => controller?.seek?.(Number(seconds))}
         title={movie?.title || request?.metadata?.title || '正在播放'}
         episodeLabel={currentEpisode?.title || `第 ${episodeIndex + 1} 集`}
         sourceLabel={candidateLabel}
