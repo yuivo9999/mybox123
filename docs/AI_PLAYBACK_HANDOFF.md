@@ -2292,3 +2292,82 @@ TV1 metadata effect 改为 source-aware 生命周期：
 - 不要修改 HLS 参数；
 - 不要把 React active flag 当作网络取消；
 - 不要宣称 TV1/EPG 的 Abort 已经完成真实设备验证。
+
+# 2026-10-05 本轮执行记录：P0 播放 Owner 边界审计
+
+## 结论
+
+确认当前 Live 有两个不同层级的播放入口，但不是两个长期同时存在的播放器 owner：
+
+1. `LiveFeature`：直播首页内嵌预览播放器。它创建自己的 `playbackController`，用于用户在频道列表页直接预览/切换频道。
+2. `PlaybackPage`：`route === 'live-play'` 的专用播放页。它创建第二个独立 `playbackController`，负责正式播放页生命周期、线路切换、重试、App 前后台等。
+
+App 路由在同一时刻只渲染其中一个：
+- 无 route + tab=live → MainPage → LiveFeature
+- route=live-play → PlaybackPage
+
+因此目前没有证据支持“两个组件同时持有 DOM 播放器”的常态性 bug。
+
+## 更关键的安全网
+
+`playbackResourceManager` + `playbackTaskRegistry` 已经提供全局单 owner 约束：
+
+- 新 controller start 时 acquire taskId；
+- 如果已有不同 taskId，旧 task 会 stop + release；
+- controller leave 对 LIVE 采用 release；
+- playbackCore 自身还有 operationGeneration / playerGeneration 双层旧操作隔离。
+
+因此架构上形成：
+
+`LiveFeature / PlaybackPage`
+→ `playbackService.createController()`
+→ `playbackCore`
+→ `playbackResourceManager`
+→ `playbackTaskRegistry`
+→ Native / HTML5 adapter
+
+## 本轮发现并修复的真实问题
+
+LiveFeature 的 source-aware cache 清理 effect 原来没有监听 `sources`，activeChannel 的 source-aware cache lookup 也没有监听 `sources`。
+
+这会导致 source A/B 启停改变后，在 channel object 和 resolvedStreams 没有变化的情况下，React 不重新计算 source identity。
+
+已修复：
+- cleanup effect dependency 增加 `sources`
+- activeChannel source-aware lookup dependency 增加 `sources`
+
+Commit:
+- `f7ab1b57f9f175b020d1a89d27fb601e2be646a2` — `fix(live): recompute source-aware playback cache on source changes`
+
+## 新增测试
+
+新增：
+`tests/playback/playback-resource-owner.test.mjs`
+
+覆盖：
+- 不同 task 只能存在一个 owner；
+- 新 owner 会释放旧 owner；
+- release 旧 owner 不会误释放新 owner；
+- 同 task reacquire 不会自我释放。
+
+Commit:
+- `b2fb419ef41eb48227a1223b3de459f2d1086355` — `test(playback): lock single resource owner`
+
+## 当前验证状态
+
+由于当前执行环境没有直接运行仓库 Node test runner 的条件，本轮没有声称测试通过。
+
+需要实际运行：
+- `npm run test:playback-lifecycle`
+- 新增 `tests/playback/playback-resource-owner.test.mjs`
+- `npm test`
+
+## 下一步
+
+P0 播放 Owner 边界已经完成代码审计，下一步进入：
+1. P0 把 TV1 Abort/source lifecycle 与 EPG cancellation 补成可执行 Node 行为测试；
+2. P0 检查 `PlaybackPage` live deep-link / back / source switch 后 request identity 是否始终闭合；
+3. P1 HTML5 custom headers capability filtering；
+4. P1 HLS live latency/buffer 真实源验证。
+
+不要在此阶段删除 LiveFeature 的内嵌播放器：它目前承担直播首页 preview 角色，且 App 已证明 route 层级会把它与 PlaybackPage 分离。若未来要收敛成单一播放器 UI，应作为独立产品/交互重构，而不是作为本轮竞态修复顺手删除。
