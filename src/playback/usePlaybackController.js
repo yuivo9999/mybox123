@@ -38,10 +38,12 @@ export function usePlaybackController({
 
   if (requestKeyRef.current !== requestKey) {
     requestKeyRef.current = requestKey;
-    progressRef.current = { currentTime: 0, duration: null, persistedAt: 0 };
   }
 
   useEffect(() => {
+    // React runs the previous lifecycle cleanup before this new effect setup.
+    // Reset here so the previous episode can persist its final progress first.
+    progressRef.current = { currentTime: 0, duration: null, persistedAt: 0 };
     setPlaybackMetrics({ currentTime: 0, duration: 0 });
   }, [requestKey]);
 
