@@ -7,11 +7,11 @@ import { FONT_CATALOG, getFontById } from '../config/fontCatalog.js';
 import { ensureFont } from '../services/fontLoader.js';
 import { MovieCarousel } from '../components/media/MovieCarousel.jsx';
 
-function Main({tab,route,selected,movies,channels,favorites,history,sources,searches,progress,settings,onTab,onMovie,onLive,onLiveChannel,onSearchHistory,toggleFavorite,onClearData,onClearHistory,onSaveSources,onClearSearches,onRemoveSearch,onClearCache,onSourceEnabled,onSourceActive,onTestSource,onRemoveSource,onUpdateSettings}){
+function Main({tab,route,selected,livePlayback,movies,channels,favorites,history,sources,searches,progress,settings,onTab,onMovie,onLive,onLiveChannel,onSearchHistory,toggleFavorite,onClearData,onClearHistory,onSaveSources,onClearSearches,onRemoveSearch,onClearCache,onSourceEnabled,onSourceActive,onTestSource,onRemoveSource,onUpdateSettings}){
  const [favoriteSection,setFavoriteSection]=useState('movies'); const [fontPicker,setFontPicker]=useState(false);
  const [confirm,setConfirm]=useState(null); const [sourceForm,setSourceForm]=useState(null); const [batchMode,setBatchMode]=useState(false);
  if(tab==='live') return <>
-  <LiveFeature channels={channels} sources={sources} favorites={favorites} requestedChannelId={selected?.channelId || null} requestedStreamId={selected?.__livePlaybackStreamId || null} onChannel={onLiveChannel} onPlay={onLive} onTab={onTab} toggleFavorite={toggleFavorite}/>
+  <LiveFeature channels={channels} sources={sources} favorites={favorites} requestedChannelId={livePlayback?.channelId || selected?.channelId || null} requestedStreamId={livePlayback?.streamId || null} onChannel={onLiveChannel} onPlay={onLive} onTab={onTab} toggleFavorite={toggleFavorite}/>
   {route==='live-channel' && selected && <LiveChannelPanel channel={selected} channels={channels} sources={sources} favorites={favorites} onBack={()=>onTab('live')} onPlay={onLive} onChannel={onLiveChannel} toggleFavorite={toggleFavorite}/>} 
  </>;
  if(tab==='favorites'){
