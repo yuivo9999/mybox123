@@ -9,7 +9,8 @@
 - 仓库：`yuivo9999/mybox123`
 - 默认分支：`main`
 - 当前接力分支：`ai-handoff/playback-phase1`
-- 本轮最新提交：`f9b91e53daee39f24766647e64555de150b84793`
+- 本轮代码最新提交：`e00b371a99bfbb60f451599dc5c5f8e12b9dae6a`
+- 交接文档更新后分支 HEAD 会继续前进；以分支最新 commit 为准。
 - 本轮没有合并到 `main`。
 - 本轮没有删除任何核心播放模块。
 - 本轮重点：修复播放入口上下文、播放返回行为、首选源导致的跨源兜底丢失。
@@ -418,8 +419,42 @@ VOD 正式页面是：
 ---
 
 ## 当前状态
+本轮已完成：播放上下文 + 返回行为 + preferred source 排序兜底 + 共享 PlaybackController 生命周期。
 
-本轮完成：播放上下文 + 返回行为 + preferred source 排序兜底。
+### 9. 本轮新增完成（P1.1）
+
+新增：`src/playback/usePlaybackController.js`
+
+已接入：
+- `src/features/movie/MoviePlaybackPage.jsx`
+- `src/pages/PlaybackPage.jsx`
+
+统一的职责：
+- createController
+- attachPlayer
+- start / resolveAndLoad
+- visibility background/foreground
+- progress 15 秒持久化
+- completed 持久化
+- unmount 持久化
+- retry
+- candidate change
+- leave/release
+
+注意：这只是“生命周期收敛”，不是最终 UI 架构完成。`PlaybackPage.jsx` 仍然是 Live + VOD-like 混合页面；下一阶段仍应把 VOD UI 分支继续清理，并逐步让 Live 成为独立正式播放上下文。
+
+### 10. 当前验证状态
+
+已通过静态代码检查：
+- VOD 页不再直接 import `playbackService` 创建 controller。
+- PlaybackPage 不再直接 import `playbackService` 创建 controller。
+- 两页均通过 `usePlaybackController` 管理生命周期。
+- shared hook 使用 ref 保存最新 onEvent，避免页面 render 导致 controller 重建。
+
+尚未完成：
+- 浏览器真实播放验证
+- 自动化 test/build 运行
+- 续播“内容级 resume episode”集中计算
 
 下一位第一任务：
-**验证本轮修改 → 开始 P1.1：收敛 VOD / Live 播放页面的职责，并建立共享 PlaybackContext / controller 生命周期，而不是继续在页面里复制播放器逻辑。**
+**开始 P1.4：建立 `watchProgressService`，把“某集进度”和“某内容应该从哪一集继续”统一起来，然后接回 MovieDetail / Home / History / Playback。**
