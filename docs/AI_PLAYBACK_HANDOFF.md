@@ -1493,3 +1493,27 @@ P2.7 导航与播放上下文已经基本收口，下一阶段不再继续无收
 3. 审计移动竖屏、横屏、桌面宽屏三个布局状态，避免播放区与侧栏互相挤压。
 4. 将播放器 UI 与播放生命周期彻底解耦：UI 只发 intent，不自行管理 source/controller。
 5. 最后再做 CSS / 命名 / 微交互清理。
+## 31. P3.1 播放 UI 层级第一轮收敛
+
+### 31.1 发现的问题
+播放器本体已经承担普通播放操作、全屏控制、倍速、画面比例、选集 / 线路、音轨 / 字幕 / 清晰度、直播选台。
+但 VOD 页面外层又额外挂了 SangtianFloatingBar，造成倍速 / 播放时间信息与播放器控制重复，而且该组件仍保留了已经失效的 currentCandidateLabel / onOpenSourceModal 调用方参数。
+
+### 31.2 已实施
+- VOD MoviePlaybackPage 移除 SangtianFloatingBar。
+- 播放控制统一回到 SangtianPlayerWindow。
+- SangtianConsoleCard 移除重复的“复制播放直链”区域；播放直链复制只保留播放器顶部入口。
+- 修正 SangtianPlayerConsole.jsx 缺失的 Heart / Radio icon import，避免 Live ConsoleCard 实际渲染时引用未定义组件。
+- 保留 ConsoleCard 的真正业务内容：VOD 资料 / 相关推荐、Live 频道选择。
+
+### 31.3 当前 UI 层级
+VOD：页面上下文 → PlayerWindow 播放本体与主播放控制 → Fullscreen 播放控制 + More + 选集 → ConsoleCard 资料与相关推荐。
+Live：PlayerWindow 直播本体 / 直播状态 / 选台 / 设置 → ConsoleCard 频道浏览 → 沉浸页承担真正的全屏入口。
+这比之前的播放器 + FloatingBar + ConsoleCard 各自都提供播放能力，更接近单一主控制面。
+
+### 31.4 验证边界
+本轮仍为源码静态修改，未运行浏览器、build、lint、unit test。
+
+### 31.5 下一优先级：P3.2 响应式布局
+下一轮优先审计播放器 CSS：普通桌面宽屏、平板 / 中等宽度、手机竖屏、手机横屏 / 全屏。
+重点确认侧栏、底部控制条、顶部触发器不会挤压或遮挡视频本体；然后再处理残余命名和视觉微调。
