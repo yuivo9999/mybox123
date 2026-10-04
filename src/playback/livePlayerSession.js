@@ -50,6 +50,7 @@ export function createLivePlayerSession({ onReleased } = {}) {
     createPlayback(nextRequest) {
       if (released || !nextRequest || nextRequest.kind !== PlaybackKind.LIVE) return null;
       request = nextRequest;
+      currentChannel = nextRequest.metadata?.channel ?? currentChannel;
       const { task, core } = playbackService.createLivePlaybackParts(nextRequest, {
         onResolvedInput: input => { currentCandidate = input; },
         onCandidateChange: candidate => { currentCandidate = candidate; },
