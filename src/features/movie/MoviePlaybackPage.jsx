@@ -8,7 +8,6 @@ import { SangtianTopBar } from '../../components/theme/SangtianTopBar.jsx';
 import { SangtianDrawer } from '../../components/theme/SangtianDrawer.jsx';
 import {
   SangtianPlayerWindow,
-  SangtianFloatingBar,
   SangtianConsoleCard
 } from '../../components/theme/SangtianPlayerConsole.jsx';
 
@@ -248,15 +247,7 @@ export function MoviePlaybackPage({
         )}
       </SangtianPlayerWindow>
 
-      {/* 4. Floating Control Bar */}
-      <SangtianFloatingBar
-        playbackRate={playbackRate}
-        onChangeRate={handleChangePlaybackRate}
-        currentCandidateLabel={`✦ ${candidateLabel}`}
-        onOpenSourceModal={() => setSourceModalOpen(true)}
-      />
-
-      {/* 5. Console Card display */}
+      {/* 4. Console Card display */}
       <SangtianConsoleCard
         title={request?.metadata?.title || movie?.title || '精彩视频'}
         subtitle={`${movie?.year || '2026'} · ${movie?.category || '高清影音'} · 第 ${episodeIndex + 1} 集`}
