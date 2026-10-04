@@ -1537,3 +1537,24 @@ Live：PlayerWindow 直播本体 / 直播状态 / 选台 / 设置 → ConsoleCar
 ### 32.4 下一优先级：P3.3 播放器交互与状态解耦审计
 下一轮重点不是继续加按钮，而是检查 SangtianPlayerWindow 是否仍直接操作 videoRef 的播放 / seek / playbackRate，以及这些 intent 是否应该由 PlaybackController 统一承接。
 原则：UI 发 intent，controller 决定播放生命周期；不要把底层 controller 再复制回页面 UI。
+
+## 33. P3.3 播放器 UI / Controller intent 解耦完成
+
+### 33.1 已实施
+- playbackCore / playbackService / usePlaybackController 统一暴露 play、pause、seek、setPlaybackRate intent。
+- html5PlayerAdapter 与 nativePlayerAdapter 增加 setPlaybackRate 能力。
+- SangtianPlayerWindow 的播放/暂停、拖动进度、±10 秒、倍速切换不再直接写 video.play()/pause()/currentTime/playbackRate，而是调用 controller intent props。
+- MoviePlaybackPage 与 LivePlaybackPage 的倍速和播放控制统一走 controller。
+- LivePlaybackPage 停止时删除页面级 pause/removeAttribute/load，统一由 controller.stop() 负责生命周期。
+
+### 33.2 有意保留
+SangtianPlayerWindow 仍读取 video.currentTime、duration、buffered、paused、readyState 做展示型 metrics / UI 状态同步；这是只读观测，不属于播放生命周期控制。
+
+### 33.3 静态验证
+- SangtianPlayerConsole：无直接 video.play()/pause()/currentTime 写入/playbackRate 写入。
+- MoviePlaybackPage：无直接 videoRef.current.playbackRate/currentTime/play/pause。
+- LivePlaybackPage：播放控制与停止生命周期已收口到 controller。
+- 未运行浏览器、npm build、lint、unit test；native 宿主 setPlaybackRate 尚未运行时验证。
+
+### 33.4 下一优先级：P3.4
+继续清理播放器 UI 的重复状态来源：重点审计 isPlaying / currentTime / duration / status 是否同时由 DOM 事件、controller 状态、页面 state 三套维护。目标是减少重复状态，而不是继续增加控制按钮。
