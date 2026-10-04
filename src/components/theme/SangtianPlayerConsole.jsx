@@ -15,7 +15,7 @@ export function SangtianPlayerWindow({
   title = '', episodeLabel = '', sourceLabel = '',
   episodes = [], currentEpisodeIndex = 0, onSelectEpisode,
   onPreviousEpisode, onNextEpisode,
-  candidates = [], onSelectCandidate, onOpenSourceModal,
+  candidates = [], onSelectCandidate,
   onTimeMetricsChange,
   playbackCapabilities = {}, getAudioTracks, getSubtitleTracks, getQualities, selectAudioTrack, selectSubtitleTrack, selectQuality,
 }) {
