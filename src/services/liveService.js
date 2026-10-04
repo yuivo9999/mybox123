@@ -150,7 +150,7 @@ export const liveService = {
     return channelRef?.streams ?? [];
   },
 
-  async getEPG(channelRef, range = {}) {
+  async getEPG(channelRef, range = {}, options = {}) {
     const normalizedRange = normalizeRange(range);
     const key = epgCacheKey(channelRef, normalizedRange);
     const cached = cacheStorage.get(CacheNamespace.EPG, key, { allowStale: true });
@@ -158,7 +158,7 @@ export const liveService = {
 
     const adapters = liveRegistry.list().filter((adapter) => channelRef?.sourceRefs?.some((ref) => ref.sourceId === adapter.sourceId));
     const results = await Promise.allSettled(adapters.map((adapter) =>
-      requestManager.run(`live:epg:${adapter.sourceId}:${channelRef?.channelId ?? ''}:${normalizedRange.startAt ?? ''}:${normalizedRange.endAt ?? ''}`, (signal) => adapter.getEPG(channelRef, normalizedRange, { signal })),
+      requestManager.run(`live:epg:${adapter.sourceId}:${channelRef?.channelId ?? ''}:${normalizedRange.startAt ?? ''}:${normalizedRange.endAt ?? ''}`, (signal) => adapter.getEPG(channelRef, normalizedRange, { signal: options.signal || signal })),
     ));
     const epg = results.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
     if (epg.length) {
