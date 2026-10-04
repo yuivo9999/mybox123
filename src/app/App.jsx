@@ -225,7 +225,7 @@ export function App(){
    sourceManagementService.touchUsage(preferredCandidate?.sourceId);
    // Live playback is owned by LiveFeature. Navigation only changes the visible Live UI;
    // it must never create a PlaybackPage/controller pair for the same channel.
-   sessionStateStore.patch({selected:{...channel,__livePlaybackStreamId:streamId||null},route:null,tab:'live'});
+   sessionStateStore.patch({selected:{...channel},livePlayback:{channelId:channel.channelId,streamId:streamId||null},route:null,tab:'live'});
    persistent.recordLivePlay(channel,streamId);
  };
  const movieActive=['detail','movie-play','search'].includes(route)||tab==='home'||tab==='movies';
