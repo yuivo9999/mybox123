@@ -69,7 +69,8 @@ export function createPlaybackCore(task,hooks={}) {
  };
 
  const resolve=async(candidate=task.currentCandidate,options={})=>{
-  if(!candidate)return null;
+  const operationToken=options.__operationGeneration;
+  if(!candidate||released||(operationToken!=null&&!isCurrentOperation(operationToken)))return null;
   // Live 使用源提供的原始 mediaUrl，完全跳过影视解析器链。
   if(task.request.kind===PlaybackKind.LIVE){
    const directInput={
@@ -87,6 +88,7 @@ export function createPlaybackCore(task,hooks={}) {
   sessionId=playbackSessionManager.create(candidate);
   try{
    const resolved=await parserService.resolve({...candidate,session:{sessionId}}, {...options,sessionManager:playbackSessionManager});
+   if(operationToken!=null&&!isCurrentOperation(operationToken))return null;
    hooks.onResolvedInput?.(resolved);
    return resolved;
   }catch(error){
@@ -95,7 +97,7 @@ export function createPlaybackCore(task,hooks={}) {
    hooks.onParserError?.({candidate,error:normalized,code});
    emit('error',{candidateId:candidate.candidateId,code,error:normalized.message});
    const failureCode=code===PlaybackFailureCode.NETWORK?PlaybackFailureCode.NETWORK:code===PlaybackFailureCode.EXPIRED?PlaybackFailureCode.EXPIRED:PlaybackFailureCode.PARSER;
-   if(!released && task.currentCandidateId===candidate.candidateId) failAndResolve(normalized,failureCode);
+   if(!released && task.currentCandidateId===candidate.candidateId && (operationToken==null || isCurrentOperation(operationToken))) failAndResolve(normalized,failureCode);
    return null;
   }
  }
@@ -129,7 +131,7 @@ export function createPlaybackCore(task,hooks={}) {
 
  const resolveAndLoad=async(candidate=task.currentCandidate,options={})=>{
   const generation=operationGeneration;
-  const input=await resolve(candidate,options);
+  const input=await resolve(candidate,{...options,__operationGeneration:generation});
   if(!input||!isCurrentOperation(generation))return null;
   await playResolved(input);
   if(!isCurrentOperation(generation))return null;
