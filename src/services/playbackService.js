@@ -99,14 +99,12 @@ export const playbackService = {
 };
 
 export function createPlaybackTask(request) {
-  const snapshot = Object.freeze({
-    ...request,
-    candidates: request.candidates.map((candidate) => Object.freeze({
-      ...candidate,
-      headers: Object.freeze({ ...candidate.headers }),
-      metadata: Object.freeze({ ...candidate.metadata }),
-    })),
-  });
+  const snapshot = Object.freeze({ ...request });
+  let candidates = request.candidates.map((candidate) => Object.freeze({
+    ...candidate,
+    headers: Object.freeze({ ...candidate.headers }),
+    metadata: Object.freeze({ ...candidate.metadata }),
+  }));
   let status = PlaybackRequestStatus.CREATED;
   let currentIndex = 0;
   let retryCount = 0;
@@ -121,7 +119,7 @@ export function createPlaybackTask(request) {
     return payload;
   };
 
-  const current = () => snapshot.candidates[currentIndex] ?? null;
+  const current = () => candidates[currentIndex] ?? null;
   const markFailed = (candidateId, error, code = PlaybackFailureCode.UNKNOWN) => {
     if (candidateId) failedCandidates.add(candidateId);
     failureCount += 1;
@@ -136,10 +134,10 @@ export function createPlaybackTask(request) {
   };
 
   const next = () => {
-    for (let index = currentIndex + 1; index < snapshot.candidates.length; index += 1) {
-      if (!failedCandidates.has(snapshot.candidates[index].candidateId) && !isPlaybackCandidateExpired(snapshot.candidates[index])) {
+    for (let index = currentIndex + 1; index < candidates.length; index += 1) {
+      if (!failedCandidates.has(candidates[index].candidateId) && !isPlaybackCandidateExpired(candidates[index])) {
         currentIndex = index;
-        currentCandidateId = snapshot.candidates[index].candidateId;
+        currentCandidateId = candidates[index].candidateId;
         status = PlaybackRequestStatus.LOADING;
         retryCount = 0;
         emit('sourceChanged', { candidate: current() });
@@ -150,7 +148,7 @@ export function createPlaybackTask(request) {
   };
 
   return {
-    request: snapshot,
+    get request() { return { ...snapshot, candidates }; },
     get status() { return status; },
     get currentCandidate() { return current(); },
     get currentCandidateId() { return currentCandidateId; },
@@ -187,9 +185,9 @@ export function createPlaybackTask(request) {
       return next();
     },
     switchCandidate(candidateId) {
-      const index = snapshot.candidates.findIndex((candidate) => candidate.candidateId === candidateId);
+      const index = candidates.findIndex((candidate) => candidate.candidateId === candidateId);
       if (index < 0 || failedCandidates.has(candidateId)) return null;
-      if (isPlaybackCandidateExpired(snapshot.candidates[index])) {
+      if (isPlaybackCandidateExpired(candidates[index])) {
         failedCandidates.add(candidateId);
         emit('error', { candidateId, code: PlaybackFailureCode.EXPIRED, error: 'PLAYBACK_CANDIDATE_EXPIRED' });
         return null;
@@ -199,6 +197,23 @@ export function createPlaybackTask(request) {
       retryCount = 0;
       status = PlaybackRequestStatus.LOADING;
       emit('sourceChanged', { candidate: current() });
+      return current();
+    },
+    replaceCandidates(nextCandidates = [], preferredCandidateId = null) {
+      candidates = nextCandidates.map((candidate) => Object.freeze({
+        ...candidate,
+        headers: Object.freeze({ ...candidate.headers }),
+        metadata: Object.freeze({ ...candidate.metadata }),
+      }));
+      failedCandidates.clear();
+      retryCount = 0;
+      const preferredIndex = preferredCandidateId
+        ? candidates.findIndex((candidate) => candidate.candidateId === preferredCandidateId)
+        : -1;
+      currentIndex = preferredIndex >= 0 ? preferredIndex : 0;
+      currentCandidateId = candidates[currentIndex]?.candidateId ?? null;
+      status = candidates.length ? PlaybackRequestStatus.LOADING : PlaybackRequestStatus.STOPPED;
+      emit('sourceChanged', { candidate: current(), candidates });
       return current();
     },
     stop() {
