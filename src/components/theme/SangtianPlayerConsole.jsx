@@ -33,7 +33,7 @@ export function SangtianPlayerWindow({
   const [showFullscreenBar, setShowFullscreenBar] = useState(true);
   const [showLeftSidebar, setShowLeftSidebar] = useState(false);
   const [showRightSidebar, setShowRightSidebar] = useState(false);
-  const [showEpisodeSidebar, setShowEpisodeSidebar] = useState(false);
+  const [rightSidebarSection, setRightSidebarSection] = useState('settings');
   const [episodePage, setEpisodePage] = useState(0);
   const [isStoppedManually, setIsStoppedManually] = useState(false);
   const [audioTracks, setAudioTracks] = useState([]);
@@ -149,7 +149,7 @@ export function SangtianPlayerWindow({
       if (!isSystem && !isWebFullscreen) {
         setShowLeftSidebar(false);
         setShowRightSidebar(false);
-        setShowEpisodeSidebar(false);
+        setRightSidebarSection('settings');
       }
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
@@ -163,7 +163,7 @@ export function SangtianPlayerWindow({
   const resetControlsTimeout = () => {
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     setShowFullscreenBar(true);
-    if (fullscreen && isPlaying && !isLocked && !showLeftSidebar && !showRightSidebar && !showEpisodeSidebar) {
+    if (fullscreen && isPlaying && !isLocked && !showLeftSidebar && !showRightSidebar) {
       controlsTimeoutRef.current = setTimeout(() => {
         setShowFullscreenBar(false);
       }, 4000);
@@ -180,7 +180,7 @@ export function SangtianPlayerWindow({
     return () => {
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     };
-  }, [fullscreen, isPlaying, isLocked, showLeftSidebar, showRightSidebar, showEpisodeSidebar]);
+  }, [fullscreen, isPlaying, isLocked, showLeftSidebar, showRightSidebar]);
 
   const [selectedSidebarCat, setSelectedSidebarCat] = useState('全部');
 
@@ -261,7 +261,7 @@ export function SangtianPlayerWindow({
       setIsWebFullscreen(false);
       setShowLeftSidebar(false);
       setShowRightSidebar(false);
-      setShowEpisodeSidebar(false);
+      setRightSidebarSection('settings');
       setIsLocked(false);
       if (document.fullscreenElement) {
         try { await document.exitFullscreen?.(); } catch {}
@@ -472,7 +472,7 @@ export function SangtianPlayerWindow({
                         <button
                           type="button"
                           className="sangtian-trigger-btn"
-                          onClick={(e) => { e.stopPropagation(); setShowLeftSidebar(!showLeftSidebar); setShowRightSidebar(false); setShowEpisodeSidebar(false); }}
+                          onClick={(e) => { e.stopPropagation(); setShowLeftSidebar(!showLeftSidebar); setShowRightSidebar(false); setRightSidebarSection('settings'); }}
                         >
                           <LayoutGrid size={15} />
                           <span>选台</span>
@@ -494,7 +494,7 @@ export function SangtianPlayerWindow({
                       <button
                         type="button"
                         className="sangtian-trigger-btn"
-                        onClick={(e) => { e.stopPropagation(); setShowEpisodeSidebar(!showEpisodeSidebar); setShowRightSidebar(false); }}
+                        onClick={(e) => { e.stopPropagation(); setRightSidebarSection('episodes'); setShowRightSidebar(true); }}
                       >
                         <ListVideo size={15} />
                         <span>选集 ({episodes.length})</span>
@@ -505,10 +505,10 @@ export function SangtianPlayerWindow({
                     <button
                       type="button"
                       className="sangtian-trigger-btn"
-                      onClick={(e) => { e.stopPropagation(); setShowRightSidebar(!showRightSidebar); setShowLeftSidebar(false); setShowEpisodeSidebar(false); }}
+                      onClick={(e) => { e.stopPropagation(); setShowRightSidebar(!showRightSidebar); setShowLeftSidebar(false); setRightSidebarSection('settings'); }}
                     >
                       <SlidersHorizontal size={15} />
-                      <span>{isLive ? '解码' : '线路设置'}</span>
+                      <span>{isLive ? '设置' : '更多'}</span>
                     </button>
 
                     {/* Lock Screen Button */}
@@ -571,132 +571,55 @@ export function SangtianPlayerWindow({
                   </div>
                 )}
 
-                {/* Right Episode Sidebar for VOD / Movies in Fullscreen */}
-                {!isLive && showEpisodeSidebar && (
-                  <div className="sangtian-fullscreen-right-sidebar" onClick={(e) => e.stopPropagation()}>
-                    <div className="sidebar-header">
-                      <b>剧集选集 ({episodes.length} 集)</b>
-                      <button className="close-sidebar-btn" onClick={() => setShowEpisodeSidebar(false)}>✕</button>
-                    </div>
-                    {episodeGroups.length > 1 && (
-                      <div className="sidebar-category-chips" style={{ marginTop: 6 }}>
-                        {episodeGroups.map((_, i) => (
-                          <button
-                            key={i}
-                            className={`sidebar-chip ${episodePage === i ? 'active' : ''}`}
-                            onClick={() => setEpisodePage(i)}
-                          >
-                            {i * 50 + 1}–{Math.min((i + 1) * 50, episodes.length)}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <div className="sidebar-settings-content" style={{ marginTop: 6 }}>
-                      <div className="settings-btn-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))' }}>
-                        {currentGroupEpisodes.map((ep, idx) => {
-                          const realIdx = episodePage * 50 + idx;
-                          const isCurrent = realIdx === currentEpisodeIndex;
-                          return (
-                            <button
-                              key={ep.episodeId || realIdx}
-                              className={`setting-btn ${isCurrent ? 'active' : ''}`}
-                              onClick={() => {
-                                onSelectEpisode?.(realIdx);
-                                setShowEpisodeSidebar(false);
-                              }}
-                              title={ep.title}
-                            >
-                              {ep.title || `${realIdx + 1}`}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Right Settings Sidebar */}
+                {/* Unified Right Playback Sidebar */}
                 {showRightSidebar && (
                   <div className="sangtian-fullscreen-right-sidebar" onClick={(e) => e.stopPropagation()}>
                     <div className="sidebar-header">
-                      <b>{isLive ? '播放与解码设置' : '线路与播放设置'}</b>
+                      <b>{rightSidebarSection === 'episodes' && !isLive ? '剧集选集 (' + episodes.length + ' 集)' : (isLive ? '播放与解码设置' : '播放设置')}</b>
                       <button className="close-sidebar-btn" onClick={() => setShowRightSidebar(false)}>✕</button>
                     </div>
                     <div className="sidebar-settings-content">
-                      <div className="settings-group">
-                        <label>画面比例</label>
-                        <div className="settings-btn-grid">
-                          {aspectOptions.map((opt) => (
-                            <button
-                              key={opt.id}
-                              className={`setting-btn ${aspectMode === opt.id ? 'active' : ''}`}
-                              onClick={() => setAspectMode(opt.id)}
-                            >
-                              {opt.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {(playbackCapabilities.qualitySelection && qualities.length > 0) && (
-                        <div className="settings-group">
-                          <label>清晰度</label>
-                          <div className="settings-btn-grid">
-                            {qualities.map(q=><button key={q.qualityId} className={`setting-btn ${selectedQuality===q.qualityId?'active':''}`} onClick={async()=>{const value=await selectQuality?.(q.qualityId);if(value){setSelectedQuality(q.qualityId);}}}>{q.label || (q.height ? q.height+'p' : '自动')}</button>)}
+                      {rightSidebarSection === 'episodes' && !isLive ? (
+                        <>
+                          {episodeGroups.length > 1 && (
+                            <div className="sidebar-category-chips" style={{ marginTop: 6 }}>
+                              {episodeGroups.map((_, i) => (
+                                <button key={i} className={`sidebar-chip ${episodePage === i ? 'active' : ''}`} onClick={() => setEpisodePage(i)}>
+                                  {i * 50 + 1}–{Math.min((i + 1) * 50, episodes.length)}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          <div className="settings-group">
+                            <label>选择集数</label>
+                            <div className="settings-btn-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))' }}>
+                              {currentGroupEpisodes.map((ep, idx) => {
+                                const realIdx = episodePage * 50 + idx;
+                                const isCurrent = realIdx === currentEpisodeIndex;
+                                return <button key={ep.episodeId || realIdx} className={`setting-btn ${isCurrent ? 'active' : ''}`} onClick={() => { onSelectEpisode?.(realIdx); setShowRightSidebar(false); }} title={ep.title}>{ep.title || (realIdx + 1)}</button>;
+                              })}
+                            </div>
                           </div>
-                        </div>
+                          {candidates?.length > 0 && (
+                            <div className="settings-group">
+                              <label>播放线路</label>
+                              <div className="settings-btn-grid vertical">
+                                {candidates.map((c, idx) => <button key={c.candidateId} className={`setting-btn ${candidate?.candidateId === c.candidateId ? 'active' : ''}`} onClick={() => { onSelectCandidate?.(c.candidateId); setShowRightSidebar(false); }}>{c.metadata?.label || c.label || (c.index != null ? '线路 ' + (c.index + 1) : '线路 ' + (idx + 1))}</button>)}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {!isLive && <div className="settings-group"><label>播放速度</label><div className="settings-btn-grid">{[0.75, 1.0, 1.25, 1.5, 2.0].map(rate => <button key={rate} className={`setting-btn ${playbackRate === rate ? 'active' : ''}`} onClick={() => onChangePlaybackRate?.(rate)}>{rate}x</button>)}</div></div>}
+                          <div className="settings-group"><label>画面比例</label><div className="settings-btn-grid">{aspectOptions.map(opt => <button key={opt.id} className={`setting-btn ${aspectMode === opt.id ? 'active' : ''}`} onClick={() => setAspectMode(opt.id)}>{opt.label}</button>)}</div></div>
+                          {playbackCapabilities.qualitySelection && qualities.length > 0 && <div className="settings-group"><label>清晰度</label><div className="settings-btn-grid">{qualities.map(q => <button key={q.qualityId} className={`setting-btn ${selectedQuality === q.qualityId ? 'active' : ''}`} onClick={async () => { const value = await selectQuality?.(q.qualityId); if (value) setSelectedQuality(q.qualityId); }}>{q.label || (q.height ? q.height + 'p' : '自动')}</button>)}</div></div>}
+                          {playbackCapabilities.audioTracks && audioTracks.length > 0 && <div className="settings-group"><label>音轨</label><div className="settings-btn-grid">{audioTracks.map(t => <button key={t.id} className={`setting-btn ${selectedAudioTrack === t.id ? 'active' : ''}`} onClick={async () => { const ok = await selectAudioTrack?.(t.id); if (ok !== false) setSelectedAudioTrack(t.id); }}>{t.label || t.language || t.id}</button>)}</div></div>}
+                          {playbackCapabilities.subtitleTracks && subtitleTracks.length > 0 && <div className="settings-group"><label>字幕</label><div className="settings-btn-grid">{subtitleTracks.map(t => <button key={t.id} className={`setting-btn ${selectedSubtitleTrack === t.id ? 'active' : ''}`} onClick={async () => { const ok = await selectSubtitleTrack?.(t.id); if (ok !== false) setSelectedSubtitleTrack(t.id); }}>{t.label || t.language || t.id}</button>)}</div></div>}
+                          {!isLive && candidates?.length > 0 && <div className="settings-group"><label>播放线路 ({candidates.length})</label><div className="settings-btn-grid vertical">{candidates.map((c, idx) => <button key={c.candidateId} className={`setting-btn ${candidate?.candidateId === c.candidateId ? 'active' : ''}`} onClick={() => { onSelectCandidate?.(c.candidateId); setShowRightSidebar(false); }}>{c.metadata?.label || c.label || (c.index != null ? '线路 ' + (c.index + 1) : '线路 ' + (idx + 1))}</button>)}</div></div>}
+                        </>
                       )}
-                      {(playbackCapabilities.audioTracks && audioTracks.length > 0) && (
-                        <div className="settings-group">
-                          <label>音轨</label>
-                          <div className="settings-btn-grid">
-                            {audioTracks.map(t=><button key={t.id} className={`setting-btn ${selectedAudioTrack===t.id?'active':''}`} onClick={async()=>{const ok=await selectAudioTrack?.(t.id);if(ok!==false)setSelectedAudioTrack(t.id);}}>{t.label || t.language || t.id}</button>)}
-                          </div>
-                        </div>
-                      )}
-                      {(playbackCapabilities.subtitleTracks && subtitleTracks.length > 0) && (
-                        <div className="settings-group">
-                          <label>字幕</label>
-                          <div className="settings-btn-grid">
-                            {subtitleTracks.map(t=><button key={t.id} className={`setting-btn ${selectedSubtitleTrack===t.id?'active':''}`} onClick={async()=>{const ok=await selectSubtitleTrack?.(t.id);if(ok!==false)setSelectedSubtitleTrack(t.id);}}>{t.label || t.language || t.id}</button>)}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* VOD Candidate Lines */}
-                      {!isLive && candidates?.length > 0 && (
-                        <div className="settings-group">
-                          <label>备用播放线路 ({candidates.length})</label>
-                          <div className="settings-btn-grid vertical">
-                            {candidates.map((c, idx) => (
-                              <button
-                                key={c.candidateId}
-                                className={`setting-btn ${candidate?.candidateId === c.candidateId ? 'active' : ''}`}
-                                onClick={() => {
-                                  onSelectCandidate?.(c.candidateId);
-                                  setShowRightSidebar(false);
-                                }}
-                              >
-                                {c.metadata?.label || c.label || (c.index != null ? `线路 ${c.index + 1}` : `线路 ${idx + 1}`)}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="settings-group exit-section">
-                        <button
-                          type="button"
-                          className="sangtian-big-exit-btn"
-                          onClick={() => {
-                            setShowRightSidebar(false);
-                            handleToggleFullscreen();
-                          }}
-                        >
-                          <Minimize2 size={18} />
-                          <span>退出全屏模式</span>
-                        </button>
-                      </div>
+                      <div className="settings-group exit-section"><button type="button" className="sangtian-big-exit-btn" onClick={() => { setShowRightSidebar(false); handleToggleFullscreen(); }}><Minimize2 size={18} /><span>退出全屏模式</span></button></div>
                     </div>
                   </div>
                 )}
