@@ -84,6 +84,7 @@ export const playbackService = {
       start: () => core.start(),
       resolveAndLoad: (candidate, options) => core.resolveAndLoad(candidate, options),
       subscribe: listener => core.subscribe(listener),
+      get failedCandidateIds() { return core.task?.failedCandidateIds ?? []; },
       switchCandidate: id => core.switchCandidate(id),
       switchEpisode: (...args) => core.switchEpisode(...args),
       replaceLiveCandidates: (candidates, metadata) => core.replaceLiveCandidates(candidates, metadata),
