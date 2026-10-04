@@ -956,3 +956,148 @@ P1：
 - 不要把行为测试脚本重新指回 architecture runner；这正是本轮修复的测试基础设施问题。
 - 当前最大未知不是“有没有 generation guard”，而是**fallback owner 是否唯一、Native bridge 是否有可区分 session、以及实际测试是否通过**。
 - 浏览器/Android 真机验证仍然没有完成，不能把代码级 PASS 当成产品级 PASS。
+
+
+---
+
+# 25. 本轮继续执行结果：P0-A fallback owner 收敛 + controller 生命周期修正
+
+## 本轮
+- 日期：2026-10-05
+- 起始 HEAD：`cee1ddcabd28c723f52fc44799753e8257e346f2`
+- 本轮代码提交：`7dc141f65a6a027e1f0b3a912350d4c6f9167041`
+- 工作范围：继续执行 P0-A；沿 `LiveFeature → playbackCore → recover → failAndResolve → onCandidateChange` 追踪自动 fallback，并检查线路切换是否意外重建 controller。
+- 修改文件：
+  - `src/features/live/LiveFeature.jsx`
+  - `docs/AI_PLAYBACK_HANDOFF.md`
+
+## 已确认的 P0-A 根因
+### 1. 自动 fallback 的唯一 owner 应为 playbackCore/task
+实际调用链：
+
+`player error`
+→ `playbackCore.handlePlayerEvent()`
+→ `recover()`
+→ retry/reconnect
+→ `failAndResolve()`
+→ `task.fail()`
+→ `hooks.onCandidateChange(next)`
+→ `resolveAndLoad(next)`
+
+因此 LiveFeature 不应该在 `onPlayerError` 中再次调用 `switchCandidate()`。
+
+此前 LiveFeature 的 `onPlayerError` 会自行递增 `activeStreamIndex` 并调用 `playbackController.switchCandidate()`。这会让 UI 层和 playbackCore 同时拥有自动 fallback 控制权；尤其当 core 已经切到下一个 candidate、但该 candidate 的再次 load 又失败时，UI 可能继续切到下下个 candidate。
+
+### 2. 更严重的隐藏问题：activeStreamIndex 被错误地作为 controller 生命周期依赖
+此前：
+
+`useMemo(createController, [livePlaybackRequest, activeChannel, activeStreamIndex])`
+
+而 core 的 `onCandidateChange` 本身就会更新 `activeStreamIndex`。
+
+结果是：
+
+`candidate switch`
+→ `setActiveStreamIndex()`
+→ React rerender
+→ controller useMemo dependency 变化
+→ 旧 controller cleanup/leave
+→ 新 controller create/start
+
+这会把一次正常的 candidate switch 放大成一次 controller 销毁/重建，破坏 playbackCore 已经建立的 operation/player generation 生命周期隔离。
+
+## 本轮修复
+### P0-A-1：LiveFeature 不再执行自动 fallback
+`onPlayerError` 现在只负责展示最终逃逸到 UI 层的错误，不再：
+- 修改 `activeStreamIndex`
+- 调 `switchCandidate()`
+- 参与自动 retry/fallback
+
+自动 fallback 的唯一 owner：
+
+**`playbackCore + playbackTask`**
+
+### P0-A-2：controller 生命周期只跟随 playback request
+`playbackController` 的 memo dependency 从：
+
+`[livePlaybackRequest, activeChannel, activeStreamIndex]`
+
+收敛为：
+
+`[livePlaybackRequest]`
+
+这样用户主动切线路或 core 自动 fallback 时，candidate 变化不会重新创建 controller。
+
+### P0-A-3：保留 onCandidateChange 作为 UI 同步点
+core 切换 candidate 后仍调用：
+
+`hooks.onCandidateChange(next)`
+
+LiveFeature 继续通过它更新：
+- `playbackCandidate`
+- `activeStreamIndex`
+- 清理旧错误展示
+
+但这些只是**显示状态同步**，不再反向控制 playbackCore。
+
+## 代码级结论
+- [x] 已确认 UI fallback 与 core fallback 存在双 owner 风险。
+- [x] 已删除 UI 层自动 candidate transition。
+- [x] 已解除 `activeStreamIndex → controller recreation` 的生命周期耦合。
+- [x] core 的 generation guard 不需要因此修改。
+- [x] resource manager / task registry 仍作为单资源 owner 机制保留。
+
+## 验证状态
+- [x] 已重新读取当前 main HEAD，确认从上一轮 `cee1ddc...` 开始没有其他 AI 插入提交。
+- [x] 已完成代码级调用链审查。
+- [ ] `npm run test:playback-lifecycle`：本环境尚未执行，不能标 PASS。
+- [ ] `npm test`：本环境尚未执行。
+- [ ] 浏览器真实 HLS：PENDING。
+- [ ] Android Native 真实播放：PENDING。
+- [ ] 真机 rapid switch：PENDING。
+
+## 当前剩余问题
+### P0
+- [ ] **P0-B：resource manager → task registry → adapter release 仍需真实验证**
+  - 文件：`src/playback/playbackResourceManager.js`
+  - `src/playback/playbackTaskRegistry.js`
+  - `src/playback/playbackCore.js`
+  - 验收：A→B acquire 后 A 的 stop/release 顺序稳定，且 registry 不残留 A。
+
+- [ ] **P0-C：Native bridge event identity 仍 UNKNOWN**
+  - 文件：`src/player/nativePlayerAdapter.js`
+  - 当前已确认：旧 adapter callback 可以由 core 的 player generation 隔离。
+  - 仍未知：Android bridge payload 是否携带 player/session/task identity。
+  - 下一步：搜索 Android/WebView bridge 定义和所有 `onPlayerEvent` 写入点。
+
+- [ ] **P0-D：candidate switch 重建 adapter 的实际设备成本仍 PENDING**
+  - 文件：`src/playback/playbackCore.js`
+  - 代码层仍使用 reattach 来隔离旧 callback。
+  - 需要浏览器/Android 验证 HLS destroy/rebind 与 Native release/load 的实际行为。
+
+### P1
+- [ ] HTML5 custom headers / candidate capability filtering
+- [ ] HLS live latency/buffer 策略
+- [ ] PlaybackPage / LiveFeature 双入口边界
+- [ ] live channel / stream / candidate identity
+- [ ] EPG stale request isolation
+
+## 当前不能确定
+- **PENDING**：behavior tests 是否通过，需要真实依赖环境执行。
+- **PENDING**：Native bridge 是否带 session/player identity。
+- **PENDING**：candidate switch reattach 在真实设备上的性能与副作用。
+
+## 下一位 AI 立即执行
+1. `tests/playback/playback-lifecycle.test.mjs`：实际运行 `npm run test:playback-lifecycle`，如果失败先修测试/环境，不要改成静态伪通过。
+2. `src/playback/playbackResourceManager.js` + `src/playback/playbackTaskRegistry.js`：继续验证 resource owner 与 registry 的 stop/release 顺序，补缺失行为测试。
+3. 全仓搜索 `TVBoxWebView.onPlayerEvent`、`onPlayerEvent`、`loadMedia`、`releaseMedia`，定位 Android/WebView bridge 的真实事件来源。
+4. `src/player/nativePlayerAdapter.js`：如果 bridge payload 没有 identity，设计不破坏现有 bridge 的最小 token 隔离方案。
+5. `src/player/html5PlayerAdapter.js`：继续验证 HLS destroy/rebind、listener cleanup 与 stale event。
+6. P0 未闭环前不要进入 UI 美化、路由大重构或 HLS 参数调整。
+
+## 给下下一位 AI 留的资料
+- P0-A 已经不再是“未知”：代码审查确认了双 owner 风险，并已把自动 fallback 唯一化到 playbackCore/task。
+- 一个关键架构事实已经修正：`activeStreamIndex` 是 UI 选择状态，不应成为 playbackController 生命周期依赖。
+- 不要恢复 LiveFeature `onPlayerError → switchCandidate` 的自动 fallback。
+- 不要把 `activeStreamIndex` 加回 controller 的 useMemo dependencies。
+- 下一阶段重点已经明确转到 resource release 链与 Native bridge event identity；不要重复做 fallback owner 审查。
