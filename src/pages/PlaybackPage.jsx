@@ -96,75 +96,78 @@ function PlaybackView({
     return channel?.epg?.find(program => program.status === 'upcoming' || Date.parse(program.startAt) > now);
   }, [channel, isLive, now]);
 
-  const controller = useMemo(() => playbackService.createController(request, {
-    onEvent: event => {
-      if (event.event === 'error') setError(event.error || '播放候选失败');
-      if (event.event === 'released') setStatus('released');
-      if (event.event === 'stopped') setStatus('stopped');
-
-      // VOD Progress Tracking
-      if (!isLive && event.event === 'progress') {
-        const currentTime = event.currentTime ?? 0;
-        const duration = event.duration ?? null;
-        setPlaybackTime(currentTime);
-        if (duration && Number.isFinite(duration) && duration > 0) {
-          setTotalDuration(duration);
+  const controller = useMemo(() => {
+    if (isLive) return playbackService.getLivePlayerController(request);
+    return playbackService.createController(request, {
+      onEvent: event => {
+        if (event.event === 'error') setError(event.error || '播放候选失败');
+        if (event.event === 'released') setStatus('released');
+        if (event.event === 'stopped') setStatus('stopped');
+        if (event.event === 'progress') {
+          const currentTime = event.currentTime ?? 0;
+          const duration = event.duration ?? null;
+          setPlaybackTime(currentTime);
+          if (duration && Number.isFinite(duration) && duration > 0) setTotalDuration(duration);
+          progressRef.current = { ...progressRef.current, currentTime, duration };
+          if (request?.contentId && request?.episodeId && currentTime - progressRef.current.persistedAt >= 15) {
+            recordProgress(request.contentId, request.episodeId, currentTime, duration, false);
+            progressRef.current.persistedAt = currentTime;
+          }
         }
-        progressRef.current = { ...progressRef.current, currentTime, duration };
-        if (request?.contentId && request?.episodeId && currentTime - progressRef.current.persistedAt >= 15) {
-          recordProgress(request.contentId, request.episodeId, currentTime, duration, false);
-          progressRef.current.persistedAt = currentTime;
+        if (event.event === 'completed' && request?.contentId && request?.episodeId) {
+          const progress = progressRef.current;
+          if (progress.currentTime > 0) recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, true);
         }
-      }
-      if (!isLive && event.event === 'completed' && request?.contentId && request?.episodeId) {
-        const progress = progressRef.current;
-        if (progress.currentTime > 0) {
-          recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, true);
-        }
-      }
-    },
-    onStateChange: setStatus,
-    onCandidateChange: next => {
-      setCandidate(next);
-      setResolvedInput(null);
-      if (next) setError('');
-    },
-    onResolvedInput: setResolvedInput,
-    onParserError: ({ code }) => setError('解析失败：' + code),
-    onPlayerError: ({ error: e }) => setError(e?.message || '播放器加载失败'),
-    onExhausted: () => setStatus('error'),
-  }), [request, isLive, recordProgress]);
+      },
+      onStateChange: setStatus,
+      onCandidateChange: next => {
+        setCandidate(next);
+        setResolvedInput(null);
+        if (next) setError('');
+      },
+      onResolvedInput: setResolvedInput,
+      onParserError: ({ code }) => setError('解析失败：' + code),
+      onPlayerError: ({ error: e }) => setError(e?.message || '播放器加载失败'),
+      onExhausted: () => setStatus('error'),
+    });
+  }, [request, isLive, recordProgress]);
 
   useEffect(() => {
     let active = true;
     const onVisibility = () => void controller.handleAppState(document.visibilityState === 'hidden' ? 'background' : 'foreground');
     document.addEventListener('visibilitychange', onVisibility);
 
-    const player = controller.attachPlayer(videoRef.current);
-    const initial = controller.start();
-    setCandidate(initial);
-
-    if (!initial) {
-      setStatus('error');
-      setError('没有可用的播放候选');
+    if (isLive) {
+      const video = controller.getVideoElement?.();
+      videoRef.current = video;
+      controller.attachPresentation?.(playerWindowBodyRef.current);
+      const liveState = controller.getPlaybackState?.();
+      setStatus(liveState?.state || 'idle');
+      setCandidate(request?.candidates?.find(item => item.candidateId === controller.getPlaybackState?.()?.candidateId) || request?.candidates?.[0] || null);
     } else {
-      controller.resolveAndLoad(initial).catch(e => {
-        if (active) setError(e?.message || '播放初始化失败');
-      });
+      const player = controller.attachPlayer(videoRef.current);
+      const initial = controller.start();
+      setCandidate(initial);
+      if (!initial) {
+        setStatus('error');
+        setError('没有可用的播放候选');
+      } else {
+        controller.resolveAndLoad(initial).catch(e => {
+          if (active) setError(e?.message || '播放初始化失败');
+        });
+      }
+      void player;
     }
 
     return () => {
       active = false;
       document.removeEventListener('visibilitychange', onVisibility);
-
-      // VOD Progress persistence on unmount
       if (!isLive && request?.contentId && request?.episodeId && progressRef.current.currentTime > 0) {
         const progress = progressRef.current;
         recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, false);
       }
-
-      controller.leave();
-      void player;
+      if (isLive) controller.detachPresentation?.();
+      else controller.leave();
     };
   }, [controller, request, isLive, recordProgress]);
 
@@ -221,29 +224,14 @@ function PlaybackView({
   };
 
   const handleStop = () => {
-    try {
-      controller.stop();
-    } catch (e) {
-      console.error("Stop controller failed:", e);
-    }
+    try { controller.stop(); } catch (e) { console.error("Stop controller failed:", e); }
     setResolvedInput(null);
-    try {
-      if (videoRef.current) {
-        videoRef.current.pause();
-        videoRef.current.src = "";
-        videoRef.current.removeAttribute('src');
-        try {
-          videoRef.current.load();
-        } catch {}
-      }
-    } catch (e) {
-      console.error("Pause video failed:", e);
-    }
+    setStatus('stopped');
   };
 
   const handleChangePlaybackRate = rate => {
     setPlaybackRate(rate);
-    if (videoRef.current) videoRef.current.playbackRate = rate;
+    controller.setPlaybackRate?.(rate);
   };
 
   const handleSelectTheme = newTheme => {
@@ -362,14 +350,17 @@ function PlaybackView({
             setTotalDuration(dur);
           }
         }}
+        controller={controller}
       >
-        <video
-          ref={videoRef}
-          playsInline
-          preload="metadata"
-          poster={request?.metadata?.poster || movie?.poster}
-          className="sangtian-video-element"
-        />
+        {!isLive && (
+          <video
+            ref={videoRef}
+            playsInline
+            preload="metadata"
+            poster={request?.metadata?.poster || movie?.poster}
+            className="sangtian-video-element"
+          />
+        )}
       </SangtianPlayerWindow>
 
       {/* 4. Floating Control Bar (VOD Only) */}
