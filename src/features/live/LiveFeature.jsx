@@ -13,7 +13,7 @@ export function createLiveFeature({ channels = [] } = {}) {
     getCategories() { return liveService.getCategories(channels); },
     list(options = {}) { return liveService.listChannels(channels, options); },
     getChannel(id) { return liveService.getById(channels, id); },
-    async getEPG(channel, range) { return liveService.getEPG(channel, range); },
+    async getEPG(channel, range, options = {}) { return liveService.getEPG(channel, range, options); },
   };
 }
 
@@ -212,18 +212,20 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
 
   // Load current EPG program details when active channel changes
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
     setCurrentEPG(null);
     if (!activeChannel) return undefined;
 
-    liveService.getEPG(activeChannel).then(programs => {
-      if (!active || !programs?.length) return;
+    liveService.getEPG(activeChannel, {}, { signal: controller.signal }).then(programs => {
+      if (controller.signal.aborted || !programs?.length) return;
       const now = Date.now();
       const current = programs.find(p => p.startAt <= now && p.endAt >= now) || programs[0];
       if (current) setCurrentEPG(current);
-    }).catch(() => {});
+    }).catch(error => {
+      if (error?.name !== 'AbortError') return;
+    });
 
-    return () => { active = false; };
+    return () => controller.abort();
   }, [activeChannel]);
 
   const loadChannelStreams = async channel => {
@@ -621,11 +623,11 @@ export function LiveChannelPanel({
   }, [channel, sources]);
 
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
     if (channel?.capabilities?.epg === false) {
       setEpg(channel?.epg ?? []);
       setEpgLoading(false);
-      return () => { active = false; };
+      return undefined;
     }
     setEpg(channel?.epg ?? []);
     setEpgLoading(true);
@@ -634,12 +636,14 @@ export function LiveChannelPanel({
       startAt: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
       endAt: new Date(now + 4 * 60 * 60 * 1000).toISOString(),
     };
-    feature.getEPG(channel, range).then(items => {
-      if (active && items.length) setEpg(items);
-    }).catch(() => {}).finally(() => {
-      if (active) setEpgLoading(false);
+    feature.getEPG(channel, range, { signal: controller.signal }).then(items => {
+      if (!controller.signal.aborted && items.length) setEpg(items);
+    }).catch(error => {
+      if (error?.name !== 'AbortError') return;
+    }).finally(() => {
+      if (!controller.signal.aborted) setEpgLoading(false);
     });
-    return () => { active = false; };
+    return () => controller.abort();
   }, [channel, feature]);
 
   if (!channel) {
