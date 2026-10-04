@@ -871,36 +871,15 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
 .sangtian-window-btn.icon-only {
   padding: 3px 6px;
 }
-.sangtian-window.is-landscape {
+/* Fullscreen uses the real viewport orientation. Do not rotate the player with CSS;
+   the Orientation API / device itself owns portrait vs landscape. */
+.sangtian-window.is-fullscreen {
   position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vh !important;
-  height: 100vw !important;
-  max-width: none !important;
-  max-height: none !important;
-  margin: 0 !important;
-  border-radius: 0 !important;
-  border: none !important;
-  z-index: 99999 !important;
-  transform-origin: top left !important;
-  transform: rotate(90deg) translateY(-100%) !important;
-  background: #000000 !important;
-}
-
-.sangtian-window.is-landscape .sangtian-window-body {
-  height: calc(100vw - 38px) !important;
-  aspect-ratio: auto !important;
-}
-
-.sangtian-window.is-web-fullscreen {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
+  inset: 0 !important;
   width: 100vw !important;
+  width: 100dvw !important;
   height: 100vh !important;
+  height: 100dvh !important;
   max-width: none !important;
   max-height: none !important;
   margin: 0 !important;
@@ -910,8 +889,9 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
   background: #000000 !important;
 }
 
-.sangtian-window.is-web-fullscreen .sangtian-window-body {
-  height: calc(100vh - 38px) !important;
+.sangtian-window.is-fullscreen .sangtian-window-body {
+  height: 100% !important;
+  min-height: 100% !important;
   aspect-ratio: auto !important;
 }
 
@@ -1782,7 +1762,7 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
 }
 
 .sangtian-window.aspect-16-9 .sangtian-video-element {
-  width: min(100%, calc((100vh - 38px) * 16 / 9));
+  width: min(100%, calc(100dvh * 16 / 9));
   height: auto;
   max-height: 100%;
   aspect-ratio: 16 / 9;
@@ -1790,7 +1770,7 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
 }
 
 .sangtian-window.aspect-4-3 .sangtian-video-element {
-  width: min(100%, calc((100vh - 38px) * 4 / 3));
+  width: min(100%, calc(100dvh * 4 / 3));
   height: auto;
   max-height: 100%;
   aspect-ratio: 4 / 3;
@@ -1805,8 +1785,8 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
 
 /* In normal window mode, ratio presets use the actual player area without changing the page layout. */
 @media (min-width: 520px) {
-  .sangtian-window:not(.is-landscape):not(.is-web-fullscreen).aspect-16-9 .sangtian-video-element,
-  .sangtian-window:not(.is-landscape):not(.is-web-fullscreen).aspect-4-3 .sangtian-video-element {
+  .sangtian-window:not(.is-fullscreen).aspect-16-9 .sangtian-video-element,
+  .sangtian-window:not(.is-fullscreen).aspect-4-3 .sangtian-video-element {
     width: 100%;
     height: 100%;
     object-fit: contain;
@@ -1987,8 +1967,8 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
 
 
 /* Android media player enhancements */
-.sangtian-window.is-system-fullscreen,.sangtian-window.is-web-fullscreen{position:fixed;inset:0;z-index:9000;width:100vw;height:100vh;background:#000;border-radius:0}
-.sangtian-window.is-system-fullscreen .sangtian-window-body,.sangtian-window.is-web-fullscreen .sangtian-window-body{height:100%;min-height:100%;border-radius:0}
+.sangtian-window.is-fullscreen{z-index:9000}
+.sangtian-window.is-fullscreen .sangtian-window-body{height:100%;min-height:100%;border-radius:0}
 .sangtian-video-overlay.compact{pointer-events:none;background:rgba(0,0,0,.28)}
 .sangtian-fullscreen-controls{position:absolute;inset:0;z-index:12;display:flex;flex-direction:column;justify-content:space-between;padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:linear-gradient(to bottom,rgba(0,0,0,.62),transparent 24%,transparent 58%,rgba(0,0,0,.72));color:#fff;transition:opacity .2s ease}
 .sangtian-fullscreen-controls:not(.visible){opacity:0;pointer-events:none}
