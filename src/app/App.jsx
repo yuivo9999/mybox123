@@ -89,6 +89,14 @@ export function App(){
    return false;
  },onAppStateChange:(state)=>{if(state==='foreground'&&(route==='movie-play'||route==='live-play'))webViewRuntime.call('getAppState')} }),[route]);
 
+ const getMovieReturnRoute=(explicit=null)=> explicit || (route==='detail'?'detail':route==='search'?'search':tab==='movies'?'movies':'home');
+ const returnFromMoviePlayback=()=>{
+  const returnRoute=selected?.metadata?.returnRoute||'detail';
+  if(returnRoute==='detail') return sessionStateStore.patch({tab:'movies',route:'detail',selected});
+  if(returnRoute==='search') return sessionStateStore.patch({tab:'movies',route:'search',selected:null});
+  if(returnRoute==='movies') return sessionStateStore.patch({tab:'movies',route:null,selected:null});
+  return sessionStateStore.patch({tab:'home',route:null,selected:null});
+ };
  const openMovie=(movie,routeOverride=null)=>{
    if(routeOverride==='search'){sessionStateStore.patch({tab:'movies',route:'search',selected:null});return}
    if(!movie)return;
