@@ -3,6 +3,7 @@ let snapshot = Object.freeze({
   tab: 'home',
   route: null,
   selected: null,
+  livePlayback: null,
 });
 
 function emit() {
