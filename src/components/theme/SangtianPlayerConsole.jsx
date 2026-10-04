@@ -342,21 +342,25 @@ export function SangtianPlayerWindow({
               <Square size={13}/>
               <span>停止</span>
             </button>
-            <button className="sangtian-window-btn" onClick={handleCopyLink} title="复制播放链接">
-              {copied ? <Check size={13}/> : <Copy size={13}/>}
-              <span>{copied ? '已复制' : '复制'}</span>
-            </button>
-            <button className={`sangtian-window-btn ${isLandscape ? 'active' : ''}`} onClick={handleToggleLandscape} title="方向">
-              <RotateCw size={13}/>
-              <span>{isLandscape ? '竖屏' : '横屏'}</span>
-            </button>
-            <button className={`sangtian-window-btn ${aspectMode !== 'original' ? 'active' : ''}`} onClick={handleCycleAspect} title={currentAspect.title}>
-              <Ratio size={13}/>
-              <span>{currentAspect.label}</span>
-            </button>
-            <button className="sangtian-window-btn icon-only" onClick={handleToggleFullscreen} title="全屏播放">
-              <Maximize2 size={13}/>
-            </button>
+            {!isLive && (
+              <>
+                <button className="sangtian-window-btn" onClick={handleCopyLink} title="复制播放链接">
+                  {copied ? <Check size={13}/> : <Copy size={13}/>}
+                  <span>{copied ? '已复制' : '复制'}</span>
+                </button>
+                <button className={`sangtian-window-btn ${isLandscape ? 'active' : ''}`} onClick={handleToggleLandscape} title="方向">
+                  <RotateCw size={13}/>
+                  <span>{isLandscape ? '竖屏' : '横屏'}</span>
+                </button>
+                <button className={`sangtian-window-btn ${aspectMode !== 'original' ? 'active' : ''}`} onClick={handleCycleAspect} title={currentAspect.title}>
+                  <Ratio size={13}/>
+                  <span>{currentAspect.label}</span>
+                </button>
+                <button className="sangtian-window-btn icon-only" onClick={handleToggleFullscreen} title="全屏播放">
+                  <Maximize2 size={13}/>
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
