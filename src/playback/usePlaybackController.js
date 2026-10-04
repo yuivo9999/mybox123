@@ -1,6 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { playbackService } from '../services/playbackService.js';
 
+function getPlaybackRequestKey(request) {
+  if (!request) return '';
+  return JSON.stringify({
+    contentId: request.contentId ?? null,
+    episodeId: request.episodeId ?? null,
+    channelId: request.channelId ?? null,
+    startPositionSeconds: request.metadata?.startPositionSeconds ?? null,
+    candidates: (request.candidates ?? []).map(candidate => ({
+      candidateId: candidate.candidateId ?? null,
+      sourceId: candidate.sourceId ?? null,
+      mediaUrl: candidate.mediaUrl ?? candidate.url ?? candidate.metadata?.url ?? null,
+      protocol: candidate.protocol ?? null,
+    })),
+  });
+}
+
 /**
  * Shared playback lifecycle for VOD and immersive Live playback pages.
  * UI components should consume the returned state/actions instead of creating
@@ -15,9 +31,23 @@ export function usePlaybackController({
 } = {}) {
   const progressRef = useRef({ currentTime: 0, duration: null, persistedAt: 0 });
   const onEventRef = useRef(onEvent);
+  const recordProgressRef = useRef(recordProgress);
+  const requestRef = useRef(request);
+  const requestKey = getPlaybackRequestKey(request);
+
   useEffect(() => {
     onEventRef.current = onEvent;
   }, [onEvent]);
+
+  useEffect(() => {
+    recordProgressRef.current = recordProgress;
+  }, [recordProgress]);
+
+  useEffect(() => {
+    requestRef.current = request;
+    progressRef.current = { currentTime: 0, duration: null, persistedAt: 0 };
+  }, [requestKey, request]);
+
   const [candidate, setCandidate] = useState(request?.candidates?.[0] ?? null);
   const [status, setStatus] = useState('idle');
   const [resolvedInput, setResolvedInput] = useState(null);
@@ -27,9 +57,10 @@ export function usePlaybackController({
     setError(message || '');
   }, []);
 
-  const controller = useMemo(() => playbackService.createController(request, {
+  const controller = useMemo(() => playbackService.createController(requestRef.current, {
     onEvent: event => {
       onEventRef.current?.(event);
+      const currentRequest = requestRef.current;
       if (event.event === 'error') {
         reportError(event.error || '播放候选失败');
       }
@@ -38,19 +69,31 @@ export function usePlaybackController({
         const duration = event.duration ?? null;
         progressRef.current = { ...progressRef.current, currentTime, duration };
         if (
-          request?.contentId &&
-          request?.episodeId &&
-          typeof recordProgress === 'function' &&
+          currentRequest?.contentId &&
+          currentRequest?.episodeId &&
+          typeof recordProgressRef.current === 'function' &&
           currentTime - progressRef.current.persistedAt >= 15
         ) {
-          recordProgress(request.contentId, request.episodeId, currentTime, duration, false);
+          recordProgressRef.current(
+            currentRequest.contentId,
+            currentRequest.episodeId,
+            currentTime,
+            duration,
+            false,
+          );
           progressRef.current.persistedAt = currentTime;
         }
       }
-      if (!isLive && event.event === 'completed' && request?.contentId && request?.episodeId) {
+      if (!isLive && event.event === 'completed' && currentRequest?.contentId && currentRequest?.episodeId) {
         const progress = progressRef.current;
-        if (progress.currentTime > 0 && typeof recordProgress === 'function') {
-          recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, true);
+        if (progress.currentTime > 0 && typeof recordProgressRef.current === 'function') {
+          recordProgressRef.current(
+            currentRequest.contentId,
+            currentRequest.episodeId,
+            progress.currentTime,
+            progress.duration,
+            true,
+          );
         }
       }
     },
@@ -64,7 +107,7 @@ export function usePlaybackController({
     onParserError: ({ code }) => reportError('解析失败：' + code),
     onPlayerError: ({ error: playerError }) => reportError(playerError?.message || '播放器加载失败'),
     onExhausted: () => setStatus('error'),
-  }), [request, isLive, recordProgress, reportError]);
+  }), [requestKey, isLive, reportError]);
 
   useEffect(() => {
     if (!request || !videoRef?.current || !controller) return undefined;
@@ -90,14 +133,27 @@ export function usePlaybackController({
     return () => {
       active = false;
       document.removeEventListener('visibilitychange', onVisibility);
-      if (!isLive && request?.contentId && request?.episodeId && progressRef.current.currentTime > 0 && typeof recordProgress === 'function') {
+      const currentRequest = requestRef.current;
+      if (
+        !isLive
+        && currentRequest?.contentId
+        && currentRequest?.episodeId
+        && progressRef.current.currentTime > 0
+        && typeof recordProgressRef.current === 'function'
+      ) {
         const progress = progressRef.current;
-        recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, false);
+        recordProgressRef.current(
+          currentRequest.contentId,
+          currentRequest.episodeId,
+          progress.currentTime,
+          progress.duration,
+          false,
+        );
       }
       controller.leave();
       void player;
     };
-  }, [controller, request, videoRef, isLive, recordProgress, reportError]);
+  }, [controller, requestKey, videoRef, isLive, reportError]);
 
   const switchCandidate = useCallback((candidateId) => {
     const next = controller.switchCandidate(candidateId);
