@@ -35,7 +35,15 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
   bind();
 
   const adapter={
-    get capabilities(){return createPlayerCapabilities(video);},
+    get capabilities(){
+      const base=createPlayerCapabilities(video);
+      return Object.freeze({...base,
+        [PlayerCapability.AUDIO_TRACKS]:Boolean(hlsInstance?.audioTracks?.length||video?.audioTracks),
+        [PlayerCapability.SUBTITLE_TRACKS]:Boolean(hlsInstance?.subtitleTracks?.length||video?.textTracks),
+        [PlayerCapability.TRACK_SELECTION]:Boolean(hlsInstance?.audioTracks?.length||hlsInstance?.subtitleTracks?.length||video?.audioTracks||video?.textTracks),
+        [PlayerCapability.QUALITY_SELECTION]:Boolean(hlsInstance?.levels?.length),
+      });
+    },
     load(next){
       if(released)throw new Error('PLAYER_ADAPTER_RELEASED');
       input=next;
@@ -154,12 +162,30 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
     },
     setVolume(value){const n=Number(value);if(!Number.isFinite(n))return video.volume;video.volume=Math.min(1,Math.max(0,n));return video.volume;},
     getState(){return {state,input,currentTime:video.currentTime,duration:video.duration};},
-    getAudioTracks(){return trackList(video.audioTracks);},
-    getSubtitleTracks(){return trackList(video.textTracks);},
-    selectAudioTrack(trackId){if(!video.audioTracks)return false;for(const t of video.audioTracks)t.enabled=String(t.id)===String(trackId);emit('audioTrackChanged',{trackId});return true;},
-    selectSubtitleTrack(trackId){if(!video.textTracks)return false;for(const t of video.textTracks)t.mode=String(t.id)===String(trackId)?'showing':'disabled';emit('subtitleTrackChanged',{trackId});return true;},
-    getQualities(){return input?.manifest?.variants?.map((v,i)=>({qualityId:String(v.attributes?.['VIDEO-RANGE']??v.attributes?.RESOLUTION??i),width:Number(v.attributes?.RESOLUTION?.split('x')?.[0]??0),height:Number(v.attributes?.RESOLUTION?.split('x')?.[1]??0),bitrate:Number(v.attributes?.BANDWIDTH??0),url:v.url}))??[];},
-    selectQuality(qualityId){const q=this.getQualities().find(x=>x.qualityId===String(qualityId));if(!q)return false;const wasPlaying=!video.paused;const pos=video.currentTime;video.src=q.url;video.load();if(wasPlaying)void video.play();if(Number.isFinite(pos))try{video.currentTime=pos;}catch{}emit('qualityChanged',{quality:q});return q;},
+    getAudioTracks(){
+      if(hlsInstance?.audioTracks?.length)return hlsInstance.audioTracks.map((t,i)=>({id:String(t.id??i),label:t.name??t.lang??('Audio '+(i+1)),language:t.lang??'',kind:'audio'}));
+      return trackList(video.audioTracks);
+    },
+    getSubtitleTracks(){
+      if(hlsInstance?.subtitleTracks?.length)return [{id:'off',label:'关闭字幕',language:'',kind:'subtitle'},...hlsInstance.subtitleTracks.map((t,i)=>({id:String(t.id??i),label:t.name??t.lang??('Subtitle '+(i+1)),language:t.lang??'',kind:'subtitle'}))];
+      return [{id:'off',label:'关闭字幕',language:'',kind:'subtitle'},...trackList(video.textTracks)];
+    },
+    selectAudioTrack(trackId){
+      if(hlsInstance?.audioTracks?.length){hlsInstance.audioTrack=Number(trackId);emit('audioTrackChanged',{trackId});return true;}
+      if(!video.audioTracks)return false;for(const t of video.audioTracks)t.enabled=String(t.id)===String(trackId);emit('audioTrackChanged',{trackId});return true;
+    },
+    selectSubtitleTrack(trackId){
+      if(hlsInstance?.subtitleTracks?.length){hlsInstance.subtitleDisplay=String(trackId)!=='off';hlsInstance.subtitleTrack=String(trackId)==='off'?-1:Number(trackId);emit('subtitleTrackChanged',{trackId});return true;}
+      if(!video.textTracks)return false;for(const t of video.textTracks)t.mode=String(trackId)!=='off'&&String(t.id)===String(trackId)?'showing':'disabled';emit('subtitleTrackChanged',{trackId});return true;
+    },
+    getQualities(){
+      if(hlsInstance?.levels?.length)return hlsInstance.levels.map((level,i)=>({qualityId:String(i),width:Number(level.width??0),height:Number(level.height??0),bitrate:Number(level.bitrate??level.attrs?.BANDWIDTH??0),label:level.height?(level.height+'p'):(level.name??('线路 '+(i+1)))}));
+      return input?.manifest?.variants?.map((v,i)=>({qualityId:String(i),width:Number(v.attributes?.RESOLUTION?.split('x')?.[0]??0),height:Number(v.attributes?.RESOLUTION?.split('x')?.[1]??0),bitrate:Number(v.attributes?.BANDWIDTH??0),url:v.url}))??[];
+    },
+    selectQuality(qualityId){
+      if(hlsInstance?.levels?.length){const id=Number(qualityId);if(!Number.isInteger(id)||id<0||id>=hlsInstance.levels.length)return false;hlsInstance.currentLevel=id;emit('qualityChanged',{quality:this.getQualities()[id]});return this.getQualities()[id];}
+      const q=this.getQualities().find(x=>x.qualityId===String(qualityId));if(!q)return false;const wasPlaying=!video.paused;const pos=video.currentTime;video.src=q.url;video.load();if(wasPlaying)void video.play();if(Number.isFinite(pos))try{video.currentTime=pos;}catch{}emit('qualityChanged',{quality:q});return q;
+    },
     release(){if(released)return;released=true;cleanupHls();unbind();try { video.pause(); } catch {} try { video.src = ""; } catch {} try { video.removeAttribute('src'); } catch {} try { video.load(); } catch {} state=PlayerState.RELEASED;emit('released');},
   };
   return createPlayerAdapterContract(adapter);
