@@ -1755,3 +1755,48 @@ P3.8：如果能取得本地执行环境，优先实际运行 build + test:react
 3. VOD progress persistence 与自动下一集是否存在竞态；
 4. Live stop / leave / page back 是否存在重复 teardown；
 5. 最后再做视觉 polish，不再新增播放架构层。
+
+
+## P3.8 已完成：request lifecycle 竞态审计与旧 controller 隔离
+
+### 本轮实际发现
+静态回读 `usePlaybackController` 时发现 request 切换存在两个真实竞态风险：
+
+1. **旧 controller 异步事件可能回写新 request**
+   - 原 controller callback 通过共享 ref 读取当前 request。
+   - 旧 episode/source 的 parser/load 如果在新 request 建立后才完成，可能把旧 status / candidate / resolvedInput / error / progress 写到新页面。
+2. **request 切换时 progressRef 过早 reset**
+   - 原先在 render 阶段检测 requestKey 变化就清空 progressRef。
+   - React 随后执行旧 lifecycle cleanup 时，上一集最后进度已经丢失，导致离开/切集时最终进度可能无法持久化。
+
+### 已实施
+文件：`src/playback/usePlaybackController.js`
+
+- 每个 controller callback 绑定创建时的 `requestKey`。
+- 增加 lifecycle identity guard；旧 controller 的 event / state / candidate / resolvedInput / parser error / player error / exhausted 不再更新新 request 的 React state。
+- `resolveAndLoad()` 的异步 catch 同样增加 request identity guard，避免旧加载失败覆盖新 request。
+- cleanup 使用创建时的 `requestSnapshot`，保证最终进度归属正确。
+- progressRef 的 reset 从 render 阶段移动到 `[requestKey]` effect；React 会先执行上一生命周期 cleanup，再执行新 effect setup，因此上一集可以先保存最终进度，再开始下一集。
+- 删除不再需要的共享 `requestRef` 作为旧 request 数据来源。
+- controller memo 只以 `requestKey / isLive` 等生命周期依赖重建，不因为 request 对象本身每次 render 都是新引用而重复创建 controller。
+
+### 责任边界进一步明确
+- requestKey：播放生命周期 identity。
+- requestSnapshot：该 controller 生命周期不可变的 request 快照。
+- requestKeyRef：只用于判断异步事件是否仍属于当前生命周期。
+- progressRef：当前生命周期的进度缓冲，不跨 episode/source 复用。
+- recordProgressRef：允许业务 persistence callback 更新，但不会改变 request 归属。
+
+### 静态回归
+已确认：
+- 旧 controller event/state/candidate/error 不再越过 request 边界。
+- 旧 async resolve error 不再越过 request 边界。
+- 上一生命周期 cleanup 仍可读取自己的 requestSnapshot 与最终 progress。
+- Live 不走 VOD progress persistence 分支。
+- controller API 仍保持单一 façade。
+
+### 运行验证边界
+本轮仍未执行 Node/npm、浏览器、Android/iOS 真机，因此不能宣称 build/test 或运行时竞态验证通过。
+
+### 下一优先级
+P3.9：继续审计 candidate/status 在手动切源、自动 fallback、retry、stop/leave 后的状态同步，并重点检查 VOD 自动下一集与 progress persistence 是否存在重复导航/重复 teardown。若环境能提供本地 Node/npm，再优先实际执行 `npm run build`、`npm run test:react`、`npm test`。
