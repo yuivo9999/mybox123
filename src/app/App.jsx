@@ -308,8 +308,7 @@ export function AppRoot(){
    }else if(route==='detail'||route==='search'){
      sessionStateStore.patch({tab:'movies',route:null,selected:null});
    }else if(route==='live-play'){
-     if(getPlaybackContext(selected).returnRoute==='history') sessionStateStore.patch({tab:'history',route:null,selected:null});
-     else sessionStateStore.patch({tab:'live',route:null,selected:null});
+     sessionStateStore.patch(resolvePlaybackReturnTarget(selected,{fallbackTab:'live'}));
    }else if(route==='live-channel'){
      sessionStateStore.patch({tab:'live',route:null,selected:null});
    }else if(route==='appearance'){
