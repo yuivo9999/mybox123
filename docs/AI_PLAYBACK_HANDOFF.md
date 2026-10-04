@@ -2223,3 +2223,72 @@ P0 EPG 竞态从“只防 state 污染”提升为“state 防污染 + 请求取
 - 不要修改 HLS buffer；
 - 不要把 `active` flag 说成已经解决了请求取消问题；
 - 不要因为 EPG 已有 AbortController 就宣称真实网络 Abort 已通过设备/浏览器验证。
+# 2026-10-05 本轮执行记录：P0 TV1 source/session 生命周期
+
+## 本轮确认的问题
+
+确认 tv1LiveService 使用 module-level sessions Map，以 sourceId 为唯一 key，原先存在三个风险：
+
+1. source 被禁用/删除时，session 不会自动清除；
+2. 同一个 sourceId 如果 URL/headers/localContent 发生变化，旧 session 仍可能被复用；
+3. loadMetadata() 在解析过程中如果被 Abort，原 session 可能残留部分 metadata/lines，后续调用存在复用风险。
+
+同时确认 LiveFeature 原来的 TV1 metadata effect 只有 active flag：旧请求不会更新 React state，但网络读取没有取消；全局 tv1Channels 还会让“已有任意 TV1 频道就跳过所有新 TV1 source”的逻辑成立，新增 Source B 时可能根本不读取 B。
+
+## 本轮修改
+
+### src/services/tv1LiveService.js
+
+增加 source fingerprint：sourceRef/url、headers、localContent。
+
+fingerprint 变化时立即丢弃旧 session。
+metadata fetch 完成后再次检查 AbortSignal。
+aborted metadata session 在 Map 中主动删除。
+保留 clear(sourceId) 作为显式 source 生命周期清理入口。
+
+### src/features/live/LiveFeature.jsx
+
+TV1 metadata effect 改为 source-aware 生命周期：
+
+- 每个待加载 source 独立 AbortController；
+- 将 signal 传给 tv1LiveService.loadMetadata()；
+- cleanup 时 abort 未完成 source；
+- source 不再启用时过滤掉其 tv1Channels；
+- 没有任何 TV1 source 时清空 TV1 service sessions；
+- 不再用“global TV1 cache 只要非空就跳过全部 source”的粗粒度判断；
+- 只跳过已经存在于缓存中的 source，其余新增 source 正常加载；
+- onChannel 增加 source/channel 去重，避免重复 effect 或缓存恢复导致重复频道。
+
+## Commit
+
+- 48f284a21a75e11a033c689f2c3926f1ff142556 — fix(tv1): invalidate stale source sessions
+- b13ff54c6408d33049a5f6b9079cfee101376079 — fix(live): cancel and invalidate TV1 source lifecycle
+
+## 当前判断
+
+这一轮解决的是 source lifecycle identity，不是简单“清空缓存”。
+
+现在 source A 禁用/删除后，其 session 和 UI channel 都有明确失效路径；source B 新增时不会再被 A 的全局 TV1 cache 阻止加载；同 sourceId 修改 URL/headers/localContent 时也不会继续盲复用旧 session。
+
+仍需真实验证：
+- [ ] A → disabled → B
+- [ ] A → remove → A same sourceId with changed URL
+- [ ] metadata fetch 在 Abort 中途结束
+- [ ] Android/TVBox 实机切源
+- [ ] Node 行为测试实际执行
+
+## 下一步严格顺序
+
+1. P0：补 TV1/EPG/source lifecycle 行为测试，把刚刚修复的竞态固定下来。
+2. P0：检查 LiveFeature 与 PlaybackPage 的播放 controller/resource ownership。明确谁创建、谁 attach、谁 stop/destroy、谁负责 candidate switch，防止双 owner。
+3. P1 HTML5 custom headers capability filtering。
+4. P1 HLS live latency/buffer 真实源验证。
+5. P1 channel/source/stream identity 与 history/favorites 闭环。
+
+## 不要重复做
+
+- 不要删除 globalLiveCache；
+- 不要重新实现 playbackCore / Native generation；
+- 不要修改 HLS 参数；
+- 不要把 React active flag 当作网络取消；
+- 不要宣称 TV1/EPG 的 Abort 已经完成真实设备验证。
