@@ -1019,3 +1019,38 @@ Landscape VOD：
 - 本轮没有合并 `main`。
 - 本轮没有运行真实浏览器、build、lint、test。
 
+
+
+## 22. P2.5 第一小步已完成：清理 Live inline 播放的遗留 decoderEngine
+
+### 22.1 确认
+`src/features/live/LiveFeature.jsx` 的 inline 播放仍保留 `decoderEngine` state、global cache 字段以及传给 `SangtianPlayerWindow` 的旧 props。
+
+但 P1.6 已经移除了播放器 UI 中的假 Decoder Engine 控制，`SangtianPlayerWindow` 也不再消费这些 props。因此这些状态已经没有实际功能，只会制造“Live 仍支持手动解码内核切换”的错误暗示。
+
+### 22.2 已修改
+删除：
+- `globalLiveCache.decoderEngine`
+- `decoderEngine` React state
+- decoderEngine global cache sync effect
+- `decoderEngine / onChangeDecoderEngine` 传参
+
+没有改变 Live 的频道、线路、EPG、inline 播放或沉浸播放逻辑。
+
+### 22.3 静态验证
+当前 `LiveFeature.jsx` 已不再声明或传递 decoderEngine。
+
+尚未验证：
+- 浏览器真实 Live inline 播放
+- Live inline → immersive 状态连续性
+- build / lint / test
+
+### 22.4 下一步
+继续 P2.5，但不要一次性重写 LiveFeature：
+1. 优先比较 LiveFeature 当前 inline controller 生命周期与 `usePlaybackController` 的能力差异。
+2. 如果能无行为损失迁移，则让 inline Live 也使用共享 hook；否则先抽取最小共享 Live controller 生命周期，不复制一套 playbackCore。
+3. 然后再考虑将 `PlaybackPage.jsx` 正式更名为 `LivePlaybackPage.jsx`，并把“inline preview / immersive playback”的职责写清楚。
+
+### 22.5 接力状态
+- 当前代码提交：`16e40d84a82d0e48e8f4dd0a0de4d234c13e5293`
+- 文档将在该代码提交后继续更新；实际 branch HEAD 为准。
