@@ -729,3 +729,41 @@ P1.8 后不要再回头审计“PlaybackPage 是否还承担 VOD”——本轮�
 - Live 的 HLS/native 能力仍受底层 adapter 实际能力限制。
 - `usePlaybackController` request identity 生命周期问题尚未处理。
 - 本轮未运行真实播放器、build、lint、test。
+
+
+## 17. P1.9 已完成：稳定 usePlaybackController 的 request 生命周期
+
+### 17.1 问题
+原 `usePlaybackController` 直接把 `request` 对象放进 `useMemo(createController)` 依赖。
+如果上层每次 render 产生新的 request object，即使实际播放内容、episode、candidate 都没变，也会重新创建 controller，触发重新 attach/start/load/leave。
+
+### 17.2 已修改
+文件：`src/playback/usePlaybackController.js`
+- 增加 `getPlaybackRequestKey()`，按真正影响播放生命周期的字段建立语义 key：
+  - contentId
+  - episodeId
+  - channelId
+  - startPositionSeconds
+  - candidateId/sourceId/mediaUrl/protocol
+- controller 创建依赖从完整 request identity 改为 `requestKey + isLive`。
+- 用 requestRef 保存当前语义 request，避免 controller 因 UI render object identity 变化而重建。
+- recordProgress 改用 ref，不再因为回调 identity 变化重建 controller。
+- requestKey 真正变化时重置 progressRef，避免不同 episode 继承上一集的进度缓存。
+- cleanup / progress callback 读取 requestRef，保证 controller 生命周期结束时使用当前语义 request。
+
+### 17.3 静态验证
+已回读确认：
+- request object 每次 render 但语义不变时，不再进入 createController 的依赖。
+- episode/source/candidate 真正变化时 requestKey 改变，controller 会重新建立生命周期。
+- progressRef 在 requestKey 改变时清零。
+- 本轮仍未运行浏览器、build、lint、test。
+
+### 17.4 下一步
+进入 P2 播放 UI 去重：
+1. 先梳理 TopBar / PlayerWindow / ConsoleCard / Source Modal 各自实际承担的交互。
+2. 不直接删除控件；先建立“唯一入口”规则：
+   - 播放基础控制只在 PlayerWindow
+   - 线路只保留一个显式入口
+   - Live 频道切换与 VOD 选集分开
+   - More / diagnostics 不放主控制栏
+3. 再做自动下一集 countdown/cancel。
