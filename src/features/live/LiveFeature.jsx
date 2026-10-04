@@ -85,7 +85,8 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   // Keep Live playback selection synchronized with the persistent Live workspace.
   // Route changes must not create a second controller or force a reconnect.
   useEffect(() => {
-    if (!requestedChannelId || requestedChannelId === selectedChannelId) return;
+    if (!requestedChannelId) return;
+    if (requestedChannelId === selectedChannelId && !requestedStreamId) return;
     if (allChannels.some(channel => channel.channelId === requestedChannelId)) {
       setSelectedChannelId(requestedChannelId);
       const requestedChannel = allChannels.find(channel => channel.channelId === requestedChannelId);
