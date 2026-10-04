@@ -205,6 +205,65 @@ test('playback service returns the same live controller until the session is rel
   delete globalThis.window;
 });
 
+
+test('second live controller request reuses the existing session instead of competing for it', () => {
+  installNativeBridge();
+  const firstRequest = playbackService.createLiveRequest({
+    channel: {
+      channelId: 'singleton-channel-a',
+      name: 'Singleton A',
+      streams: [candidate('a', 'https://example.test/a.m3u8')],
+    },
+  });
+  const secondRequest = playbackService.createLiveRequest({
+    channel: {
+      channelId: 'singleton-channel-b',
+      name: 'Singleton B',
+      streams: [candidate('b', 'https://example.test/b.m3u8')],
+    },
+  });
+
+  const first = playbackService.getLivePlayerController(firstRequest);
+  const second = playbackService.getLivePlayerController(secondRequest);
+
+  assert.equal(second, first);
+  assert.equal(second.sessionId, first.sessionId);
+  assert.equal(second.currentChannel?.channelId, 'singleton-channel-b');
+
+  first.release();
+  delete globalThis.window;
+});
+
+test('live page leave detaches presentation without releasing the session', () => {
+  installNativeBridge();
+  const request = playbackService.createLiveRequest({
+    channel: {
+      channelId: 'detach-channel',
+      name: 'Detach',
+      streams: [candidate('a', 'https://example.test/a.m3u8')],
+    },
+  });
+  const session = playbackService.getLivePlayerSession(request);
+  const host = { appendChild(node) { node.parentNode = host; } };
+  const target = { appendChild(node) { node.parentNode = target; } };
+  const video = { parentNode: null };
+
+  session.registerVideo(video, host);
+  session.attachPresentation(target);
+  const controller = session.controller;
+  controller.leave();
+
+  assert.equal(video.parentNode, host);
+  assert.equal(session.controller, controller);
+  assert.ok(session.core);
+  assert.equal(session.getVideoElement(), video);
+
+  controller.stop();
+  assert.equal(session.controller, null);
+  assert.equal(session.core, null);
+  delete globalThis.window;
+});
+
 test('stale candidate load cannot prepare or play after a rapid switch', async () => {
   const { calls, loadWaiters } = installNativeBridge();
   const aLoad = deferred();
