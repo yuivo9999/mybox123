@@ -1607,3 +1607,67 @@ SangtianPlayerWindow 仍读取 video.currentTime、duration、buffered、paused�
 
 ### 当前接力要求
 下一位 AI 不要重新做 P3.4 状态源调查。优先检查本轮静态改动是否有调用方遗漏，然后继续 P3.5 移动端全屏/横竖屏行为审计。
+
+
+## P3.5 已完成：移动端全屏 / 横竖屏状态语义收敛
+
+### 本轮目标
+继续 P3.4 后的最高优先级，审计播放器在手机竖屏、横屏、Fullscreen API、CSS fallback 之间是否存在重复状态和强制旋转。重点检查 `is-landscape`、`requestFullscreen`、`fullscreenchange`、Orientation API、viewport 高度与 safe-area。
+
+### 已发现的问题
+- `SangtianPlayerConsole` 原来同时维护 `isSystemFullscreen` 与 `isWebFullscreen`，但进入全屏时会同时把两个 CSS class 加到播放器上，语义不清。
+- 原 `.is-landscape` CSS 使用 `rotate(90deg)` + `100vh/100vw` 强制旋转播放器。这会与真实设备 orientation、浏览器 Fullscreen API 和 Android/iOS viewport 行为产生竞争，尤其容易出现点击坐标/安全区/视频尺寸错位。
+- Fullscreen 时使用固定 `100vh`，移动浏览器地址栏收缩/展开时可能留下可见空白或控制栏被遮挡。
+- Orientation button 原来点击后立即修改 React state，即使 `screen.orientation.lock()` 被浏览器拒绝，也会产生“看起来已经横屏”的假状态。
+
+### 已修改
+文件：`src/components/theme/SangtianPlayerConsole.jsx`
+- `isSystemFullscreen` 只代表真实 `document.fullscreenElement`。
+- `isWebFullscreen` 只作为 Fullscreen API 不可用/被拒绝时的 CSS fallback；不再进入 Fullscreen API 后也强行设置该状态。
+- 新增实际 orientation 同步：优先读取 `screen.orientation.type`，并以 `matchMedia('(orientation: landscape)')` / `orientationchange` 作为兼容来源。
+- Orientation button 不再先写假状态；只有真实 Orientation API 自己改变 viewport 后，UI 才跟随实际方向。
+- 全屏状态统一输出单一 `is-fullscreen` CSS class，不再同时输出 `is-system-fullscreen is-web-fullscreen`。
+- Fullscreen 不再自动调用 `screen.orientation.lock()`；全屏与旋转两个动作解耦，方向由用户的方向控制或设备真实方向决定。
+
+文件：`src/styles/app.css`
+- 删除 `.sangtian-window.is-landscape` 的固定 90° CSS rotation。
+- 删除依赖 `100vh/100vw` 的横屏旋转布局。
+- 统一 Fullscreen 为 `.is-fullscreen`。
+- Fullscreen 使用 `100dvw/100dvh`（同时保留 `100vw/100vh` fallback）适配移动浏览器动态 viewport。
+- aspect 预设改为使用真实 fullscreen viewport，不再减去旧的 38px 旋转窗口高度。
+- 保留 safe-area inset 控制条布局。
+
+文件：`src/pages/LivePlaybackPage.jsx`
+- 既有 `ResizeObserver + resize + orientationchange` 的 Native video surface bounds 同步继续保留；它现在可以配合真实 viewport orientation，而不是依赖播放器自身 CSS 90° rotation。
+
+### 当前责任边界
+- Fullscreen 状态：浏览器 Fullscreen API / PlayerWindow fallback。
+- Orientation 状态：设备/浏览器真实 viewport orientation。
+- 播放控制：PlaybackController intent。
+- CSS：只负责适配真实 viewport，不再伪造设备旋转。
+- Native surface：LivePlaybackPage 根据实际播放器容器尺寸重新同步 bounds。
+
+### 静态回归检查
+已回读确认：
+- `SangtianPlayerConsole.jsx` 不再生成 `is-system-fullscreen` / `is-web-fullscreen` / `is-landscape` class。
+- `app.css` 不再存在旧 90° `rotate(90deg)` 播放器旋转规则。
+- `LivePlaybackPage.jsx` 的 orientationchange / ResizeObserver bounds 同步仍存在。
+- Fullscreen API 入口仍只有 PlayerWindow 一处正式 UI 行为。
+- 本轮未运行浏览器、Android/iOS 真机、npm build、lint、unit test。
+
+### 未完成 / 风险
+- 必须在真实 Android Chrome、iOS Safari、普通桌面浏览器分别验证：
+  1. 竖屏进入 Fullscreen；
+  2. Fullscreen 后设备旋转到横屏；
+  3. 点击“横屏/竖屏”按钮时 Orientation API 成功与被拒绝两种情况；
+  4. 地址栏展开/收起时控制栏与视频是否仍覆盖完整 viewport；
+  5. iOS 不支持 Orientation API 时是否保持真实设备方向而不出现假旋转；
+  6. Native Live video surface bounds 在旋转后是否仍准确。
+- 不要在没有真实设备证据的情况下重新加入 CSS `rotate(90deg)`。
+
+### 下一优先级
+P3.6：继续做播放器 UI / CSS 最后一轮收敛，但重点从“继续加功能”转为：
+1. 清理残余 fullscreen CSS 旧命名/重复规则；
+2. 检查 PlayerWindow 内是否还有 page-local playback state；
+3. 检查普通窗口 / Fullscreen / Live inline 三种模式的唯一控制入口；
+4. 最后再做视觉 polish 与命名清理。
