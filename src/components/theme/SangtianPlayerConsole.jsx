@@ -363,26 +363,6 @@ export function SangtianPlayerWindow({
 
       <div ref={videoContainerRef} className="sangtian-window-body">
         <>
-          <div className="sangtian-terminal-panel">
-            <pre className="terminal-code">{`播放信息
-
-模式：${isLive ? 'Live 直连' : '影视解析'}
-协议：${resolvedInput?.protocol || candidate?.protocol || '未知'}
-源：${candidate?.sourceId || '—'}
-状态：${status || 'idle'}
-播放进度：${formatTime(currentTime)} / ${formatTime(duration)}
-已缓冲：${formatTime(bufferedSeconds)}
-加载速率：${loadSpeed}
-网络估速：${networkDownlink != null ? networkDownlink + ' Mbps' : '不可用'}
-播放地址：${streamUrl || '等待地址…'}`}</pre>
-            <div className="terminal-footer">
-              <button className="terminal-back-btn" onClick={()=>setShowTerminal(false)}>
-                <Play size={13}/>
-                <span>返回视频播放</span>
-              </button>
-            </div>
-          </div>
-
             {renderedChildren}
             {(() => {
               const isStopped = isStoppedManually || status === 'stopped';
