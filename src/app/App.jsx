@@ -84,7 +84,7 @@ export function App(){
  },[tab,contentState.channels.length,contentState.status,persistent.sources]);
  useEffect(()=>webViewRuntime.mount({onBack:()=>{
    if(typeof document!=='undefined'&&document.fullscreenElement){void webViewRuntime.setFullscreen(false);return true}
-   if(route==='movie-play'){sessionStateStore.patch({route:selected?.metadata?.returnRoute||'detail'});return true}   if(route==='live-play'){handleLiveBack();return true}
+   if(route==='movie-play'){returnFromMoviePlayback();return true}   if(route==='live-play'){handleLiveBack();return true}
    if(route==='detail'||route==='live-channel'||route==='search'){sessionStateStore.patch({route:null,selected:null});return true}
    return false;
  },onAppStateChange:(state)=>{if(state==='foreground'&&(route==='movie-play'||route==='live-play'))webViewRuntime.call('getAppState')} }),[route]);
@@ -192,7 +192,7 @@ export function App(){
    if (route) {
      if (direction !== 'right') return;
      if (route === 'movie-play') {
-       sessionStateStore.patch({route:selected?.metadata?.returnRoute||'detail',selected:selected?.metadata?.returnRoute==='detail'?selected:null});
+       returnFromMoviePlayback();
      } else if (route === 'detail' || route === 'search') {
        sessionStateStore.patch({route:null,selected:null});
      } else if (route === 'live-play') {
@@ -266,7 +266,7 @@ export function App(){
           return (
             <>
               {movieActive
-                ? <MovieFeature route={route} tab={tab} selected={selected} movies={contentState.movies} channels={contentState.channels} history={persistent.history} progress={persistent.progress} selectedSources={persistent.selectedSources} sources={persistent.sources} movieCategories={contentState.movieCategories} movieActiveCategory={contentState.movieActiveCategory} movieCategoryLoading={contentState.movieCategoryLoading} onLoadMovieCategory={(category)=>{setContentState(state=>({...state,movieActiveCategory:category??state.movieActiveCategory,movieCategoryLoading:true}));void reloadSources(undefined,{background:true,includeMovie:true,includeLive:false,movieCategoryId:category?.id??null,movieCategoryName:category?.name??''})}} onSelectMovieSource={setSourceActive} favorites={persistent.favorites} onMovie={openMovie} onPlay={playMovie} onTab={nav} onBack={()=>sessionStateStore.patch({route:route==='movie-play'?(selected?.metadata?.returnRoute||'detail'):null,selected:route==='movie-play'&&selected?.metadata?.returnRoute==='detail'?selected:null})} onLive={playLive} recordSearch={persistent.recordSearch} toggleFavorite={persistent.toggleFavorite}/>
+                ? <MovieFeature route={route} tab={tab} selected={selected} movies={contentState.movies} channels={contentState.channels} history={persistent.history} progress={persistent.progress} selectedSources={persistent.selectedSources} sources={persistent.sources} movieCategories={contentState.movieCategories} movieActiveCategory={contentState.movieActiveCategory} movieCategoryLoading={contentState.movieCategoryLoading} onLoadMovieCategory={(category)=>{setContentState(state=>({...state,movieActiveCategory:category??state.movieActiveCategory,movieCategoryLoading:true}));void reloadSources(undefined,{background:true,includeMovie:true,includeLive:false,movieCategoryId:category?.id??null,movieCategoryName:category?.name??''})}} onSelectMovieSource={setSourceActive} favorites={persistent.favorites} onMovie={openMovie} onPlay={playMovie} onTab={nav} onBack={()=>route==='movie-play'?returnFromMoviePlayback():sessionStateStore.patch({route:null,selected:null})} onLive={playLive} recordSearch={persistent.recordSearch} toggleFavorite={persistent.toggleFavorite}/>
                 : route === 'live-channel'
                   ? <LiveChannelPanel channel={selected} channels={contentState.channels} sources={persistent.sources} favorites={persistent.favorites} onBack={()=>sessionStateStore.patch({route:null,selected:null,tab:'live'})} onPlay={playLive} onChannel={openLiveChannel} toggleFavorite={persistent.toggleFavorite}/>
                   : route === 'live-play'
@@ -298,7 +298,10 @@ export function AppRoot(){
  const recoverFromPageError=()=>{
    if(route==='movie-play'){
      const returnRoute=selected?.metadata?.returnRoute||'detail';
-     sessionStateStore.patch({tab:'movies',route:returnRoute,selected:returnRoute==='detail'?selected:null});
+     if(returnRoute==='detail') sessionStateStore.patch({tab:'movies',route:'detail',selected});
+     else if(returnRoute==='search') sessionStateStore.patch({tab:'movies',route:'search',selected:null});
+     else if(returnRoute==='movies') sessionStateStore.patch({tab:'movies',route:null,selected:null});
+     else sessionStateStore.patch({tab:'home',route:null,selected:null});
    }else if(route==='detail'||route==='search'){
      sessionStateStore.patch({tab:'movies',route:null,selected:null});
    }else if(route==='live-play'){
