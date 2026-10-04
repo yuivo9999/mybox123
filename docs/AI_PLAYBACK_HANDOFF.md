@@ -1671,3 +1671,32 @@ P3.6：继续做播放器 UI / CSS 最后一轮收敛，但重点从“继续加
 2. 检查 PlayerWindow 内是否还有 page-local playback state；
 3. 检查普通窗口 / Fullscreen / Live inline 三种模式的唯一控制入口；
 4. 最后再做视觉 polish 与命名清理。
+
+
+## P3.6 已完成：Fullscreen CSS / 播放器 UI 残余清理
+
+### 本轮修改
+- 删除已经没有调用方的 `.fullscreen-quick-exit` CSS。
+- 删除重复的 `.is-fullscreen` 后置覆盖规则，保留唯一 fullscreen layout 定义，避免 z-index / body height 被后面的旧规则意外覆盖。
+- `SangtianPlayerConsole.syncMediaMetrics()` 删除未使用的 `duration` 临时变量；duration 的权威 UI 数据继续来自 controller。
+- 全局回读确认 PlayerWindow 当前仍只把 videoRef 用作只读媒体观测（buffered / currentTime），没有恢复直接 play/pause/seek/playbackRate 写入。
+
+### 当前 UI 入口
+- 普通播放窗口：停止、复制（VOD）、方向、比例、全屏。
+- Fullscreen：返回、播放/暂停、进度、±10 秒（VOD）、倍速、More / 选集 / 线路 / Live 频道等上下文控制。
+- Source / candidate 选择不再从多个播放控制栏重复出现。
+- Fullscreen 与 orientation 已经是两个独立状态：Fullscreen API 控制全屏，真实 viewport orientation 控制横竖屏。
+
+### 验证边界
+已完成静态回读：
+- CSS 不再包含旧 `is-landscape` 90° rotation。
+- CSS 不再包含 `is-system-fullscreen` / `is-web-fullscreen`。
+- PlayerWindow 不再输出这些旧 class。
+- 未运行浏览器、真机、build、lint、unit test。
+
+### 下一优先级
+P3.7：做一次最终播放链静态回归，然后如果环境允许优先运行 build/lint/test；之后才考虑视觉 polish。重点检查：
+1. `usePlaybackController` 的 request lifecycle 是否稳定；
+2. VOD / Live controller intent 是否没有遗漏调用方；
+3. Fullscreen fallback 与 document fullscreen 状态是否没有双状态残留；
+4. PlayerWindow 的 local state 是否全部属于 UI 状态/只读指标，而不是第二套 playback state machine。
