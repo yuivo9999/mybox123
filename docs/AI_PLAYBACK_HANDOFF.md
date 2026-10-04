@@ -1414,3 +1414,46 @@ P2.6 上一轮的 History 调用传入了 `'live-history'`，但 `App.handleLive
 - 不要把 `request.context` 当成实时 candidate 状态；candidate 切换仍由 controller/request candidates 管理。
 - 不要删除 metadata 兼容 fallback，除非确认所有旧 request 创建路径已经迁移。
 - `returnRoute='history'` 是当前 History 播放闭环的统一语义；不要重新引入 `live-history` 之类的平行 route 名称。
+
+## 29. P2.7 第二小步已完成：统一 VOD / Live 播放返回目标
+
+### 29.1 修改
+继续沿用显式 PlaybackContext，没有再创建新的播放器状态层。
+
+新增 src/playback/playbackContext.js：
+- resolvePlaybackReturnRoute()：统一根据显式 returnRoute、当前 route/tab 推导播放入口语义。
+- resolvePlaybackReturnTarget()：把播放请求直接解析成统一导航目标 { tab, route, selected }。
+- history 始终返回 History；detail/search/movies 保留原有语义；returnTab 只作为目标 tab 的补充，不覆盖 history 这种明确业务语义。
+
+修改 src/app/App.jsx：
+- getMovieReturnRoute() 改为复用 resolvePlaybackReturnRoute()。
+- VOD 正常返回改为复用 resolvePlaybackReturnTarget()。
+- VOD ErrorBoundary 恢复改为复用同一个 return target helper，删除重复的 route 分支。
+- 普通 VOD 页面 onBack 不再自己拼 returnRoute + selected，直接复用 returnFromMoviePlayback()。
+- Live 返回保留 live-channel 的特殊业务恢复；其余 History / Live 默认返回统一复用 resolvePlaybackReturnTarget()。
+
+### 29.2 结果
+播放返回逻辑现在从 App 正常返回一套、App ErrorBoundary 一套、MovieFeature onBack 再一套，收敛为同一个 PlaybackContext → ReturnTarget 解析规则。
+
+同时明确：
+- request.context：播放导航/恢复语义；
+- request.metadata：展示/解析附加信息；
+- request.candidates：实时可播放资源；
+- returnTab：默认目标 tab，不取代 returnRoute 的业务语义。
+
+### 29.3 静态验证
+已完成源码级回读：
+- App 使用 resolvePlaybackReturnRoute / resolvePlaybackReturnTarget。
+- 不再保留 VOD ErrorBoundary 的重复 returnRoute 分支。
+- VOD onBack 不再直接拼装 PlaybackContext 字段。
+- Live live-channel 特殊恢复仍存在，没有错误地把频道详情当普通 tab 返回。
+- 未重新引入 live-history。
+- 尚未运行浏览器、build、lint、test。
+
+### 29.4 下一步
+按优先级先做一次 P2.7 全局静态回归：
+1. 检查所有播放 request 创建点是否都已携带/兼容 PlaybackContext。
+2. 检查全仓是否仍有直接 metadata.returnRoute 读取。
+3. 检查 returnRoute / returnTab 是否存在语义冲突。
+4. 检查 PlaybackPage、旧 decoderEngine、重复播放 controller 等遗留命名/路径。
+5. 若静态结果稳定，再进入 P3 UI/响应式收敛；同时在环境允许时优先跑 build/lint/test。
