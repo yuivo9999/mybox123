@@ -19,7 +19,7 @@ export function SangtianPlayerWindow({
   playbackCapabilities = {}, getAudioTracks, getSubtitleTracks, getQualities, selectAudioTrack, selectSubtitleTrack, selectQuality,
 }) {
   const [copied, setCopied] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(false);
+  const [isLandscape, setIsLandscape] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(orientation: landscape)')?.matches === true);
   const [isSystemFullscreen, setIsSystemFullscreen] = useState(false);
   const [isWebFullscreen, setIsWebFullscreen] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
@@ -134,6 +134,11 @@ export function SangtianPlayerWindow({
   }, [videoRef, candidate, resolvedInput, status]);
 
   useEffect(() => {
+    const syncOrientation = () => {
+      const orientation = typeof screen !== 'undefined' ? screen.orientation?.type : '';
+      const mediaLandscape = typeof window !== 'undefined' && window.matchMedia?.('(orientation: landscape)')?.matches === true;
+      setIsLandscape(orientation ? orientation.startsWith('landscape') : mediaLandscape);
+    };
     const handleFullscreenChange = () => {
       const isSystem = Boolean(document.fullscreenElement);
       setIsSystemFullscreen(isSystem);
@@ -143,9 +148,19 @@ export function SangtianPlayerWindow({
         setRightSidebarSection('settings');
       }
     };
+    const mediaQuery = typeof window !== 'undefined' ? window.matchMedia?.('(orientation: landscape)') : null;
     document.addEventListener('fullscreenchange', handleFullscreenChange);
+    screen?.orientation?.addEventListener?.('change', syncOrientation);
+    window.addEventListener('orientationchange', syncOrientation);
+    mediaQuery?.addEventListener?.('change', syncOrientation);
     handleFullscreenChange();
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    syncOrientation();
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      screen?.orientation?.removeEventListener?.('change', syncOrientation);
+      window.removeEventListener('orientationchange', syncOrientation);
+      mediaQuery?.removeEventListener?.('change', syncOrientation);
+    };
   }, [isWebFullscreen]);
 
   // Auto-hide fullscreen controls after 4 seconds of inactivity
@@ -238,16 +253,18 @@ export function SangtianPlayerWindow({
     const currentlyActive = isSystemFullscreen || isWebFullscreen;
 
     if (!currentlyActive) {
-      setIsWebFullscreen(true);
       setShowFullscreenBar(true);
       if (elem?.requestFullscreen) {
         try {
           await elem.requestFullscreen();
+          setIsWebFullscreen(false);
         } catch {
-          // If requestFullscreen is restricted by iframe/browser security, Web Fullscreen provides 100% full coverage!
+          // Browser/iframe denied the Fullscreen API; use the app's CSS fullscreen fallback.
+          setIsWebFullscreen(true);
         }
+      } else {
+        setIsWebFullscreen(true);
       }
-      try { await screen.orientation?.lock?.(isLandscape ? 'landscape' : 'portrait'); } catch {}
     } else {
       setIsWebFullscreen(false);
       setShowLeftSidebar(false);
@@ -257,14 +274,19 @@ export function SangtianPlayerWindow({
       if (document.fullscreenElement) {
         try { await document.exitFullscreen?.(); } catch {}
       }
-      try { screen.orientation?.unlock?.(); } catch {}
     }
   };
 
   const handleToggleLandscape = async () => {
     const next = !isLandscape;
-    setIsLandscape(next);
-    try { await screen.orientation?.lock?.(next ? 'landscape' : 'portrait'); } catch {}
+    const orientation = typeof screen !== 'undefined' ? screen.orientation : null;
+    if (!orientation?.lock) return;
+    try {
+      await orientation.lock(next ? 'landscape' : 'portrait');
+    } catch {
+      // iOS Safari and some embedded browsers do not expose orientation locking.
+      // Do not fake a rotated player; let the real viewport orientation remain authoritative.
+    }
   };
 
   const handleSeek = value => {
@@ -310,7 +332,7 @@ export function SangtianPlayerWindow({
 
   return (
     <div
-      className={`sangtian-window ${isLive ? 'is-live-direct' : ''} ${isLandscape ? 'is-landscape' : ''} ${fullscreen ? 'is-system-fullscreen is-web-fullscreen' : ''} aspect-${aspectMode.replace(':','-')}`}
+      className={`sangtian-window ${isLive ? 'is-live-direct' : ''} ${fullscreen ? 'is-fullscreen' : ''} aspect-${aspectMode.replace(':','-')}`}
       onMouseMove={fullscreen ? resetControlsTimeout : undefined}
       onTouchStart={fullscreen ? resetControlsTimeout : undefined}
     >
