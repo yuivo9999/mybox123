@@ -66,7 +66,7 @@ const globalLiveCache = {
   isImmersive: false,
 };
 
-export function LiveFeature({ channels = [], sources = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite, requestedChannelId = null }) {
+export function LiveFeature({ channels = [], sources = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite, requestedChannelId = null, requestedStreamId = null }) {
   const page = usePageState();
   const videoRef = useRef(null);
   const playerWindowBodyRef = useRef(null);
@@ -88,12 +88,14 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     if (!requestedChannelId || requestedChannelId === selectedChannelId) return;
     if (allChannels.some(channel => channel.channelId === requestedChannelId)) {
       setSelectedChannelId(requestedChannelId);
-      setActiveStreamIndex(0);
+      const requestedChannel = allChannels.find(channel => channel.channelId === requestedChannelId);
+      const requestedIndex = requestedStreamId && requestedChannel?.streams?.findIndex(stream => stream.streamId === requestedStreamId);
+      setActiveStreamIndex(requestedIndex >= 0 ? requestedIndex : 0);
       setPlaybackCandidate(null);
       setResolvedPlaybackInput(null);
       setPlaybackError('');
     }
-  }, [requestedChannelId, allChannels, selectedChannelId]);
+  }, [requestedChannelId, requestedStreamId, allChannels, selectedChannelId]);
 
   const enabledTv1Sources = useMemo(
     () => sources.filter(source => source.sourceType === 'live' && source.liveMode === 'tv1' && source.enabled !== false),
