@@ -8,6 +8,7 @@ import {
 } from '../models/playback.js';
 import { createPlaybackCore } from '../playback/playbackCore.js';
 import { createPlaybackLifecyclePolicy } from '../playback/playbackLifecyclePolicy.js';
+import { playbackRuntime } from '../playback/playbackRuntime.js';
 
 function sortCandidates(candidates) {
   return [...candidates].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
@@ -85,16 +86,39 @@ export const playbackService = {
       subscribe: listener => core.subscribe(listener),
       switchCandidate: id => core.switchCandidate(id),
       switchEpisode: (...args) => core.switchEpisode(...args),
+      replaceLiveCandidates: (candidates, metadata) => core.replaceLiveCandidates(candidates, metadata),
       setVideoViewBounds: bounds => core.setVideoViewBounds(bounds),
+      setPlaybackRate: rate => core.setPlaybackRate(rate),
+      setVolume: value => core.setVolume(value),
+      getPlaybackState: () => core.getPlaybackState(),
+      getBufferState: () => core.getBufferState(),
+      getAudioTracks: () => core.getAudioTracks(),
+      selectAudioTrack: id => core.selectAudioTrack(id),
+      getSubtitleTracks: () => core.getSubtitleTracks(),
+      selectSubtitleTrack: id => core.selectSubtitleTrack(id),
+      getQualities: () => core.getQualities(),
+      selectQuality: id => core.selectQuality(id),
+      getVideoElement: () => core.getVideoElement(),
       pause: () => core.pause(),
       play: () => core.play(),
+      seek: seconds => core.seek(seconds),
       stop: () => core.stop(),
       handleAppState: state => core.handleAppState(state),
+      attachPresentation: target => core.attachPresentation(target),
+      detachPresentation: () => core.detachPresentation(),
       leave: () => {
         if (policy.onPageLeave === 'release') core.release();
-        else core.stop();
+        else core.detachPresentation();
       },
     });
+  },
+
+  getLivePlayerSession(request, hooks = {}) {
+    return playbackRuntime.getLivePlayerSession(request, hooks);
+  },
+
+  getLivePlayerController(request, hooks = {}) {
+    return playbackRuntime.getLivePlayerSession(request, hooks).controller;
   },
 };
 
@@ -107,6 +131,7 @@ export function createPlaybackTask(request) {
       metadata: Object.freeze({ ...candidate.metadata }),
     })),
   });
+  let activeCandidates = snapshot.candidates;
   let status = PlaybackRequestStatus.CREATED;
   let currentIndex = 0;
   let retryCount = 0;
@@ -121,7 +146,7 @@ export function createPlaybackTask(request) {
     return payload;
   };
 
-  const current = () => snapshot.candidates[currentIndex] ?? null;
+  const current = () => activeCandidates[currentIndex] ?? null;
   const markFailed = (candidateId, error, code = PlaybackFailureCode.UNKNOWN) => {
     if (candidateId) failedCandidates.add(candidateId);
     failureCount += 1;
@@ -136,10 +161,10 @@ export function createPlaybackTask(request) {
   };
 
   const next = () => {
-    for (let index = currentIndex + 1; index < snapshot.candidates.length; index += 1) {
-      if (!failedCandidates.has(snapshot.candidates[index].candidateId) && !isPlaybackCandidateExpired(snapshot.candidates[index])) {
+    for (let index = currentIndex + 1; index < activeCandidates.length; index += 1) {
+      if (!failedCandidates.has(activeCandidates[index].candidateId) && !isPlaybackCandidateExpired(activeCandidates[index])) {
         currentIndex = index;
-        currentCandidateId = snapshot.candidates[index].candidateId;
+        currentCandidateId = activeCandidates[index].candidateId;
         status = PlaybackRequestStatus.LOADING;
         retryCount = 0;
         emit('sourceChanged', { candidate: current() });
@@ -150,7 +175,7 @@ export function createPlaybackTask(request) {
   };
 
   return {
-    request: snapshot,
+    get request() { return { ...snapshot, candidates: activeCandidates }; },
     get status() { return status; },
     get currentCandidate() { return current(); },
     get currentCandidateId() { return currentCandidateId; },
@@ -186,10 +211,25 @@ export function createPlaybackTask(request) {
       markFailed(currentCandidateId, error, code);
       return next();
     },
+    replaceCandidates(candidates = [], { channelId, metadata } = {}) {
+      activeCandidates = candidates.map(candidate => Object.freeze({
+        ...candidate,
+        headers: Object.freeze({ ...(candidate.headers ?? {}) }),
+        metadata: Object.freeze({ ...(candidate.metadata ?? {}) }),
+      }));
+      currentIndex = 0;
+      currentCandidateId = activeCandidates[0]?.candidateId ?? null;
+      retryCount = 0;
+      failureCount = 0;
+      failedCandidates.clear();
+      status = PlaybackRequestStatus.LOADING;
+      emit('sourceChanged', { candidate: current(), channelId, metadata: metadata ?? {}, reason: 'channelChanged' });
+      return current();
+    },
     switchCandidate(candidateId) {
       const index = snapshot.candidates.findIndex((candidate) => candidate.candidateId === candidateId);
       if (index < 0 || failedCandidates.has(candidateId)) return null;
-      if (isPlaybackCandidateExpired(snapshot.candidates[index])) {
+      if (isPlaybackCandidateExpired(activeCandidates[index])) {
         failedCandidates.add(candidateId);
         emit('error', { candidateId, code: PlaybackFailureCode.EXPIRED, error: 'PLAYBACK_CANDIDATE_EXPIRED' });
         return null;
