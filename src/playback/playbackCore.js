@@ -187,6 +187,14 @@ export function createPlaybackCore(task,hooks={}) {
   retry(options={}){if(!networkPolicy.shouldRetry({code:options.code??'network'}))return null;const candidate=task.retry(options);if(candidate)void resolveAndLoad(candidate);return candidate;},
   fail(error,code=PlaybackFailureCode.UNKNOWN){return failAndResolve(error,code);},
   switchCandidate(candidateId){operationGeneration+=1;const next=task.switchCandidate(candidateId);hooks.onCandidateChange?.(next);if(next){networkPolicy.reset();attachPlayer(playerElement);transition(PlayerState.LOADING);void resolveAndLoad(next).catch(e=>hooks.onPlayerError?.({error:e,candidate:next}));}return next;},
+  replaceCandidates(candidates, preferredCandidateId=null){
+   operationGeneration+=1;
+   const next=task.replaceCandidates(candidates,preferredCandidateId);
+   hooks.onCandidateChange?.(next);
+   if(next){networkPolicy.reset();attachPlayer(playerElement);transition(PlayerState.LOADING);void resolveAndLoad(next).catch(e=>hooks.onPlayerError?.({error:e,candidate:next}));}
+   else transition(PlayerState.STOPPED);
+   return next;
+  },
   switchEpisode(episodeId,candidate=null,startPositionSeconds=0){emit('episodeChanged',{episodeId,startPositionSeconds});if(candidate)return this.switchCandidate(candidate.candidateId);return episodeId;},
   async handleAppState(state){
    if(state==='background'){if(task.request.kind===PlaybackKind.VOD){await player?.pause?.();}else{player?.pause?.();}}
