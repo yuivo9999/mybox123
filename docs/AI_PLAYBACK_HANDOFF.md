@@ -1115,3 +1115,48 @@ Live inline preview 现在改用 `usePlaybackController({ request, videoRef, isL
 ### 23.6 接力状态
 - 当前代码提交：`f4a988132175855d33557b7d33ebcba6a76afb36`
 - 文档提交将在本次代码提交后继续推进。
+
+
+## 24. P2.5 第三小步已完成：正式命名 LivePlaybackPage
+
+### 24.1 修改
+- 新增 `src/pages/LivePlaybackPage.jsx`，承载原沉浸式 Live `PlaybackPage` 实现。
+- `src/app/App.jsx` 的两个 `live-play` 渲染分支全部改为 `LivePlaybackPage`。
+- 删除旧 `src/pages/PlaybackPage.jsx`，不再保留语义模糊的通用 PlaybackPage 文件名。
+
+### 24.2 为什么
+当前 VOD 正式播放页已经明确是 `MoviePlaybackPage`，Live 沉浸式播放也应该拥有明确的领域名称。这样后续 AI 看到 `LivePlaybackPage` 就能立即知道：
+- 它不是 VOD 播放页；
+- 它是 Live immersive 播放页；
+- `LiveFeature` 的 inline 播放是另一种 Preview 场景；
+- 底层播放生命周期统一由 `usePlaybackController` / `playbackCore` 提供。
+
+### 24.3 回归修正
+重命名过程中静态回读发现旧文件中有一处历史文本替换留下的字面量 `\\n`，会导致 JSX 源码非法。已立即修正为真实换行，并再次检查新文件。
+
+### 24.4 静态验证
+已确认：
+- App 不再 import `PlaybackPage`。
+- App 中 `<PlaybackPage>` 使用数为 0。
+- App 中 `<LivePlaybackPage>` 使用数为 2，对应正常与 error 两个 `live-play` 分支。
+- `LivePlaybackPage.jsx` 导出 `LivePlaybackPage`。
+- 新页面没有直接调用 `playbackService.createController`。
+- 旧 `PlaybackPage.jsx` 已删除。
+
+尚未验证：
+- 浏览器 Live 沉浸播放；
+- JSX/build/lint/test；
+- 全屏、线路切换、返回导航的真实运行。
+
+### 24.5 下一步
+继续 P2.5：
+1. 审计 `LiveFeature` inline 的 `SangtianPlayerWindow`，把 inline 明确收敛为 PreviewPlayer 级别的最小控制。
+2. 优先判断哪些控件只属于 immersive：停止、复制直链、方向/比例、全屏等；不要先删，先确认它们是否存在必要的 inline 使用场景。
+3. 保留基础播放状态、线路切换与“沉浸播放”入口。
+4. 完成后再进入 P2.6：History → 直接恢复对应 episode 的播放闭环。
+
+### 24.6 接力状态
+- 当前代码最新提交：`d7260ffa0bf90f748de99d544ef374f9bd5a94e8`
+- 当前分支：`ai-handoff/playback-phase1`
+- 未合并 main。
+- 本轮没有运行浏览器、build、lint、test。
