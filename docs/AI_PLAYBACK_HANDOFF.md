@@ -1300,3 +1300,123 @@ playbackResourceManager → playbackTaskRegistry.stopAndRelease → player.relea
 - 不要把 `stop()` 改回“立即 unregister + release”，否则会破坏同一 controller restart，以及竞争 controller 的统一 resource ownership。
 - Resource manager 的 owner handle 会在 B acquire 时先失效，然后由 registry 对 A 执行 stopAndRelease；这是当前预期行为。
 - 当前最重要的未知已经从 resource ownership 进一步收敛到 Native bridge identity 和真实 adapter release 行为。
+
+
+# 28. 本轮继续执行结果：P0-B/P0-D HTML5 HLS stale callback 隔离
+
+## 本轮
+- 日期：2026-10-05
+- 起始有效 HEAD：`c08d2200454cf925afd54007281cf165e386f2e5`
+- 本轮代码提交：`2fb1f95af518d53a83679bd450261207289fcbf7`
+- 工作范围：继续按 P0 优先级检查 `html5PlayerAdapter.js` 的 HLS destroy/rebind 生命周期，并确认仓库是否包含可直接验证 Native bridge 的 Android 实现。
+
+## 本轮发现
+
+### P0-D-1：HLS 实例销毁后，旧实例 callback 仍然闭包引用 adapter 状态
+此前 `cleanupHls()` 会：
+- detachMedia
+- destroy
+- `hlsInstance = null`
+
+但旧 HLS 实例注册的 `MEDIA_ATTACHED / MANIFEST_PARSED / FRAG_LOADED / ERROR` callback 没有 adapter-local generation 判断。
+
+虽然 playbackCore 已经有 player generation，可以阻止部分事件继续影响 core，但 adapter 自己的旧 callback 仍可能：
+- 修改 `hlsRecoveryCount`
+- 修改 `state`
+- 修改 `hlsInstance`
+- 再次调用 `cleanupHls()`
+- emit 一个过时的 `prepared/error`
+
+这属于“core 之外的 stale callback”风险，尤其发生在 candidate switch 快速 destroy → create HLS 时。
+
+## 本轮修复
+
+新增 HTML5 adapter-local `hlsGeneration`：
+
+- 每次 `cleanupHls()` 都使旧 HLS generation 失效。
+- 每次创建新的 HLS instance 后生成 `currentHlsGeneration`。
+- HLS callbacks 统一先检查：
+  - adapter 未 released；
+  - generation 仍匹配；
+  - `hlsInstance === hls`。
+- 不满足条件直接 return。
+
+因此旧 HLS 实例即使在 destroy/rebind 后仍有延迟 callback，也不能继续操作当前 adapter 的新播放实例。
+
+### 为什么没有再增加 core token
+这是 adapter 内部实例生命周期问题。
+
+当前隔离层级为：
+1. HTML5 adapter：`hlsGeneration` 防止旧 HLS 实例污染新 HLS 实例；
+2. playbackCore：`playerGeneration` 防止旧 adapter callback 污染新 adapter；
+3. playbackCore：`operationGeneration` 防止旧 async operation 污染新 playback operation；
+4. playbackCore：`activePlayerOperationGeneration` 防止 stop 后同 adapter event resurrect recovery。
+
+这四层职责不同，不应合并成一个巨型 token。
+
+## Native bridge 仓库检查
+
+本轮继续搜索：
+- `TVBoxAndroidBridge`
+- `onPlayerEvent`
+- `loadMedia`
+- `releaseMedia`
+- `MainActivity`
+- `android/`
+- `capacitor.config`
+
+当前 GitHub 代码搜索仍未发现 Android bridge 实现。
+
+因此当前结论继续保持：
+
+- Native bridge implementation：**仓库内 UNKNOWN / 很可能为外部 WebView/宿主依赖**
+- Event payload identity：**UNKNOWN**
+- 不修改 Native bridge 协议，不凭空加入 task/session/player 字段。
+
+## 验证状态
+
+- [x] HTML5 HLS stale callback 代码级隔离已提交。
+- [x] Native bridge 关键符号继续搜索，无仓库内实现证据。
+- [ ] `npm run test:playback-lifecycle`：仍未实际执行；当前环境没有可确认的完整依赖安装结果。
+- [ ] `npm test`：未执行。
+- [ ] 真实浏览器 HLS rapid switch：PENDING。
+- [ ] Android Native rapid switch / release：PENDING。
+- [ ] HLS destroy/rebind 的真实浏览器行为：PENDING。
+
+## 当前 P0
+
+### P0-B
+- [x] ResourceManager → TaskRegistry stopped-owner 代码/行为测试路径已补齐。
+- [ ] 真实 Node 22 执行行为测试。
+- [ ] Native releaseMedia 真实释放验证。
+
+### P0-C
+- [ ] Native bridge event identity UNKNOWN。
+- [ ] 需要宿主 Android/WebView bridge 源码或真实 payload 才能进一步收敛。
+
+### P0-D
+- [x] HTML5 HLS adapter-local stale callback guard 已加入。
+- [ ] 真实 HLS rapid switch / destroy-rebind 验证。
+
+## P1（暂不进入）
+- HTML5 custom headers / candidate capability filtering
+- HLS live latency/buffer 策略
+- PlaybackPage / LiveFeature 双入口资源边界
+- live channel / stream / candidate identity
+- EPG stale request isolation
+
+## 下一位 AI 立即执行
+
+1. 先确认当前 HEAD 是否仍为 `2fb1f95af518d53a83679bd450261207289fcbf7`，避免覆盖后续 AI 的提交。
+2. 优先解决“真实测试执行”问题：检查仓库是否有 lockfile/CI dependency cache；若当前工具环境不能安装依赖，就明确记录环境阻塞，不伪造 PASS。
+3. 检查 `.github/workflows` 是否存在可运行的测试 workflow；如果没有，不要为了测试临时大改 CI。
+4. 继续从 `src/player/html5PlayerAdapter.js` 检查非 HLS video DOM event 在 `load → stop → load` 之间是否可能污染新 input；如发现同等级 stale 风险，再补 adapter-local generation，但避免重复 token。
+5. Native bridge 仍以 UNKNOWN 处理；若仓库没有 Android 原生代码，转向 adapter-side isolation，而不是猜 bridge 协议。
+6. P0 真实验证完成前，不进入 UI polish、路由重构或 HLS 参数 tuning。
+
+## 给下下一位 AI 留的资料
+
+- 本轮已经修的是 **HLS 实例内部 stale callback**，不是 playbackCore generation guard。
+- 不要删除 `hlsGeneration`，除非有等价或更强的 HLS instance identity 隔离。
+- Native bridge 没有在仓库中找到实现；不要假设 `onPlayerEvent` payload 有 session/player identity。
+- 当前 P0 的最后核心障碍已经越来越偏向“真实运行环境/宿主验证”，而不是继续堆静态 token。
