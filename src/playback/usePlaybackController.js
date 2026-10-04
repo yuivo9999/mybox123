@@ -32,14 +32,12 @@ export function usePlaybackController({
   const progressRef = useRef({ currentTime: 0, duration: null, persistedAt: 0 });
   const onEventRef = useRef(onEvent);
   const recordProgressRef = useRef(recordProgress);
-  const requestRef = useRef(request);
   const requestKeyRef = useRef(getPlaybackRequestKey(request));
   const requestKey = getPlaybackRequestKey(request);
   const requestSnapshot = request;
 
   if (requestKeyRef.current !== requestKey) {
     requestKeyRef.current = requestKey;
-    requestRef.current = request;
     progressRef.current = { currentTime: 0, duration: null, persistedAt: 0 };
   }
 
@@ -65,11 +63,13 @@ export function usePlaybackController({
     setError(message || '');
   }, []);
 
-  const controller = useMemo(() => playbackService.createController(requestSnapshot, {
+  const controller = useMemo(() => {
+    const isCurrentLifecycle = () => requestKeyRef.current === requestKey;
+    return playbackService.createController(requestSnapshot, {
     onEvent: event => {
       // A controller can finish an async parse/load after the page has already
       // switched to another request. Ignore late events from the old lifecycle.
-      if (requestKeyRef.current !== requestKey) return;
+      if (!isCurrentLifecycle()) return;
       onEventRef.current?.(event);
       const currentRequest = requestSnapshot;
       if (event.event === 'error') {
@@ -109,17 +109,29 @@ export function usePlaybackController({
         }
       }
     },
-    onStateChange: setStatus,
+    onStateChange: nextStatus => {
+      if (isCurrentLifecycle()) setStatus(nextStatus);
+    },
     onCandidateChange: next => {
+      if (!isCurrentLifecycle()) return;
       setCandidate(next);
       setResolvedInput(null);
       if (next) setError('');
     },
-    onResolvedInput: setResolvedInput,
-    onParserError: ({ code }) => reportError('解析失败：' + code),
-    onPlayerError: ({ error: playerError }) => reportError(playerError?.message || '播放器加载失败'),
-    onExhausted: () => setStatus('error'),
-  }), [requestKey, requestSnapshot, isLive, reportError]);
+    onResolvedInput: input => {
+      if (isCurrentLifecycle()) setResolvedInput(input);
+    },
+    onParserError: ({ code }) => {
+      if (isCurrentLifecycle()) reportError('解析失败：' + code);
+    },
+    onPlayerError: ({ error: playerError }) => {
+      if (isCurrentLifecycle()) reportError(playerError?.message || '播放器加载失败');
+    },
+    onExhausted: () => {
+      if (isCurrentLifecycle()) setStatus('error');
+    },
+  });
+  }, [requestKey, isLive, reportError]);
 
   useEffect(() => {
     if (!request || !videoRef?.current || !controller) return undefined;
@@ -165,7 +177,7 @@ export function usePlaybackController({
       controller.leave();
       void player;
     };
-  }, [controller, requestKey, requestSnapshot, videoRef, isLive, reportError]);
+  }, [controller, requestKey, videoRef, isLive, reportError]);
 
   const switchCandidate = useCallback((candidateId) => {
     const next = controller.switchCandidate(candidateId);
