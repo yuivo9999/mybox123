@@ -11,7 +11,7 @@ function Main({tab,route,selected,movies,channels,favorites,history,sources,sear
  const [favoriteSection,setFavoriteSection]=useState('movies'); const [fontPicker,setFontPicker]=useState(false);
  const [confirm,setConfirm]=useState(null); const [sourceForm,setSourceForm]=useState(null); const [batchMode,setBatchMode]=useState(false);
  if(tab==='live') return <>
-  <LiveFeature channels={channels} sources={sources} favorites={favorites} requestedChannelId={selected?.channelId || null} onChannel={onLiveChannel} onPlay={onLive} onTab={onTab} toggleFavorite={toggleFavorite}/>
+  <LiveFeature channels={channels} sources={sources} favorites={favorites} requestedChannelId={selected?.channelId || null} requestedStreamId={selected?.__livePlaybackStreamId || null} onChannel={onLiveChannel} onPlay={onLive} onTab={onTab} toggleFavorite={toggleFavorite}/>
   {route==='live-channel' && selected && <LiveChannelPanel channel={selected} channels={channels} sources={sources} favorites={favorites} onBack={()=>onTab('live')} onPlay={onLive} onChannel={onLiveChannel} toggleFavorite={toggleFavorite}/>} 
  </>;
  if(tab==='favorites'){
