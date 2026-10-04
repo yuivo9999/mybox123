@@ -19,7 +19,7 @@ import { ensureFont } from '../services/fontLoader.js';
 import { getGestureDirection, getTopLevelSwipeTarget, getParentForRoute, isSwipeExcludedTarget } from './navigationGesture.js';
 
 export function App(){
- const session=useSessionState(); const persistent=usePersistentState(); const {tab,route,selected}=session;
+ const session=useSessionState(); const persistent=usePersistentState(); const {tab,route,selected,livePlayback}=session;
  const [contentState,setContentState]=useState({status:'idle',movies:[],channels:[],error:null,sourceLoading:false,movieCategories:[],movieActiveCategory:null,movieSourceId:null,movieCategoryLoading:false});
  const [sourceErrorDismissed,setSourceErrorDismissed]=useState(false);
  const reloadGenerationRef=useRef(0);
@@ -244,7 +244,7 @@ export function App(){
       {(() => {
         // 1. If in a management tab, always show it
         if (isManagementTab) {
-          return <MainPage tab={tab} movies={contentState.movies} channels={contentState.channels} favorites={persistent.favorites} history={persistent.history} progress={persistent.progress} settings={persistent.settings} sources={persistent.sources} searches={persistent.searches} onTab={nav} onMovie={openMovie} onLive={playLive} onLiveChannel={openLiveChannel} onSearchHistory={openSearchHistory} toggleFavorite={persistent.toggleFavorite} onClearData={persistent.clearUserData} onClearHistory={persistent.clearHistory} onClearSearches={persistent.clearSearches} onRemoveSearch={persistent.removeSearch} onClearCache={persistent.clearCache} onSourceEnabled={setSourceEnabled} onSourceActive={setSourceActive} onUpdateSettings={persistent.updateSettings} onTestSource={testSource} onSaveSources={saveSources} onRemoveSource={removeSource}/>;
+          return <MainPage tab={tab} livePlayback={livePlayback} movies={contentState.movies} channels={contentState.channels} favorites={persistent.favorites} history={persistent.history} progress={persistent.progress} settings={persistent.settings} sources={persistent.sources} searches={persistent.searches} onTab={nav} onMovie={openMovie} onLive={playLive} onLiveChannel={openLiveChannel} onSearchHistory={openSearchHistory} toggleFavorite={persistent.toggleFavorite} onClearData={persistent.clearUserData} onClearHistory={persistent.clearHistory} onClearSearches={persistent.clearSearches} onRemoveSearch={persistent.removeSearch} onClearCache={persistent.clearCache} onSourceEnabled={setSourceEnabled} onSourceActive={setSourceActive} onUpdateSettings={persistent.updateSettings} onTestSource={testSource} onSaveSources={saveSources} onRemoveSource={removeSource}/>;
         }
 
         // Live owns one persistent playback workspace. Keep it mounted for all Live routes.
