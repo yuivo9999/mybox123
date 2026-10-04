@@ -314,6 +314,7 @@ export function AppRoot(){
      if(returnRoute==='detail') sessionStateStore.patch({tab:'movies',route:'detail',selected});
      else if(returnRoute==='search') sessionStateStore.patch({tab:'movies',route:'search',selected:null});
      else if(returnRoute==='movies') sessionStateStore.patch({tab:'movies',route:null,selected:null});
+     else if(returnRoute==='history') sessionStateStore.patch({tab:'history',route:null,selected:null});
      else sessionStateStore.patch({tab:'home',route:null,selected:null});
    }else if(route==='detail'||route==='search'){
      sessionStateStore.patch({tab:'movies',route:null,selected:null});
