@@ -11,7 +11,6 @@ export function SangtianPlayerWindow({
   onFullscreen, terminalTag = 'BASH', children, videoContainerRef, isLive = false,
   playbackRate = 1.0, onChangePlaybackRate,
   channels = [], activeChannel = null, activeStreamIndex = 0, onSelectChannel, onSwitchStreamIndex,
-  decoderEngine = 'exo', onChangeDecoderEngine,
   isImmersive = false, onToggleImmersive,
   title = '', episodeLabel = '', sourceLabel = '',
   episodes = [], currentEpisodeIndex = 0, onSelectEpisode,
@@ -670,26 +669,6 @@ export function SangtianPlayerWindow({
                           </div>
                         </div>
                       )}
-
-                      <div className="settings-group">
-                        <label>解码内核 (Decoder Engine)</label>
-                        <div className="settings-btn-grid vertical">
-                          {[
-                            { id: 'exo', name: 'ExoPlayer (MediaCodec 硬解推荐)' },
-                            { id: 'ijk', name: 'IJKPlayer (FFmpeg 软解兼容)' },
-                            { id: 'native', name: 'Android System Native' },
-                            { id: 'html5', name: 'HTML5 Web Engine' },
-                          ].map((engine) => (
-                            <button
-                              key={engine.id}
-                              className={`setting-btn ${decoderEngine === engine.id ? 'active' : ''}`}
-                              onClick={() => onChangeDecoderEngine?.(engine.id)}
-                            >
-                              {engine.name}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
 
                       <div className="settings-group exit-section">
                         <button
