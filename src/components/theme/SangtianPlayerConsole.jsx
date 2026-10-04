@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Copy, Maximize2, Minimize2, RotateCw, Sparkles, Terminal, Paperclip,
+  Copy, Maximize2, Minimize2, RotateCw, Sparkles, Paperclip,
   Play, Pause, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, Rewind, FastForward,
   FileText, LayoutGrid, SlidersHorizontal, Check, RefreshCw, Ratio,
   Lock, Unlock, ListVideo, Square
@@ -19,7 +19,6 @@ export function SangtianPlayerWindow({
   onTimeMetricsChange,
   playbackCapabilities = {}, getAudioTracks, getSubtitleTracks, getQualities, selectAudioTrack, selectSubtitleTrack, selectQuality,
 }) {
-  const [showTerminal, setShowTerminal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isLandscape, setIsLandscape] = useState(false);
   const [isSystemFullscreen, setIsSystemFullscreen] = useState(false);
@@ -30,7 +29,6 @@ export function SangtianPlayerWindow({
   const [duration, setDuration] = useState(0);
   const [bufferedSeconds, setBufferedSeconds] = useState(0);
   const [bufferRate, setBufferRate] = useState(0);
-  const [networkDownlink, setNetworkDownlink] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showFullscreenBar, setShowFullscreenBar] = useState(true);
   const [showLeftSidebar, setShowLeftSidebar] = useState(false);
@@ -143,16 +141,6 @@ export function SangtianPlayerWindow({
       }
     };
   }, [videoRef, candidate, resolvedInput, status]);
-
-  useEffect(() => {
-    const connection = typeof navigator !== 'undefined'
-      ? (navigator.connection || navigator.mozConnection || navigator.webkitConnection)
-      : null;
-    const update = () => setNetworkDownlink(Number.isFinite(Number(connection?.downlink)) ? Number(connection.downlink) : null);
-    update();
-    connection?.addEventListener?.('change', update);
-    return () => connection?.removeEventListener?.('change', update);
-  }, []);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -330,8 +318,6 @@ export function SangtianPlayerWindow({
   const currentGroupEpisodes = episodeGroups[episodePage] ?? episodes;
 
   const renderedChildren = children;
-  const bufferPct = duration > 0 ? Math.min(100, (bufferedSeconds / duration) * 100) : 0;
-  const loadSpeed = bufferRate > 0 ? `${bufferRate.toFixed(1)} 秒/秒` : '—';
   const displayTitle = title || request?.metadata?.title || (isLive ? activeChannel?.name : '正在播放');
   const displayEpisode = episodeLabel || (episodes.length > 0 ? `第 ${currentEpisodeIndex + 1} 集` : '');
 
@@ -376,7 +362,7 @@ export function SangtianPlayerWindow({
       )}
 
       <div ref={videoContainerRef} className="sangtian-window-body">
-        {showTerminal ? (
+        <>
           <div className="sangtian-terminal-panel">
             <pre className="terminal-code">{`播放信息
 
@@ -396,8 +382,7 @@ export function SangtianPlayerWindow({
               </button>
             </div>
           </div>
-        ) : (
-          <>
+
             {renderedChildren}
             {(() => {
               const isStopped = isStoppedManually || status === 'stopped';
@@ -781,11 +766,6 @@ export function SangtianPlayerWindow({
                         />
                         <span>{formatTime(duration)}</span>
                       </div>
-                      <div className="sangtian-fullscreen-metrics">
-                        <span>缓冲 {bufferPct.toFixed(0)}%</span>
-                        <span>加载 {loadSpeed}</span>
-                        <span>网络 {networkDownlink != null ? networkDownlink + ' Mbps' : '—'}</span>
-                      </div>
                     </>
                   )}
 
@@ -836,8 +816,7 @@ export function SangtianPlayerWindow({
                 </div>
               </div>
             )}
-          </>
-        )}
+        </>
       </div>
     </div>
   );
