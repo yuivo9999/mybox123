@@ -171,6 +171,10 @@ export function createPlaybackCore(task,hooks={}) {
    playbackTaskRegistry.register({request:task.request,stop:()=>{try{player?.stop?.();}finally{task.stop?.();}},release:()=>{try{player?.release?.();}finally{task.release?.();}}});
    resourceRelease?.();
    resourceRelease=playbackResourceManager.acquire(task.request.taskId,(previous)=>hooks.onResourceReplaced?.(previous));
+   // stop() deliberately keeps the adapter/resource ownership so the same controller can be
+   // restarted. Rebind the player callback after stop so events from the restarted session are
+   // accepted by the new operation generation.
+   if (activePlayerOperationGeneration === null) attachPlayer(playerElement);
    const initial=task.start();if(initial)transition(PlayerState.LOADING);return initial;
   },
   async resolveAndLoad(candidate=task.currentCandidate,options={}){return resolveAndLoad(candidate,options);},
@@ -188,7 +192,15 @@ export function createPlaybackCore(task,hooks={}) {
    if(state==='background'){if(task.request.kind===PlaybackKind.VOD){await player?.pause?.();}else{player?.pause?.();}}
    if(state==='foreground'&&task.request.kind===PlaybackKind.LIVE&&task.currentCandidate){try{await resolveAndLoad(task.currentCandidate);}catch(e){void recover(e,PlaybackFailureCode.NETWORK);}}
   },
-  stop(){operationGeneration+=1;activePlayerOperationGeneration=null;player?.stop?.();task.stop();resourceRelease?.();resourceRelease=null;playbackTaskRegistry.unregister(task.request.taskId);},
+  stop(){
+   operationGeneration+=1;
+   activePlayerOperationGeneration=null;
+   player?.stop?.();
+   task.stop();
+   // Keep the controller registered and resource-owned while stopped. This allows an
+   // explicit start()/retry flow to reuse the controller, while a competing controller
+   // can still replace it through playbackResourceManager -> taskRegistry -> release.
+  },
   release(){if(released)return;operationGeneration+=1;activePlayerOperationGeneration=null;released=true;try{player?.release?.();}finally{player=null;resourceRelease?.();resourceRelease=null;playbackSessionManager.clear(sessionId);sessionId=null;unsubscribe();eventBus.clear();task.release();playbackTaskRegistry.unregister(task.request.taskId);}}
  };
 }
