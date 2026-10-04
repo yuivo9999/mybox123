@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Heart } from 'lucide-react';
 import { movieService } from '../../services/movieService.js';
 import { usePlaybackController } from '../../playback/usePlaybackController.js';
+import { getPlaybackContext } from '../../playback/playbackContext.js';
 import { usePersistentState } from '../../state/usePersistentState.js';
 import { SangtianTopBar } from '../../components/theme/SangtianTopBar.jsx';
 import { SangtianDrawer } from '../../components/theme/SangtianDrawer.jsx';
@@ -34,6 +35,7 @@ export function MoviePlaybackPage({
   const episodes = movie?.episodes ?? request?.metadata?.episodes ?? [];
   const episodeIndex = Math.max(0, episodes.findIndex(item => item.episodeId === request?.episodeId) ?? 0);
   const currentEpisode = episodes[episodeIndex] ?? null;
+  const playbackContext = getPlaybackContext(request);
 
   const {
     controller,
@@ -64,7 +66,7 @@ export function MoviePlaybackPage({
   const playNextEpisode = () => {
     if (episodeIndex >= episodes.length - 1) return;
     setNextEpisodeCountdown(null);
-    onEpisode?.(movie, episodeIndex + 1, source, request?.metadata?.returnRoute || 'detail');
+    onEpisode?.(movie, episodeIndex + 1, source, playbackContext.returnRoute || 'detail');
   };
 
   const handleVideoEnded = () => {
@@ -149,8 +151,8 @@ export function MoviePlaybackPage({
           </button>
         </div>
         <div className="movie-playback-context-actions">
-          <button type="button" disabled={episodeIndex <= 0} onClick={() => onEpisode?.(movie, episodeIndex - 1, source, request?.metadata?.returnRoute || 'detail')}><ChevronLeft size={15} />上一集</button>
-          <button type="button" disabled={episodeIndex >= episodes.length - 1} onClick={() => onEpisode?.(movie, episodeIndex + 1, source, request?.metadata?.returnRoute || 'detail')}>下一集<ChevronRight size={15} /></button>
+          <button type="button" disabled={episodeIndex <= 0} onClick={() => onEpisode?.(movie, episodeIndex - 1, source, playbackContext.returnRoute || 'detail')}><ChevronLeft size={15} />上一集</button>
+          <button type="button" disabled={episodeIndex >= episodes.length - 1} onClick={() => onEpisode?.(movie, episodeIndex + 1, source, playbackContext.returnRoute || 'detail')}>下一集<ChevronRight size={15} /></button>
         </div>
       </section>
 
@@ -174,9 +176,9 @@ export function MoviePlaybackPage({
         sourceLabel={candidateLabel}
         episodes={episodes}
         currentEpisodeIndex={episodeIndex}
-        onSelectEpisode={idx => onEpisode?.(movie, idx, source, request?.metadata?.returnRoute || 'detail')}
-        onPreviousEpisode={episodeIndex > 0 ? () => onEpisode?.(movie, episodeIndex - 1, source, request?.metadata?.returnRoute || 'detail') : undefined}
-        onNextEpisode={episodeIndex < episodes.length - 1 ? () => onEpisode?.(movie, episodeIndex + 1, source, request?.metadata?.returnRoute || 'detail') : undefined}
+        onSelectEpisode={idx => onEpisode?.(movie, idx, source, playbackContext.returnRoute || 'detail')}
+        onPreviousEpisode={episodeIndex > 0 ? () => onEpisode?.(movie, episodeIndex - 1, source, playbackContext.returnRoute || 'detail') : undefined}
+        onNextEpisode={episodeIndex < episodes.length - 1 ? () => onEpisode?.(movie, episodeIndex + 1, source, playbackContext.returnRoute || 'detail') : undefined}
         candidates={candidates}
         onSelectCandidate={switchCandidate}
         videoContainerRef={videoContainerRef}
@@ -261,7 +263,7 @@ export function MoviePlaybackPage({
         description={movie?.description || '暂无视频简介。'}
         episodes={episodes}
         currentEpisodeId={request?.episodeId}
-        onSelectEpisode={idx => onEpisode?.(movie, idx, source, request?.metadata?.returnRoute || 'detail')}
+        onSelectEpisode={idx => onEpisode?.(movie, idx, source, playbackContext.returnRoute || 'detail')}
         candidates={candidates}
         currentCandidateId={candidate?.candidateId}
         onSelectCandidate={switchCandidate}
@@ -296,7 +298,7 @@ export function MoviePlaybackPage({
                       key={ep.episodeId}
                       className={episodeIndex === idx ? 'active' : ''}
                       onClick={() => {
-                        onEpisode?.(movie, idx, source, request?.metadata?.returnRoute || 'detail');
+                        onEpisode?.(movie, idx, source, playbackContext.returnRoute || 'detail');
                         setSourceModalOpen(false);
                       }}
                     >
