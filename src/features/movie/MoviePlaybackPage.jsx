@@ -26,7 +26,6 @@ export function MoviePlaybackPage({
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sourceModalOpen, setSourceModalOpen] = useState(false);
-  const [decoderEngine, setDecoderEngine] = useState('exo');
   const videoRef = useRef(null);
   const videoContainerRef = useRef(null);
 
@@ -169,8 +168,6 @@ export function MoviePlaybackPage({
         channels={[]}
         activeChannel={null}
         activeStreamIndex={0}
-        decoderEngine={decoderEngine}
-        onChangeDecoderEngine={setDecoderEngine}
       >
         <video
           ref={videoRef}
