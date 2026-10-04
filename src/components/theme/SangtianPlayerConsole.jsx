@@ -9,14 +9,13 @@ import {
 export function SangtianPlayerWindow({
   videoRef, status, error, resolvedInput, candidate, request, onRetry, onSwitchCandidate, onStop,
   onFullscreen, terminalTag = 'BASH', children, videoContainerRef, isLive = false,
-  playbackRate = 1.0, onChangePlaybackRate, onTogglePlayback, onSeek,
+  playbackRate = 1.0, currentTime = 0, duration = 0, isPlaying = false, onChangePlaybackRate, onTogglePlayback, onSeek,
   channels = [], activeChannel = null, activeStreamIndex = 0, onSelectChannel, onSwitchStreamIndex,
   isImmersive = false, onToggleImmersive,
   title = '', episodeLabel = '', sourceLabel = '',
   episodes = [], currentEpisodeIndex = 0, onSelectEpisode,
   onPreviousEpisode, onNextEpisode,
   candidates = [], onSelectCandidate,
-  onTimeMetricsChange,
   playbackCapabilities = {}, getAudioTracks, getSubtitleTracks, getQualities, selectAudioTrack, selectSubtitleTrack, selectQuality,
 }) {
   const [copied, setCopied] = useState(false);
@@ -25,11 +24,8 @@ export function SangtianPlayerWindow({
   const [isWebFullscreen, setIsWebFullscreen] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [aspectMode, setAspectMode] = useState('original');
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
   const [bufferedSeconds, setBufferedSeconds] = useState(0);
   const [bufferRate, setBufferRate] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [showFullscreenBar, setShowFullscreenBar] = useState(true);
   const [showLeftSidebar, setShowLeftSidebar] = useState(false);
   const [showRightSidebar, setShowRightSidebar] = useState(false);
@@ -93,9 +89,6 @@ export function SangtianPlayerWindow({
     if (!video) return;
     const cur = Number(video.currentTime) || 0;
     const dur = Number(video.duration) || 0;
-    setCurrentTime(cur);
-    setDuration(dur);
-    onTimeMetricsChange?.(cur, dur);
     let forwardBuffer = 0;
     try {
       if (video.buffered?.length) {
@@ -119,8 +112,6 @@ export function SangtianPlayerWindow({
       const video = videoRef?.current;
       if (video) {
         syncMediaMetrics();
-        const activePlaying = !video.paused && !video.ended && (video.currentTime > 0 || video.readyState >= 2);
-        setIsPlaying(activePlaying);
         if (video !== boundVideo) {
           if (boundVideo) {
             events.forEach(event => boundVideo.removeEventListener(event, update));
@@ -280,7 +271,6 @@ export function SangtianPlayerWindow({
     const video = videoRef?.current;
     if (!video || !Number.isFinite(video.duration)) return;
     onSeek?.(Number(value));
-    setCurrentTime(Number(value));
     resetControlsTimeout();
   };
 
@@ -294,9 +284,8 @@ export function SangtianPlayerWindow({
     if (isLive) return;
     const video = videoRef?.current;
     if (!video || !Number.isFinite(video.duration)) return;
-    const nextTime = Math.max(0, Math.min(video.duration, (Number(video.currentTime) || 0) + seconds));
+    const nextTime = Math.max(0, Math.min(video.duration, (Number(currentTime) || 0) + seconds));
     onSeek?.(nextTime);
-    setCurrentTime(nextTime);
     resetControlsTimeout();
   };
 
