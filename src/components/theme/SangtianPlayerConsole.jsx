@@ -88,7 +88,6 @@ export function SangtianPlayerWindow({
     const video = videoRef?.current;
     if (!video) return;
     const cur = Number(video.currentTime) || 0;
-    const dur = Number(video.duration) || 0;
     let forwardBuffer = 0;
     try {
       if (video.buffered?.length) {
