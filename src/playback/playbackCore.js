@@ -104,8 +104,10 @@ export function createPlaybackCore(task,hooks={}) {
   }
  }
 
- const playResolved=async(input)=>{
-  if(!player)throw new Error('PLAYER_ADAPTER_NOT_ATTACHED');
+ const playResolved=async(input,generation=operationGeneration)=>{
+  if(!isCurrentOperation(generation))return null;
+  const activePlayer=player;
+  if(!activePlayer)throw new Error('PLAYER_ADAPTER_NOT_ATTACHED');
   const playbackSettings = userDataService.getSettings().playback;
   const defaultEngine = task.request.kind === PlaybackKind.LIVE ? playbackSettings.livePlayer : playbackSettings.moviePlayer;
   const playerHint = {
@@ -123,11 +125,15 @@ export function createPlaybackCore(task,hooks={}) {
     undefined
    ),
   };
-  await Promise.resolve(player.load({ ...input, playerHint }));
-  await Promise.resolve(player.prepare());
+  await Promise.resolve(activePlayer.load({ ...input, playerHint }));
+  if(!isCurrentOperation(generation))return null;
+  await Promise.resolve(activePlayer.prepare());
+  if(!isCurrentOperation(generation))return null;
   const startPosition=Number(task.request.metadata?.startPositionSeconds??0);
-  if(task.request.kind===PlaybackKind.VOD&&startPosition>0)player.seek(startPosition);
-  if(input.playerHint?.autoplay!==false)await player.play();
+  if(task.request.kind===PlaybackKind.VOD&&startPosition>0)activePlayer.seek(startPosition);
+  if(!isCurrentOperation(generation))return null;
+  if(input.playerHint?.autoplay!==false)await activePlayer.play();
+  if(!isCurrentOperation(generation))return null;
   return input;
  };
 
@@ -135,7 +141,7 @@ export function createPlaybackCore(task,hooks={}) {
   const generation=operationGeneration;
   const input=await resolve(candidate,{...options,__operationGeneration:generation});
   if(!input||!isCurrentOperation(generation))return null;
-  await playResolved(input);
+  await playResolved(input,generation);
   if(!isCurrentOperation(generation))return null;
   networkPolicy.resetRetry();
   return input;
