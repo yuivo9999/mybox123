@@ -2371,3 +2371,35 @@ P0 播放 Owner 边界已经完成代码审计，下一步进入：
 4. P1 HLS live latency/buffer 真实源验证。
 
 不要在此阶段删除 LiveFeature 的内嵌播放器：它目前承担直播首页 preview 角色，且 App 已证明 route 层级会把它与 PlaybackPage 分离。若未来要收敛成单一播放器 UI，应作为独立产品/交互重构，而不是作为本轮竞态修复顺手删除。
+
+
+# 2026-10-05 本轮执行记录：P0 TV1 生命周期行为测试
+
+本轮没有扩大播放架构范围，先把上一轮已经修复的 TV1 source/session 生命周期固定成可执行测试。
+
+新增：
+- `tests/live/tv1-source-lifecycle.test.mjs`
+  - 同 sourceId 内容身份变化时 session 必须失效；
+  - 显式 clear(sourceId) 后不能泄漏旧 session；
+  - 已 aborted 的 metadata load 不能留下可复用 session。
+
+Commit：
+- `2478071cc9d6320ecef098fb7f551ea6eeb864b1` — `test(live): lock TV1 source lifecycle behavior`
+
+同时再次检查了 `package.json`：
+- `test:live` / `test:playback` 当前实际都指向 architecture test-runner；
+- `test:playback-lifecycle` 才是显式 Node test runner；
+- 因此当前环境未执行测试，不宣称通过。
+
+## 当前 P0 状态
+
+- Native generation：代码完成，实机待验证
+- deferred stream source identity：代码 + 单元测试已加入，实际 runner 待执行
+- EPG cancellation：代码完成，真实 adapter Abort 待验证
+- TV1 source/session lifecycle：代码 + 行为测试已加入，实际 runner 待执行
+- LiveFeature / PlaybackPage owner boundary：已审计，当前不删除 LiveFeature preview owner
+- source dependency race：已修复
+
+## 下一步
+
+继续 P0：检查 `live-play` 请求从 LiveFeature 进入 PlaybackPage 后的 **request identity / back / source switch / channel switch** 是否闭合；重点防止旧 request 的 candidate 或 resolved input 在返回、切源后重新写入新播放页。
