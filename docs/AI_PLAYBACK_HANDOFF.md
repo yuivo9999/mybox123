@@ -1210,3 +1210,93 @@ playbackResourceManager → playbackTaskRegistry.stopAndRelease → player.relea
 - 新确认的架构事实：stop 与 release 不能混为一谈。stop 需要保持 controller 可 restart，同时保留 resource registry ownership，等待新 controller acquire 时再由 registry 完成最终 release。
 - 目前最值得继续验证的不是“有没有 release 调用”，而是“旧 stopped controller 是否仍可被 resource manager 找到并彻底释放”。
 - Native bridge 的 payload identity 仍没有代码证据，继续保持 UNKNOWN/PENDING。
+
+
+# 27. 本轮继续执行结果：P0-B stopped owner 被竞争 controller 接管时的释放证明
+
+## 本轮
+- 日期：2026-10-05
+- 起始有效 HEAD：`0fa62ac14b321094e1b7ac43cf14f92f0bf9f8a6`
+- 本轮测试提交：`c08d2200454cf925afd54007281cf165e386f2e5`
+- 工作范围：继续执行 P0-B；针对上一轮确定的架构事实，补充“旧 controller 已 stop，但仍持有 resource/registry ownership；新 controller acquire 后必须彻底 release 旧 controller”的行为测试。
+- 修改文件：
+  - `tests/playback/playback-lifecycle.test.mjs`
+  - `docs/AI_PLAYBACK_HANDOFF.md`
+
+## 本轮完成
+### P0-B-5：补齐 stopped owner → competing controller 的行为测试
+新增场景：
+
+1. Controller A attach + start；
+2. A 调用 stop；
+3. A 仍然保留在 resource manager / task registry；
+4. Controller B attach + start；
+5. B acquire playback resource；
+6. ResourceManager 找到 A；
+7. Registry 执行 A 的 stop + release；
+8. A task 最终进入 `released`；
+9. Native `releaseMedia` 被调用；
+10. B 保持 active，未被误释放。
+
+这直接验证了上一轮的关键设计，而不是只验证“stop 后还能 start”。
+
+## 代码级结论
+当前代码链为：
+
+`B.start()`
+→ `playbackTaskRegistry.register(B)`
+→ `playbackResourceManager.acquire(B)`
+→ 发现 owner=A
+→ 清除 A owner handle
+→ `registry.stopAndRelease(A)`
+→ A player.release()
+→ A task.release()
+→ A 从 registry 删除
+→ B 成为 owner
+
+因此“stop 不 release”并不等于“stop 后资源永远泄漏”；竞争 controller acquire 时仍存在最终释放路径。
+
+## 验证状态
+- [x] 行为测试已提交：`c08d2200454cf925afd54007281cf165e386f2e5`
+- [ ] `npm run test:playback-lifecycle`：仍未在真实 Node 22 + 完整依赖环境执行。
+- [ ] `npm test`：仍未执行。
+- [ ] 浏览器真实 HLS：PENDING。
+- [ ] Android Native：PENDING。
+- [ ] 真机 rapid switch：PENDING。
+- [ ] Native bridge payload identity：PENDING。
+
+## 当前 P0
+### P0-B
+- [x] ResourceManager → TaskRegistry 的 stopped-owner 最终释放路径已有行为测试覆盖。
+- [ ] 真实 Node 22 执行测试。
+- [ ] HTML5 HLS destroy/rebind 真实验证。
+- [ ] Native releaseMedia 后 Android 侧 player/surface 是否真正释放。
+- [ ] candidate switch 的 adapter reattach 在真实设备上的成本。
+
+### P0-C
+- [ ] Native bridge event identity 仍 UNKNOWN。
+  - 仓库当前只看到 `src/player/nativePlayerAdapter.js` 写入 `window.TVBoxWebView.onPlayerEvent`。
+  - GitHub 代码搜索目前没有找到 Android/WebView bridge 实现或其它 `onPlayerEvent/loadMedia/releaseMedia` 定义。
+  - 因此不能假设 payload 有 task/session/player identity。
+  - 下一步应优先确认仓库是否包含 Android 原生目录/子模块；若没有，则记录为外部 bridge 依赖并设计 adapter-local isolation，不凭空修改 payload 协议。
+
+### P0-D
+- [ ] candidate switch reattach 真实成本仍 PENDING。
+
+## 当前不能确定
+- **PENDING**：测试是否实际通过；当前只有代码/测试提交，没有运行结果。
+- **UNKNOWN**：Android bridge 是否提供 event identity。
+- **PENDING**：HTML5/Native 真实释放效果。
+
+## 下一位 AI 立即执行
+1. `package.json` / CI：先确认 Node 22 + 依赖是否可在当前环境运行 `npm run test:playback-lifecycle`；能运行就执行并记录真实结果。
+2. `src/player/nativePlayerAdapter.js` + 仓库目录：继续确认 Android 原生 bridge 是否在仓库、子模块或 build 资源中；不要只重复搜索 JS。
+3. `src/player/html5PlayerAdapter.js`：针对 candidate switch / release 检查 HLS callback 是否可能在 `cleanupHls()` 后继续 emit；必要时增加 adapter-local generation guard。
+4. `src/playback/playbackCore.js`：如果 HTML5/native adapter 都已有 stale-event 隔离，确认 core 的三层 generation guard 是否仍足够，不要重复加 token。
+5. 若 P0-C/P0-D 仍无法从仓库获得证据，保持 UNKNOWN/PENDING，转入 P1 的 HTML5 capability boundary，但不要直接调整 HLS buffer。
+
+## 给下下一位 AI 留的资料
+- P0-B 现在不仅有代码链，还有一个专门验证“stopped A 被 B acquire 后必须 release A”的行为测试。
+- 不要把 `stop()` 改回“立即 unregister + release”，否则会破坏同一 controller restart，以及竞争 controller 的统一 resource ownership。
+- Resource manager 的 owner handle 会在 B acquire 时先失效，然后由 registry 对 A 执行 stopAndRelease；这是当前预期行为。
+- 当前最重要的未知已经从 resource ownership 进一步收敛到 Native bridge identity 和真实 adapter release 行为。
