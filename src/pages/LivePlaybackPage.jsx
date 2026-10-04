@@ -34,7 +34,7 @@ function PlaybackView({
   const currentProgram = useMemo(() => {
     if (!channel) return null;
     return channel.epg?.find(program => (
-      program.controllerStatus === 'live'
+      program.status === 'live'
       || (Date.parse(program.startAt) <= now && now < Date.parse(program.endAt))
     )) ?? null;
   }, [channel, now]);
@@ -42,14 +42,14 @@ function PlaybackView({
   const nextProgram = useMemo(() => {
     if (!channel) return null;
     return channel.epg?.find(program => (
-      program.controllerStatus === 'upcoming' || Date.parse(program.startAt) > now
+      program.status === 'upcoming' || Date.parse(program.startAt) > now
     )) ?? null;
   }, [channel, now]);
 
   const {
     controller,
-    activeCandidate: activeCandidate,
-    controllerStatus: controllerStatus,
+    candidate: activeCandidate,
+    status: controllerStatus,
     resolvedInput: controllerResolvedInput,
     error: controllerError,
     switchCandidate: switchCandidateFromController,
