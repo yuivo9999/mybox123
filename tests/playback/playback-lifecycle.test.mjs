@@ -124,6 +124,67 @@ test('stale candidate load cannot prepare or play after a rapid switch', async (
   delete globalThis.window;
 });
 
+
+test('rapid A to B to C switching only allows C to reach play', async () => {
+  const { calls, loadWaiters } = installNativeBridge();
+  const aLoad = deferred();
+  const bLoad = deferred();
+  loadWaiters.set('https://example.test/a.m3u8', aLoad);
+  loadWaiters.set('https://example.test/b.m3u8', bLoad);
+
+  const { task, core } = createLiveCore();
+  core.attachPlayer(null);
+  core.start();
+  const aPlaying = core.resolveAndLoad(task.request.candidates[0]);
+  await Promise.resolve();
+
+  core.switchCandidate(task.request.candidates[1].candidateId);
+  await Promise.resolve();
+  core.switchCandidate(task.request.candidates[2].candidateId);
+  await Promise.resolve();
+
+  aLoad.resolve(true);
+  bLoad.resolve(true);
+  await aPlaying;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(
+    calls.filter((item) => item.method === 'loadMedia').map((item) => item.url),
+    [
+      'https://example.test/a.m3u8',
+      'https://example.test/b.m3u8',
+      'https://example.test/c.m3u8',
+    ],
+  );
+  assert.equal(calls.filter((item) => item.method === 'prepareMedia').length, 1);
+  assert.equal(calls.filter((item) => item.method === 'playMedia').length, 1);
+
+  core.release();
+  delete globalThis.window;
+});
+
+test('stop invalidates a pending load before it can prepare or play', async () => {
+  const { calls, loadWaiters } = installNativeBridge();
+  const aLoad = deferred();
+  loadWaiters.set('https://example.test/a.m3u8', aLoad);
+
+  const { core } = createLiveCore();
+  core.attachPlayer(null);
+  const first = core.start();
+  const loading = core.resolveAndLoad(first);
+  await Promise.resolve();
+
+  core.stop();
+  aLoad.resolve(true);
+  await loading;
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(calls.filter((item) => item.method === 'prepareMedia').length, 0);
+  assert.equal(calls.filter((item) => item.method === 'playMedia').length, 0);
+
+  delete globalThis.window;
+});
+
 test('release while loading prevents late prepare and play', async () => {
   const { calls, loadWaiters } = installNativeBridge();
   const aLoad = deferred();
