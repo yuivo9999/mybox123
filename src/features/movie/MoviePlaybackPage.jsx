@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Heart, ListVideo, Film, RotateCw, Ratio, Play } from 'lucide-react';
 import { movieService } from '../../services/movieService.js';
-import { playbackService } from '../../services/playbackService.js';
+import { usePlaybackController } from '../../playback/usePlaybackController.js';
 import { usePersistentState } from '../../state/usePersistentState.js';
 import { SangtianTopBar } from '../../components/theme/SangtianTopBar.jsx';
 import { SangtianDrawer } from '../../components/theme/SangtianDrawer.jsx';
@@ -22,12 +22,7 @@ export function MoviePlaybackPage({
   onTab,
 }) {
   const { recordProgress, saveSettings, settings } = usePersistentState();
-  const progressRef = useRef({ currentTime: 0, duration: null, persistedAt: 0 });
   const [source, setSource] = useState(request?.metadata?.sourceId ?? request?.candidates?.[0]?.sourceId ?? '');
-  const [candidate, setCandidate] = useState(request?.candidates?.[0] ?? null);
-  const [status, setStatus] = useState('idle');
-  const [resolvedInput, setResolvedInput] = useState(null);
-  const [error, setError] = useState('');
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sourceModalOpen, setSourceModalOpen] = useState(false);
@@ -40,75 +35,26 @@ export function MoviePlaybackPage({
   const episodeIndex = Math.max(0, episodes.findIndex(item => item.episodeId === request?.episodeId) ?? 0);
   const currentEpisode = episodes[episodeIndex] ?? null;
 
-  const controller = useMemo(() => playbackService.createController(request, {
-    onEvent: event => {
-      if (event.event === 'error') setError(event.error || '播放候选失败');
-      if (event.event === 'progress') {
-        const currentTime = event.currentTime ?? 0;
-        const duration = event.duration ?? null;
-        progressRef.current = { ...progressRef.current, currentTime, duration };
-        if (request?.contentId && request?.episodeId && currentTime - progressRef.current.persistedAt >= 15) {
-          recordProgress(request.contentId, request.episodeId, currentTime, duration, false);
-          progressRef.current.persistedAt = currentTime;
-        }
-      }
-      if (event.event === 'completed' && request?.contentId && request?.episodeId) {
-        const progress = progressRef.current;
-        if (progress.currentTime > 0) {
-          recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, true);
-        }
-      }
-    },
-    onStateChange: setStatus,
-    onCandidateChange: setCandidate,
-    onResolvedInput: setResolvedInput,
-    onParserError: ({ code }) => setError('解析失败：' + code),
-    onPlayerError: ({ error: playerError }) => setError(playerError?.message || '播放器加载失败'),
-    onExhausted: () => setStatus('error'),
-  }), [request, recordProgress]);
+  const {
+    controller,
+    candidate,
+    setCandidate,
+    status,
+    resolvedInput,
+    error,
+    setError,
+    progressRef,
+    switchCandidate,
+    retry: handleRetry,
+  } = usePlaybackController({
+    request,
+    videoRef,
+    recordProgress,
+  });
 
-  useEffect(() => {
-    let active = true;
-    const player = controller.attachPlayer(videoRef.current);
-    const initial = controller.start();
-    setCandidate(initial);
-    if (!initial) {
-      setStatus('error');
-      setError('没有可用的播放候选');
-    } else {
-      controller.resolveAndLoad(initial).catch(errorValue => {
-        if (active) setError(errorValue?.message || '播放初始化失败');
-      });
-    }
-    return () => {
-      active = false;
-      if (request?.contentId && request?.episodeId && progressRef.current.currentTime > 0) {
-        const progress = progressRef.current;
-        recordProgress(request.contentId, request.episodeId, progress.currentTime, progress.duration, false);
-      }
-      controller.leave();
-      void player;
-    };
-  }, [controller, request, recordProgress]);
-
-  const switchCandidate = id => {
-    const next = controller.switchCandidate(id);
-    if (next) {
-      setCandidate(next);
-      setSource(next.sourceId ?? '');
-      setResolvedInput(null);
-      setError('');
-    }
-  };
-
-  const handleRetry = () => {
-    setError('');
-    const nextCandidate = controller.start();
-    if (nextCandidate) {
-      controller.resolveAndLoad(nextCandidate).catch(errorValue => {
-        setError(errorValue?.message || '重新加载失败');
-      });
-    }
+  const handleSelectCandidate = id => {
+    const next = switchCandidate(id);
+    if (next) setSource(next.sourceId ?? '');
   };
 
   const handleChangePlaybackRate = rate => {
@@ -141,7 +87,7 @@ export function MoviePlaybackPage({
         onHamburger={() => setDrawerOpen(true)}
         onPreview={() => {
           const next = candidates.find(c => c.candidateId !== candidate?.candidateId);
-          if (next) switchCandidate(next.candidateId);
+          if (next) handleSelectCandidate(next.candidateId);
         }}
         previewText="换源"
         workspaceText={`集数 ${episodeIndex + 1}`}
@@ -202,7 +148,7 @@ export function MoviePlaybackPage({
         onRetry={handleRetry}
         onSwitchCandidate={() => {
           const next = candidates.find(c => c.candidateId !== candidate?.candidateId);
-          if (next) switchCandidate(next.candidateId);
+          if (next) handleSelectCandidate(next.candidateId);
         }}
         playbackRate={playbackRate}
         onChangePlaybackRate={handleChangePlaybackRate}
@@ -309,7 +255,7 @@ export function MoviePlaybackPage({
                   <button
                     key={item.candidateId}
                     className={candidate?.candidateId === item.candidateId ? 'active' : ''}
-                    onClick={() => { switchCandidate(item.candidateId); setSourceModalOpen(false); }}
+                    onClick={() => { handleSelectCandidate(item.candidateId); setSourceModalOpen(false); }}
                   >
                     {item.metadata?.label || item.label || (item.index != null ? `线路 ${item.index + 1}` : `线路 ${idx + 1}`)}
                   </button>
