@@ -59,9 +59,11 @@ export function createPlaybackCore(task,hooks={}) {
  };
 
  const attachPlayer=(element)=>{
+  playerGeneration+=1;
+  const currentPlayerGeneration=playerGeneration;
   player?.release?.(); playerElement=element;
-  if(nativeAvailable()) player=createNativePlayerAdapter({onEvent:handlePlayerEvent});
-  else if(element) player=createHtml5PlayerAdapter(element,{onEvent:handlePlayerEvent});
+  if(nativeAvailable()) player=createNativePlayerAdapter({onEvent:(event)=>handlePlayerEvent(event,currentPlayerGeneration)});
+  else if(element) player=createHtml5PlayerAdapter(element,{onEvent:(event)=>handlePlayerEvent(event,currentPlayerGeneration)});
   else return null;
   return player;
  };
@@ -141,7 +143,8 @@ export function createPlaybackCore(task,hooks={}) {
   transition(PlayerState.LOADING);void resolveAndLoad(next).catch(e=>hooks.onPlayerError?.({error:e,candidate:next}));return next;
  };
 
- async function recover(error,code){
+ async function recover(error,code,generation=operationGeneration){
+  if(!isCurrentOperation(generation))return false;
   if(task.request.kind===PlaybackKind.LIVE && networkPolicy.shouldReconnect({code})){
    transition(PlayerState.RECONNECTING);emit('reconnecting',{candidate:task.currentCandidate,reconnectCount:networkPolicy.reconnectCount});
    await new Promise(r=>setTimeout(r,networkPolicy.getReconnectDelay()));
