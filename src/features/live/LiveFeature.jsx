@@ -400,6 +400,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
 
       <SangtianPlayerWindow
         videoRef={videoRef}
+        controller={playbackController}
         videoContainerRef={playerWindowBodyRef}
         status={playbackStatus}
         candidate={activeStream ? {
