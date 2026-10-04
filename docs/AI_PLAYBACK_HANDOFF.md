@@ -1054,3 +1054,64 @@ Landscape VOD：
 ### 22.5 接力状态
 - 当前代码提交：`16e40d84a82d0e48e8f4dd0a0de4d234c13e5293`
 - 文档将在该代码提交后继续更新；实际 branch HEAD 为准。
+
+
+## 23. P2.5 第二小步已完成：Live inline 播放接入共享 usePlaybackController
+
+### 23.1 修改前的问题
+`src/features/live/LiveFeature.jsx` 原先自己维护：
+- `playbackService.createController()`
+- controller state callback
+- candidate / resolvedInput / status / error state
+- attachPlayer → start → resolveAndLoad
+- cleanup → controller.leave
+- Live 线路失败后的手工 fallback
+
+这与已经存在的 `src/playback/usePlaybackController.js` 重复维护播放生命周期。
+
+### 23.2 已完成
+Live inline preview 现在改用 `usePlaybackController({ request, videoRef, isLive: true })`。
+
+保留 LiveFeature 自己应该负责的内容：
+- 频道选择
+- 延迟线路读取
+- activeStreamIndex
+- EPG
+- 频道缓存
+- inline / immersive 状态
+
+移除：
+- inline 自己创建 PlaybackController
+- inline 自己 attach/start/resolve/leave
+- 已废弃 decoderEngine state
+
+线路切换仍通过共享 hook 返回的 `switchCandidate`。
+
+### 23.3 静态检查
+已确认：
+- LiveFeature 不再直接调用 `playbackService.createController`。
+- LiveFeature 不再直接调用 `attachPlayer()`。
+- LiveFeature 使用共享 `usePlaybackController`。
+- LiveFeature 不再存在 decoderEngine 引用。
+- activeStreamIndex 会根据共享 hook 的当前 candidate 同步。
+
+尚未验证：
+- Live 浏览器真实播放
+- inline → immersive 切换
+- 线路失败自动 fallback 的真实行为
+- build / lint / test
+
+### 23.4 潜在回归点
+- `usePlaybackController` 是共享生命周期层；不要重新在 LiveFeature 增加第二套 controller 创建。
+- Live 的 UI 仍使用 `SangtianPlayerWindow`，因此“inline 是轻量 preview”目前主要是职责层面的目标，视觉/控制精简仍未完成。
+- `PlaybackPage.jsx` 仍是 immersive Live 播放页，下一步应继续收敛命名与控制职责，而不是复制新的播放器组件。
+
+### 23.5 下一步
+优先处理 Live 播放页面命名和入口职责：
+1. 确认 `PlaybackPage.jsx` 的调用方只服务 Live。
+2. 将其重命名为 `LivePlaybackPage.jsx`（保留必要兼容导出，避免一次性破坏调用方）。
+3. 再检查 LiveFeature 的 inline PlayerWindow 是否需要减少“停止/复制/方向/比例/全屏”等非 preview 控制。
+
+### 23.6 接力状态
+- 当前代码提交：`f4a988132175855d33557b7d33ebcba6a76afb36`
+- 文档提交将在本次代码提交后继续推进。
