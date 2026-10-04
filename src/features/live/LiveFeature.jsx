@@ -356,16 +356,11 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     if (!playbackController || !activeChannel?.streams?.length) return undefined;
     const request = playbackService.createLiveRequest({ channel: activeChannel });
     playbackController.ensureRequest(request);
-    const body = playerWindowBodyRef.current;
-    const video = playbackController.getVideoElement();
-    videoRef.current = video;
-    playbackController.attachPresentation(body);
-    setPlaybackCandidate(playbackController.getPlaybackState?.().state ? request.candidates[0] : request.candidates[0]);
+    videoRef.current = playbackController.getVideoElement();
+    setPlaybackCandidate(playbackController.currentCandidate || request.candidates[0] || null);
     setResolvedPlaybackInput(null);
     setPlaybackError('');
-    return () => {
-      playbackController.detachPresentation();
-    };
+    return undefined;
   }, [activeChannel, playbackController]);
 
   useEffect(() => {
