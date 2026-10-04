@@ -109,7 +109,11 @@ export function App(){
    const progress=persistent.progress.find((item)=>item.contentId===movie.contentId&&item.episodeId===episode.episodeId);
    const preferredSource=sourceId||persistent.selectedSources?.movie||persistent.settings?.defaultMovieSource||null;
    const request=playbackService.createVODRequest({content:movie,episode,episodeIndex,preferredSource,metadata:{title:movie.title,poster:movie.poster,episodeTitle:episode.title??'',sourceId:preferredSource,returnRoute:getMovieReturnRoute(returnRoute),startPositionSeconds:persistent.settings?.autoplayResume?(progress?.completed?0:(progress?.positionSeconds??0)):0}});
-   if(preferredSource){const sourceCandidates=request.candidates.filter(candidate=>candidate.sourceId===preferredSource);if(sourceCandidates.length)request.candidates=sourceCandidates;sourceManagementService.touchUsage(preferredSource);}
+   // 首选源只决定“优先尝试”，不能删除其他候选源；失败后必须允许跨源兜底。
+   if(preferredSource && request.candidates.length){
+     request.candidates=[...request.candidates.filter(candidate=>candidate.sourceId===preferredSource),...request.candidates.filter(candidate=>candidate.sourceId!==preferredSource)];
+     sourceManagementService.touchUsage(preferredSource);
+   }
    sessionStateStore.patch({selected:request,route:'movie-play',tab:'movies'}); persistent.recordMoviePlay(movie,episodeIndex,sourceId);
  };
  const testSource=async(source)=>{
