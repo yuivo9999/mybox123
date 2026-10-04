@@ -10,6 +10,7 @@ function migrateProgress(items) { const seen = new Set(); return items.filter((i
 function validate(data) { return data && Array.isArray(data.favorites) && Array.isArray(data.history) && Array.isArray(data.progress) && Array.isArray(data.searches); }
 function backupLegacyData() { if (typeof window === 'undefined') return; Object.entries(LEGACY_KEYS).forEach(([name, key]) => { const raw = window.localStorage.getItem(key); if (raw === null) return; try { storage.backup(`legacy-v1:${name}`, JSON.parse(raw)); } catch { storage.backup(`legacy-v1:${name}`, { raw }); } }); }
 export function migrateLegacyData() {
+  if (typeof window === 'undefined') return { version: MIGRATION_VERSION, completed: false, migrated: false };
   const marker = storage.read('migration:legacy-v2', null);
   if (marker?.completed && marker.version === MIGRATION_VERSION) return marker;
   const legacyFavorites = legacyRead(LEGACY_KEYS.favorites, []); const legacyHistory = legacyRead(LEGACY_KEYS.history, []); const legacySearches = legacyRead(LEGACY_KEYS.searches, []); const legacySources = legacyRead(LEGACY_KEYS.sources, null);
