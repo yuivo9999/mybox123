@@ -179,10 +179,10 @@ function PlaybackView({
       <SangtianPlayerWindow
         videoRef={videoRef}
         videoContainerRef={playerWindowBodyRef}
-        controllerStatus={controllerStatus}
-        error={error}
-        resolvedInput={resolvedInput}
-        activeCandidate={activeCandidate}
+        status={controllerStatus}
+        error={controllerError}
+        resolvedInput={controllerResolvedInput}
+        candidate={activeCandidate}
         request={request}
         onRetry={handleRetry}
         onStop={handleStop}
@@ -210,7 +210,6 @@ function PlaybackView({
         sourceLabel={candidateLabel}
         candidates={candidates}
         onSelectCandidate={switchCandidate}
-        onOpenSourceModal={() => setSourceModalOpen(true)}
       >
         <video
           ref={videoRef}
