@@ -25,7 +25,7 @@ export const sessionStateStore = {
     return snapshot;
   },
   reset() {
-    snapshot = Object.freeze({ tab: 'home', route: null, selected: null });
+    snapshot = Object.freeze({ tab: 'home', route: null, selected: null, livePlayback: null });
     emit();
     return snapshot;
   },
