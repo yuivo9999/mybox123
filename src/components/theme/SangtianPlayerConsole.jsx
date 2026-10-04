@@ -819,16 +819,7 @@ export function SangtianConsoleCard({
   isFav = false,
 }) {
   const [activeTab, setActiveTab] = useState(isLive ? 'episodes' : 'info'); // Live keeps channel selection; VOD uses the dedicated source/episode modal.
-  const [copiedLink, setCopiedLink] = useState(false);
   const [selectedLiveCat, setSelectedLiveCat] = useState('全部');
-
-  const handleCopyStream = () => {
-    if (navigator?.clipboard?.writeText && streamUrl) {
-      navigator.clipboard.writeText(streamUrl).catch(() => {});
-    }
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2200);
-  };
 
   const liveCategories = React.useMemo(() => {
     if (!isLive || !relatedItems.length) return ['全部'];
@@ -950,14 +941,6 @@ export function SangtianConsoleCard({
             {subtitle && <p className="console-subtitle">{subtitle}</p>}
             <p className="console-description">{description || '暂无剧情简介。'}</p>
 
-            <div className="console-url-snippet">
-              <span className="snippet-label">当前流直链：</span>
-              <code className="snippet-code">{streamUrl || '加载中…'}</code>
-              <button className="snippet-copy-btn" onClick={handleCopyStream}>
-                {copiedLink ? <Check size={14} color="#54c46f" /> : <Copy size={14} />}
-                <span>{copiedLink ? '已复制' : '复制直链'}</span>
-              </button>
-            </div>
           </div>
         )}
 
