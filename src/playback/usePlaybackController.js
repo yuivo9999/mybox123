@@ -43,6 +43,10 @@ export function usePlaybackController({
   }
 
   useEffect(() => {
+    setPlaybackMetrics({ currentTime: 0, duration: 0 });
+  }, [requestKey]);
+
+  useEffect(() => {
     onEventRef.current = onEvent;
   }, [onEvent]);
 
