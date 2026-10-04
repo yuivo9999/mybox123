@@ -767,3 +767,36 @@ P1.8 后不要再回头审计“PlaybackPage 是否还承担 VOD”——本轮�
    - Live 频道切换与 VOD 选集分开
    - More / diagnostics 不放主控制栏
 3. 再做自动下一集 countdown/cancel。
+
+
+## 18. P2.1 已完成：Live 线路入口去重
+
+### 修改
+文件：`src/components/theme/SangtianPlayerConsole.jsx`
+- 删除 Live ConsoleCard 内重复的“当前线路”快捷 chips。
+- Live 线路现在由播放页的统一 source modal 承担选择入口；TopBar workspace 打开该 modal。
+- ConsoleCard 的 Live 标签页专注频道切换，不再同时承担第二套线路选择器。
+- 没有删除底层 `onSelectCandidate` 能力，也没有改变 controller 的 source/candidate fallback。
+
+### 为什么这样做
+原 Live 播放页同时存在：
+1. TopBar → source modal
+2. ConsoleCard → 当前线路 quick chips
+3. PlayerWindow 的线路前后切换
+三者都能改同一个 candidate，容易造成“多个入口同时控制同一状态”的 UI 竞争。
+
+本轮只去掉第 2 项，保留：
+- 播放器内上一/下一线路快捷切换
+- 一个完整 source modal
+这样基础操作和完整线路选择各有一个明确入口。
+
+### 未做
+- VOD 的 source / episode 多入口还没有全部收敛。
+- TopBar / ConsoleCard / PlayerWindow 的更深层职责拆分还没有开始。
+- 没有运行浏览器、build、lint、test。
+
+### 下一步
+继续 P2：
+1. VOD 选集 / 换源入口去重。
+2. 自动下一集改为 countdown + cancel。
+3. 再考虑把 `PlaybackPage.jsx` 重命名为 `LivePlaybackPage.jsx`，作为独立小提交。
