@@ -1308,3 +1308,109 @@ History 不负责播放器状态，也不复制 Live fallback。
 ### 27.5 下一步
 P2.6 的下一项优先审计：Favorites → 播放闭环。
 重点确认收藏影视使用稳定 `contentId`，收藏 Live 使用稳定 `channelId`，且点击收藏内容不会绕过统一播放入口。
+
+
+## 28. P2.6 / P2.7 已推进：收藏闭环审计 + 显式 PlaybackContext
+
+### 28.1 Favorites → playback 闭环审计结果
+已检查 `src/pages/MainPage.jsx`：
+
+- 影视收藏以 `targetType=content + targetId=contentId` 保存。
+- 收藏页通过 `movie.contentId` 找回内容，点击后进入统一 `onMovie` → 详情页；详情页的播放按钮统一进入 `onPlay` → `App.playMovie()`。
+- Live 收藏以 `targetType=channel + targetId=channelId` 保存。
+- 收藏页通过 `channel.channelId` 找回频道，点击后进入统一 `onLiveChannel` → Live 频道详情；详情页播放统一进入 `onPlay` → `App.playLive()`。
+- 收藏入口没有创建第二套播放器，也没有直接操作 playback controller。
+
+结论：Favorites 当前没有绕过统一播放入口；稳定 identity 也正确使用 contentId / channelId。
+
+### 28.2 顺手发现并修复的 Live History 返回回归
+P2.6 上一轮的 History 调用传入了 `'live-history'`，但 `App.handleLiveBack()` 只识别 `history`。
+因此 Live History 虽然能直接播放，却可能返回 Live 列表而不是 History。
+
+已修正：
+- `src/pages/MainPage.jsx`：Live History 统一传 `returnRoute='history'`。
+- 这样与 VOD History、App 返回逻辑和 ErrorBoundary 恢复逻辑使用同一个 return context。
+
+这是本轮实际发现的回归点，不再把“已完成”只停留在静态设计层面。
+
+### 28.3 P2.7 第一小步：PlaybackContext 显式化
+新增：
+- `src/playback/playbackContext.js`
+
+提供：
+- `createPlaybackContext()`
+- `getPlaybackContext()`
+
+统一上下文字段：
+- kind
+- contentId
+- episodeId
+- episodeIndex
+- channelId
+- streamId
+- sourceId
+- candidateId
+- returnRoute
+- returnTab
+- startPositionSeconds
+
+修改：
+- `src/models/playback.js`
+  - playback request 增加顶层 `context`，不再要求所有页面从 `metadata` 猜返回语义。
+- `src/services/playbackService.js`
+  - VOD / Live request 都支持透传 context。
+- `src/app/App.jsx`
+  - playMovie / playLive 创建显式 context。
+  - 返回导航、ErrorBoundary 恢复优先从 `getPlaybackContext(request)` 读取 returnRoute。
+- `src/features/movie/MoviePlaybackPage.jsx`
+  - episode 上一集/下一集/选集统一从显式 PlaybackContext 读取 returnRoute。
+- 保留旧 `metadata.returnRoute` 作为兼容 fallback，因此没有一次性破坏历史请求结构。
+
+### 28.4 为什么现在做这个
+此前播放上下文散落在：
+- selected request
+- request.metadata.returnRoute
+- metadata.sourceId
+- metadata.episodeIndex
+- 调用方额外传 route 字符串
+
+这会让下一位 AI 很容易继续增加新的 route / metadata 约定。
+
+现在开始形成单一规则：
+- request.context = 播放导航/恢复上下文
+- request.metadata = 展示与解析附加信息
+- request.candidates = 可播放资源集合
+
+### 28.5 当前验证
+已做静态回读：
+- Favorites content/channel identity 与入口链路正确。
+- Live History 使用统一 `history` returnRoute。
+- playback request 有顶层 context。
+- App / MoviePlaybackPage 已优先读取 context。
+- 旧 metadata.returnRoute 仍有兼容 fallback。
+
+尚未验证：
+- 浏览器真实播放；
+- History/Favorites 点击后的真实返回；
+- build / lint / test；
+- Native/HLS runtime。
+
+### 28.6 当前最新代码状态
+- 分支：`ai-handoff/playback-phase1`
+- 最近代码提交：`f622fd7c4cb643b98037aa423e2059c7f3cc3aad`
+- 本文档将在本次代码修改后再提交一次，以保持接力状态完整。
+- 未合并 main。
+
+### 28.7 下一位 AI 第一任务
+不要重新审计 Favorites / History identity，也不要重新创建 PlaybackContext。
+
+直接继续 P2.7：
+1. 把剩余页面/恢复逻辑里直接读取 `metadata.returnRoute` 的地方迁移到 `getPlaybackContext()`。
+2. 检查 `returnTab` 是否可以替代部分硬编码 `tab='movies'/'live'`。
+3. 统一 VOD / Live 的播放返回 helper，减少 App 内重复的 route 分支。
+4. 再进入 P3 前，优先做一次静态全局回归检查，并在环境允许时运行 build/lint/test。
+
+### 28.8 潜在回归点
+- 不要把 `request.context` 当成实时 candidate 状态；candidate 切换仍由 controller/request candidates 管理。
+- 不要删除 metadata 兼容 fallback，除非确认所有旧 request 创建路径已经迁移。
+- `returnRoute='history'` 是当前 History 播放闭环的统一语义；不要重新引入 `live-history` 之类的平行 route 名称。
