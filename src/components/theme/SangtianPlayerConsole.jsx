@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Copy, Maximize2, Minimize2, RotateCw, Sparkles, Paperclip,
+  Copy, Heart, Maximize2, Minimize2, RotateCw, Sparkles, Paperclip,
   Play, Pause, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, Rewind, FastForward,
   FileText, LayoutGrid, SlidersHorizontal, Check, RefreshCw, Ratio,
-  Lock, Unlock, ListVideo, Square
+  Lock, Unlock, ListVideo, Radio, Square
 } from 'lucide-react';
 
 export function SangtianPlayerWindow({
