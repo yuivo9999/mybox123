@@ -1557,3 +1557,95 @@ playbackResourceManager → playbackTaskRegistry.stopAndRelease → player.relea
 - HTML5 DOM listener 在 adapter release 时有明确 unbind；不要把“listener 一直挂着”误判为当前 bug。
 - 真正剩余的 HTML5 风险是“同一个 adapter 的连续 load 是否存在旧 DOM event 与新 input 交错”，需要浏览器证据后再决定是否增加 input generation。
 - 不要删除上一轮的 `hlsGeneration`。
+
+
+# 30. 本轮继续执行结果：补齐 stop 后 Native stale callback 行为证明
+
+## 本轮
+- 日期：2026-10-05
+- 起始 HEAD：`3182a4ce4303c819b1a831db19d4c46b941a10b8`
+- 代码提交：`c60e4b0799fb8539dc6b52086caccdbc8672d9a9`
+- 工作范围：继续 P0 播放生命周期；在 CI 真实结果暂时无法从当前 GitHub connector 读取的情况下，不凭空宣称 PASS，先补一个明确覆盖 stop 生命周期边界的 Native stale-event 行为测试。
+
+## 本轮确认
+
+### CI 状态
+- 已确认 `main` 起始 HEAD 为 `3182a4c...`。
+- `.github/workflows/test-playback.yml` 已存在，目标为 Node 22 + `npm install` + `test:playback-lifecycle` + `test:architecture`。
+- 当前 connector 能读取 workflow 文件，但不能通过现有 workflow-run 接口取得该 push workflow 的 run 列表；commit combined status 目前为空。
+- 因此：
+  - **不能写 PASS**；
+  - **不能写 FAIL**；
+  - 当前状态保持 **PENDING / 未观测到 run 结果**。
+- 不应因为“没有 status”推断 workflow 没运行。
+
+### P0-B/P0-D：新增 stop 后 stale Native callback 测试
+新增：`tests/playback/playback-lifecycle.test.mjs`
+
+场景：
+1. 创建 live core；
+2. attach + start；
+3. 捕获旧 Native `TVBoxWebView.onPlayerEvent` callback；
+4. 调用 `core.stop()`；
+5. 手动触发旧 callback，模拟 Native bridge 晚到的 error；
+6. 断言 UI/player error hook 没有被重新唤起；
+7. 断言没有因为 stale error 重新发起 load；
+8. 最终 release。
+
+这直接验证了当前设计中：
+`stop()` 会让 `activePlayerOperationGeneration = null`，从而旧 adapter/native callback 不能 resurrect recovery。
+
+## 代码结论
+当前 Native stale-event 隔离至少覆盖：
+- candidate switch：旧 adapter callback generation 不匹配；
+- stop：active player operation generation 被清空；
+- release：player/operation generation 失效；
+- 新 adapter：重新绑定新的 callback。
+
+但仍不能证明 Android bridge 自身不会把旧播放器事件转发给新 adapter；因为仓库内仍没有发现 bridge 实现或 payload identity。
+
+## 验证状态
+- [x] 新增 stop 后 Native stale callback 行为测试。
+- [x] 代码级确认 `main` 起始 HEAD。
+- [x] 确认 workflow 文件存在。
+- [ ] `npm run test:playback-lifecycle`：当前工具环境未本地执行。
+- [ ] `npm run test:architecture`：当前工具环境未本地执行。
+- [ ] GitHub Actions 真实 run：当前 connector 无法取得 push run 列表，保持 PENDING。
+- [ ] 浏览器真实 HLS rapid switch：PENDING。
+- [ ] 同 adapter 多次 `load()` DOM event 交错：PENDING。
+- [ ] Android Native 真机 rapid switch/release：PENDING。
+- [ ] Native bridge event identity：UNKNOWN。
+
+## 当前 P0
+### P0-B
+- [x] ResourceManager → TaskRegistry stopped-owner 行为测试。
+- [x] stop/restart 行为测试。
+- [x] stop 后 stale Native callback 行为测试。
+- [ ] Node 22 实际执行结果。
+- [ ] GitHub Actions 实际执行结果。
+- [ ] Native `releaseMedia` 真机释放证明。
+
+### P0-C / P0-D
+- [x] playbackCore operation/player/active-operation generation guards。
+- [x] HTML5 HLS `hlsGeneration`。
+- [x] HTML5 adapter release 时 DOM listener unbind。
+- [x] Native stale callback 在 stop/candidate switch 的 core-side isolation tests。
+- [ ] Native bridge payload identity / external host implementation。
+- [ ] 同 adapter 多次 `load()` 的真实浏览器事件顺序。
+- [ ] HLS destroy/rebind 真实浏览器验证。
+
+## 下一位 AI 立即执行
+1. `main`：确认 HEAD 已进入 `c60e4b0799fb8539dc6b52086caccdbc8672d9a9`，不要覆盖本轮提交。
+2. GitHub Actions：继续尝试通过可用的 GitHub Actions run/job 接口获取 `Playback lifecycle tests` 的真实结果；若能拿到失败 job，直接按日志修真实失败。
+3. `tests/playback/playback-lifecycle.test.mjs`：在真实 Node 22 环境执行 `npm run test:playback-lifecycle`，再执行 `npm run test:architecture`；记录真实结果。
+4. `src/player/html5PlayerAdapter.js`：如果有浏览器自动化能力，验证同一 adapter 连续 `load(A) → load(B)` 时旧 DOM event 是否能污染 B；只有复现才增加单一 input-load generation。
+5. `src/player/nativePlayerAdapter.js`：继续确认外部 Android/WebView bridge 来源；不要猜 payload identity，也不要修改 bridge 协议。
+6. P0 真实验证未完成前，继续不要进入 UI polish、路由大重构、HLS 参数 tuning。
+
+## 给下下一位 AI 留的资料
+- 本轮不是重新增加 generation；只是把已有 stop 隔离设计补成一个明确的行为测试。
+- 不要把 GitHub connector “读不到 workflow run”解释成 workflow 没运行。
+- 当前没有锁文件，CI 继续使用 `npm install`。
+- 不要删除 `hlsGeneration`。
+- 不要把 Native bridge payload identity 当成已知事实；当前仍 UNKNOWN。
+- 真正下一步优先级仍是“取得真实测试执行证据”，其次才是浏览器/真机验证。
