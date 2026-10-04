@@ -189,5 +189,9 @@ export function usePlaybackController({
     progressRef,
     switchCandidate,
     retry,
+    play: () => controller.play(),
+    pause: () => controller.pause(),
+    seek: seconds => controller.seek(seconds),
+    setPlaybackRate: value => controller.setPlaybackRate(value),
   };
 }
