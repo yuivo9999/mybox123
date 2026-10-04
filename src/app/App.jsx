@@ -18,6 +18,7 @@ import { LoadingState, ErrorState } from '../components/StateViews.jsx';
 import { getFontById } from '../config/fontCatalog.js';
 import { ensureFont } from '../services/fontLoader.js';
 import { getGestureDirection, getTopLevelSwipeTarget, getParentForRoute, isSwipeExcludedTarget } from './navigationGesture.js';
+import { createPlaybackContext, getPlaybackContext } from '../playback/playbackContext.js';
 
 export function App(){
  const session=useSessionState(); const persistent=usePersistentState(); const {tab,route,selected}=session;
@@ -91,7 +92,7 @@ export function App(){
 
  const getMovieReturnRoute=(explicit=null)=> explicit || (route==='detail'?'detail':route==='search'?'search':route==='history'?'history':tab==='movies'?'movies':'home');
  const returnFromMoviePlayback=()=>{
-  const returnRoute=selected?.metadata?.returnRoute||'detail';
+  const returnRoute=getPlaybackContext(selected).returnRoute||'detail';
   if(returnRoute==='detail') return sessionStateStore.patch({tab:'movies',route:'detail',selected});
   if(returnRoute==='search') return sessionStateStore.patch({tab:'movies',route:'search',selected:null});
   if(returnRoute==='movies') return sessionStateStore.patch({tab:'movies',route:null,selected:null});
@@ -117,7 +118,7 @@ export function App(){
    const episode=episodes[episodeIndex]??episodes[0]; if(!episode)return;
    const progress=persistent.progress.find((item)=>item.contentId===movie.contentId&&item.episodeId===episode.episodeId);
    const preferredSource=sourceId||persistent.selectedSources?.movie||persistent.settings?.defaultMovieSource||null;
-   const request=playbackService.createVODRequest({content:movie,episode,episodeIndex,preferredSource,metadata:{title:movie.title,poster:movie.poster,episodeTitle:episode.title??'',sourceId:preferredSource,returnRoute:getMovieReturnRoute(returnRoute),startPositionSeconds:persistent.settings?.autoplayResume?(progress?.completed?0:(progress?.positionSeconds??0)):0}});
+   const request=playbackService.createVODRequest({content:movie,episode,episodeIndex,preferredSource,metadata:{title:movie.title,poster:movie.poster,episodeTitle:episode.title??'',sourceId:preferredSource,returnRoute:getMovieReturnRoute(returnRoute),startPositionSeconds:persistent.settings?.autoplayResume?(progress?.completed?0:(progress?.positionSeconds??0)):0},context:createPlaybackContext({kind:'vod',contentId:movie.contentId,episodeId:episode.episodeId,episodeIndex,sourceId:preferredSource,returnRoute:getMovieReturnRoute(returnRoute),returnTab:'movies',startPositionSeconds:persistent.settings?.autoplayResume?(progress?.completed?0:(progress?.positionSeconds??0)):0})});
    // 首选源只决定“优先尝试”，不能删除其他候选源；失败后必须允许跨源兜底。
    if(preferredSource && request.candidates.length){
      request.candidates=[...request.candidates.filter(candidate=>candidate.sourceId===preferredSource),...request.candidates.filter(candidate=>candidate.sourceId!==preferredSource)];
@@ -232,7 +233,7 @@ export function App(){
  const openSearchHistory=(keyword)=>{pageStateStore.patch('search',{query:keyword});sessionStateStore.patch({tab:'movies',route:'search',selected:null});};
  const openLiveChannel=(channel)=>{if(!channel)return; persistent.touchFavorite?.('channel', channel.channelId); sessionStateStore.patch({selected:channel,route:'live-channel',tab:'live'})};
   const handleLiveBack = () => {
-    const returnRoute = selected?.metadata?.returnRoute;
+    const returnRoute = getPlaybackContext(selected).returnRoute;
     if (returnRoute === 'history') {
       sessionStateStore.patch({tab:'history',route:null,selected:null});
       return;
@@ -249,7 +250,7 @@ export function App(){
  const playLive=(channel,streamId=null,returnRoute=null)=>{
    if(!channel)return;
    const preferredSource=persistent.settings?.defaultLiveSource||null;
-   const request=playbackService.createLiveRequest({channel,preferredSource,metadata:{title:channel.name,category:channel.category,channelId:channel.channelId,channel,returnRoute}});
+   const request=playbackService.createLiveRequest({channel,preferredSource,metadata:{title:channel.name,category:channel.category,channelId:channel.channelId,channel,returnRoute},context:createPlaybackContext({kind:'live',channelId:channel.channelId,streamId,sourceId:preferredSource,returnRoute,returnTab:'live'})});
    if(streamId){const index=request.candidates.findIndex((candidate)=>candidate.streamId===streamId);if(index>=0){request.candidates=[request.candidates[index],...request.candidates.filter((_,i)=>i!==index)];sourceManagementService.touchUsage(request.candidates[0]?.sourceId);}}
    else sourceManagementService.touchUsage(request.candidates[0]?.sourceId);
    sessionStateStore.patch({selected:request,route:'live-play',tab:'live'}); persistent.recordLivePlay(channel,streamId);
