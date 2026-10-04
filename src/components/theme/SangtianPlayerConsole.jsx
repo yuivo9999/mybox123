@@ -932,7 +932,7 @@ export function SangtianConsoleCard({
   onFav,
   isFav = false,
 }) {
-  const [activeTab, setActiveTab] = useState('episodes'); // 'episodes' | 'info' | 'sources'
+  const [activeTab, setActiveTab] = useState(isLive ? 'episodes' : 'info'); // Live keeps channel selection; VOD uses the dedicated source/episode modal.
   const [copiedLink, setCopiedLink] = useState(false);
   const [selectedLiveCat, setSelectedLiveCat] = useState('全部');
 
@@ -991,13 +991,15 @@ export function SangtianConsoleCard({
               <Heart size={14} fill={isFav ? '#e11d48' : 'none'} />
             </button>
           )}
-          <button
-            className={`console-tab-btn ${activeTab === 'episodes' ? 'active' : ''}`}
-            onClick={() => setActiveTab('episodes')}
-            title={isLive ? "频道选择" : "选集播放"}
-          >
-            <LayoutGrid size={15} />
-          </button>
+          {isLive && (
+            <button
+              className={`console-tab-btn ${activeTab === 'episodes' ? 'active' : ''}`}
+              onClick={() => setActiveTab('episodes')}
+              title="频道选择"
+            >
+              <LayoutGrid size={15} />
+            </button>
+          )}
           <button
             className={`console-tab-btn ${activeTab === 'info' ? 'active' : ''}`}
             onClick={() => setActiveTab('info')}
@@ -1015,71 +1017,38 @@ export function SangtianConsoleCard({
           <div className="console-episodes-section">
             <div className="console-section-header">
               <span className="section-eyebrow">
-                {isLive ? (filteredLiveChannels.length > 0 ? "LIVE CHANNELS · 频道切换" : "LIVE DIRECT · 当前直播") : "EPISODES · 选集列表"}
-              </span>
-              <h4>{title}</h4>
-            </div>
-
-            {isLive ? (
+                {isLive ? (
               <div className="sangtian-channel-selector-wrapper">
-                {/* Category Filter Pills */}
                 {liveCategories.length > 1 && (
                   <div className="sangtian-console-category-scroll">
                     {liveCategories.map(cat => (
-                      <button
-                        key={cat}
-                        type="button"
-                        className={`console-category-pill ${selectedLiveCat === cat ? 'active' : ''}`}
-                        onClick={() => setSelectedLiveCat(cat)}
-                      >
+                      <button key={cat} type="button" className={`console-category-pill ${selectedLiveCat === cat ? 'active' : ''}`} onClick={() => setSelectedLiveCat(cat)}>
                         <span>{cat}</span>
                       </button>
                     ))}
                   </div>
                 )}
-
-                {/* Channels Grid */}
                 <div className="sangtian-channel-selection-grid">
                   {filteredLiveChannels.map((item) => {
                     const isCurrent = item.channelId === activeItemId;
                     return (
-                      <button
-                        key={item.channelId}
-                        type="button"
-                        className={`sangtian-channel-btn ${isCurrent ? 'active' : ''}`}
-                        onClick={() => onSelectRelated?.(item)}
-                      >
-                        <div className="channel-logo-mini">
-                          {item.logo ? <img src={item.logo} alt="" /> : <Radio size={14} />}
-                        </div>
+                      <button key={item.channelId} type="button" className={`sangtian-channel-btn ${isCurrent ? 'active' : ''}`} onClick={() => onSelectRelated?.(item)}>
+                        <div className="channel-logo-mini">{item.logo ? <img src={item.logo} alt="" /> : <Radio size={14} />}</div>
                         <div className="channel-info-mini">
                           <span className="channel-name-mini">{item.name}</span>
-                          <span className="channel-sub-mini">
-                            {isCurrent ? '● 正在播放' : (item.category || '直播频道')}
-                          </span>
+                          <span className="channel-sub-mini">{isCurrent ? '● 正在播放' : (item.category || '直播频道')}</span>
                         </div>
                       </button>
                     );
                   })}
                 </div>
               </div>
-            ) : episodes.length > 0 ? (
-              <div className="sangtian-episode-grid">
-                {episodes.map((ep, idx) => {
-                  const isCurrent = ep.episodeId === currentEpisodeId || idx === 0 && !currentEpisodeId;
-                  return (
-                    <button
-                      key={ep.episodeId || idx}
-                      className={`sangtian-ep-btn ${isCurrent ? 'active' : ''}`}
-                      onClick={() => onSelectEpisode?.(idx)}
-                    >
-                      <span>{ep.title || `${idx + 1}`}</span>
-                    </button>
-                  );
-                })}
-              </div>
             ) : (
-              <div className="sangtian-empty-text">当前内容暂无更多选集可供切换</div>
+              <div className="sangtian-empty-text">
+                当前播放：{currentEpisodeId ? (episodes.find(ep => ep.episodeId === currentEpisodeId)?.title || '当前集') : '正片'}
+                <br />
+                <span>选集与线路统一从播放器上方的“集数”入口进入。</span>
+              </div>
             )}
           </div>
         )}
