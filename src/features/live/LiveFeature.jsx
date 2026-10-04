@@ -177,14 +177,12 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     status: playbackStatus,
     resolvedInput: resolvedPlaybackInput,
     error: playbackError,
+    setError: setPlaybackError,
     switchCandidate: switchPlaybackCandidate,
   } = usePlaybackController({
     request: livePlaybackRequest,
     videoRef,
     isLive: true,
-    onEvent: event => {
-      if (event.event === 'exhausted') return;
-    },
   });
 
   useEffect(() => {
@@ -393,7 +391,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
                       onClick={() => {
                         setActiveStreamIndex(index);
                         const candidate = livePlaybackRequest?.candidates?.[index];
-                        if (candidate && playbackController) playbackController.switchCandidate(candidate.candidateId);
+                        if (candidate && playbackController) switchPlaybackCandidate(candidate.candidateId);
                       }}
                     >
                       {stream.label || '线路 ' + (index + 1)}
