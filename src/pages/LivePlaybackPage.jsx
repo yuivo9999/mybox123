@@ -133,14 +133,7 @@ function PlaybackView({
       console.error('Stop controller failed:', stopError);
     }
     setResolvedInput(null);
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.removeAttribute('src');
-      try {
-        videoRef.current.load();
-      } catch {}
-    }
-  };
+      };
 
   const handleChangePlaybackRate = rate => {
     setPlaybackRate(rate);
