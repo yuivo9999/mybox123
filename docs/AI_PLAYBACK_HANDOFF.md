@@ -477,3 +477,41 @@ Home / Movies / Search / Detail 返回上下文、preferred source 保留其他�
 - Native fallback 依赖 HTML5 video element。
 - HTML5 quality selection 仍依赖 resolved input 中已有 manifest.variants，尚未确认 parser 是否稳定提供。
 - 自动 fallback 与 Live reconnect 是不同语义，Live 仍优先使用 reconnect policy。
+
+## 14. 当前接力状态（最新）
+
+- 当前分支：ai-handoff/playback-phase1
+- 当前 HEAD：2c610378e7a8e678f73747db9573427230b9621d
+- 相对 main：ahead 19 / behind 0
+- 本轮最新提交：document P1.5 playback fallback handoff
+- 尚未合并 main，也没有创建最终合并 PR。
+
+### 本轮已实际修改
+- src/services/playbackService.js
+  - 同 source candidate fallback 优先。
+  - source fallback 次之。
+  - 手动重新选择曾自动失败的 candidate 时解除失败锁。
+- src/playback/playbackCore.js
+  - 增加 Native → HTML5 engine fallback。
+- docs/AI_PLAYBACK_HANDOFF.md
+  - 已记录 P1.5 责任边界、验证状态和下一步。
+
+### 本轮未验证
+- 没有浏览器真实播放环境验证。
+- 没有运行 npm build / lint / test。
+- 没有真实 Native bridge。
+- 没有真实 A1/A2/B1 故障注入。
+
+### 下一位 AI 开始时的第一步
+1. 读取本文件。
+2. 不重新审计 P1.5 架构。
+3. 能运行项目时先做故障注入/真实播放验证。
+4. 若 P1.5 无实际回归，直接进入 P1.6：处理 MoviePlaybackPage 的 decoderEngine 假 UI。
+5. P1.6 完成后更新本文件并进入 P1.7 quality / subtitle / audio。
+
+### 重要回归提醒
+- 不要把 player engine fallback 当 source fallback。
+- 不要让手动换源因为历史自动失败状态而失效。
+- 不要在没有真实底层能力时继续增加 decoderEngine UI。
+- 继续保留本文件作为下一位 AI 的唯一接力入口。
+
