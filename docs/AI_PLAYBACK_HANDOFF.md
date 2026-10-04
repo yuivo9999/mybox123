@@ -419,17 +419,20 @@ VOD 正式页面是：
 ---
 
 ## 当前状态
-本轮已完成：播放上下文 + 返回行为 + preferred source 排序兜底 + 共享 PlaybackController 生命周期。
+本轮已完成：播放上下文 + 返回行为 + preferred source 排序兜底 + 共享 PlaybackController 生命周期 + 内容级续播计算。
 
-### 9. 本轮新增完成（P1.1）
+### 9. 本轮新增完成（P1.1 / P1.4）
 
-新增：`src/playback/usePlaybackController.js`
+新增：
+- `src/playback/usePlaybackController.js`
+- `src/services/watchProgressService.js`
 
 已接入：
 - `src/features/movie/MoviePlaybackPage.jsx`
 - `src/pages/PlaybackPage.jsx`
+- `src/features/movie/MovieFeature.jsx`
 
-统一的职责：
+共享播放生命周期现在统一处理：
 - createController
 - attachPlayer
 - start / resolveAndLoad
@@ -441,7 +444,30 @@ VOD 正式页面是：
 - candidate change
 - leave/release
 
-注意：这只是“生命周期收敛”，不是最终 UI 架构完成。`PlaybackPage.jsx` 仍然是 Live + VOD-like 混合页面；下一阶段仍应把 VOD UI 分支继续清理，并逐步让 Live 成为独立正式播放上下文。
+续播服务现在统一提供：
+- getEpisodeProgress()
+- getContentProgress()
+- getContentResume()
+- getContinueWatching()
+
+详情页已经不再直接：
+`progress.find(item => item.contentId === movie.contentId)`
+
+而是根据：
+- contentId
+- episodeId
+- updatedAt
+- completed
+- positionSeconds
+- episodes 顺序
+
+计算真正的继续播放集数。
+
+特殊规则：
+- 当前集未完成且有有效进度 → 从该集继续。
+- 当前最近观看集已完成且存在下一集 → “继续播放”指向下一集并从 0 秒开始。
+- 没有进度 → 第一集。
+- 不修改底层 persistent progress 数据格式。
 
 ### 10. 当前验证状态
 
@@ -450,11 +476,38 @@ VOD 正式页面是：
 - PlaybackPage 不再直接 import `playbackService` 创建 controller。
 - 两页均通过 `usePlaybackController` 管理生命周期。
 - shared hook 使用 ref 保存最新 onEvent，避免页面 render 导致 controller 重建。
+- MovieFeature 已移除旧的 contentId 第一条 progress 查找。
+- watchProgressService 已建立集中 resume 规则。
 
 尚未完成：
 - 浏览器真实播放验证
-- 自动化 test/build 运行
-- 续播“内容级 resume episode”集中计算
+- npm build / architecture tests
+- 自动下一集 UX
+- source/candidate/player-engine 三层 fallback 完整语义
+- decoderEngine 真切换
+- HLS quality/subtitle/audio UI
+- PlaybackPage 的 VOD-like UI 清理
+- 最终播放器 UI 去重
 
-下一位第一任务：
-**开始 P1.4：建立 `watchProgressService`，把“某集进度”和“某内容应该从哪一集继续”统一起来，然后接回 MovieDetail / Home / History / Playback。**
+### 11. 当前分支接力信息
+
+当前分支：`ai-handoff/playback-phase1`
+
+本轮关键提交：
+- `34beefb2`：新增 shared playback lifecycle hook
+- `86704ab2`：稳定 shared event callback，避免 render 重建 controller
+- `e00b371a`：VOD / immersive PlaybackPage 接入 shared lifecycle
+- `83c00bbe`：新增 watchProgressService
+- `28c0a0e8`：MovieFeature 接入集中续播规则
+- 本次交接文档更新提交会是分支最新 HEAD
+
+### 12. 下一位第一任务
+
+**先验证上述两个逻辑模块，再进入 P1.5：把 source fallback / candidate fallback / player engine fallback 三层语义明确化，并确认 playbackCore 实际失败路径是否会自动跨 source。**
+
+之后才处理：
+1. decoderEngine 假 UI
+2. quality/subtitle/audio
+3. VOD / Live 播放页职责收敛
+4. 播放 UI 去重
+5. auto-next countdown/cancel
