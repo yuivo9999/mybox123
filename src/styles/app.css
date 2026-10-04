@@ -2266,3 +2266,171 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,5
 .theme-dark .live-channel-card .card-play-btn { background: rgba(255, 255, 255, 0.08) !important; border-color: rgba(255, 255, 255, 0.12) !important; color: #f8fafc !important; }
 .theme-dark .live-channel-card .card-play-btn svg { stroke: #f8fafc !important; }
 
+
+
+/* P3.2 Playback responsive guardrails: keep fullscreen controls usable on narrow portrait screens. */
+@media (max-width: 720px) {
+  .sangtian-window {
+    margin: 8px 8px 10px;
+    border-radius: 10px;
+  }
+  .sangtian-window-bar {
+    min-height: 38px;
+    height: auto;
+    padding: 6px 8px;
+    gap: 8px;
+  }
+  .sangtian-window-tag {
+    flex: 0 0 auto;
+  }
+  .sangtian-window-actions {
+    min-width: 0;
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .sangtian-window-btn {
+    min-height: 30px;
+  }
+  .sangtian-window-body {
+    min-height: 220px;
+  }
+  .movie-fullscreen-title-box {
+    max-width: 42vw;
+  }
+}
+
+@media (max-width: 560px) {
+  .sangtian-fullscreen-controls {
+    padding-left: max(8px, env(safe-area-inset-left));
+    padding-right: max(8px, env(safe-area-inset-right));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .sangtian-fullscreen-topbar {
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .sangtian-topbar-left-triggers,
+  .sangtian-topbar-right-actions {
+    gap: 5px;
+    min-width: 0;
+  }
+  .sangtian-topbar-left-triggers {
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  .sangtian-topbar-right-actions {
+    flex: 0 0 auto;
+  }
+  .sangtian-trigger-btn {
+    min-height: 34px;
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+  .sangtian-trigger-btn span {
+    max-width: 82px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .fullscreen-clock-badge {
+    display: none;
+  }
+  .movie-fullscreen-title-box {
+    max-width: 38vw;
+    gap: 4px;
+  }
+  .movie-fullscreen-title {
+    font-size: 12px;
+  }
+  .movie-fullscreen-source {
+    display: none;
+  }
+  .sangtian-fullscreen-center {
+    min-height: 0;
+  }
+  .fullscreen-skip-row {
+    gap: 10px;
+  }
+  .fullscreen-skip-row > button:not(.fullscreen-play-btn) {
+    width: 46px;
+    height: 46px;
+  }
+  .sangtian-fullscreen-live-centerbar {
+    width: min(100%, 420px);
+    gap: 6px;
+    padding: 7px 9px;
+    border-radius: 14px;
+  }
+  .live-channel-title-center {
+    max-width: 34vw;
+    font-size: 11px;
+  }
+  .live-realtime-clock {
+    font-size: 10px;
+  }
+  .sangtian-fullscreen-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    width: 100%;
+  }
+  .sangtian-fullscreen-actions button {
+    min-height: 34px;
+    justify-content: center;
+  }
+  .sangtian-fullscreen-left-sidebar,
+  .sangtian-fullscreen-right-sidebar {
+    width: min(92vw, 320px);
+    max-width: 92vw;
+    padding: 12px;
+  }
+  .sangtian-fullscreen-left-sidebar {
+    border-radius: 0 12px 12px 0;
+  }
+  .sangtian-fullscreen-right-sidebar {
+    border-radius: 12px 0 0 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .sangtian-window-actions .sangtian-window-btn:not(.icon-only) span {
+    display: none;
+  }
+  .sangtian-window-actions .sangtian-window-btn {
+    min-width: 32px;
+    padding: 0 7px;
+    justify-content: center;
+  }
+  .sangtian-fullscreen-topbar {
+    gap: 4px;
+  }
+  .sangtian-trigger-btn {
+    padding: 6px;
+  }
+  .movie-fullscreen-title-box {
+    max-width: 34vw;
+  }
+  .sangtian-fullscreen-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .sangtian-fullscreen-controls {
+    padding-top: max(6px, env(safe-area-inset-top));
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+  }
+  .sangtian-fullscreen-center {
+    min-height: 0;
+  }
+  .sangtian-fullscreen-actions button {
+    min-height: 30px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+  .sangtian-fullscreen-live-centerbar {
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+}
