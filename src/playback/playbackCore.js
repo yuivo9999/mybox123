@@ -6,6 +6,7 @@ import { PlayerState } from '../player/playerInterface.js';
 import { createPlaybackEventBus } from './playbackEventBus.js';
 import { createPlaybackStateMachine } from './playbackStateMachine.js';
 import { createPlaybackNetworkPolicy } from './playbackNetworkPolicy.js';
+import { liveRecoveryPolicy } from './liveRecoveryPolicy.js';
 import { classifyPlaybackError } from './playbackErrorPolicy.js';
 import { playbackResourceManager } from './playbackResourceManager.js';
 import { playbackTaskRegistry } from './playbackTaskRegistry.js';
