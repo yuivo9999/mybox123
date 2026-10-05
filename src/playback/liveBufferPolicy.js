@@ -47,4 +47,10 @@ export function createLiveBufferPolicy(overrides = {}) {
   });
 }
 
+export function applyLiveFragmentBufferPolicy(hls, policy) {
+  if (!hls?.config || !policy) return false;
+  policy.onFragmentLoaded(hls);
+  return hls.config.maxBufferLength >= policy.steadyMaxBufferLength;
+}
+
 export const liveBufferPolicy = createLiveBufferPolicy();
