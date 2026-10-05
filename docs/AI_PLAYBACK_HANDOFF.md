@@ -2482,3 +2482,10 @@ Commit：
 - [x] 最小修复：`switchCandidate()` 改为读取当前 `activeCandidates`，因此 Live channel replacement 后的新线路仍可正常切换。
 - [x] `tests/playback/playback-lifecycle.test.mjs` 新增行为测试：A → B 切台后，B 的第二条 candidate 可以继续切换。
 - [ ] 尚未运行 Node/CI；按约定继续积累阶段性改动，不频繁查询 CI。
+
+
+## 本轮追加：Native callback 身份边界（2026-10-05）
+
+- [x] 重新审计 `src/player/nativePlayerAdapter.js` 与 `src/playback/playbackCore.js`：Core 侧已有 `playerGeneration + operationGeneration`，旧 callback 引用在代码层可被隔离。
+- [ ] **UNKNOWN/PENDING**：Native bridge 当前通过单一 `window.TVBoxWebView.onPlayerEvent` 分发，仓库内没有发现 player/session identity 字段或 bridge 文档，因此无法证明 Android bridge 晚到事件一定能区分旧播放器与新播放器。
+- [x] 在没有真实 bridge identity 证据前，不继续猜测性修改 adapter；保持 generation guard，待真实 Android event payload 证据后再决定是否需要全局 dispatcher/session token。
