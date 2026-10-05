@@ -171,6 +171,7 @@ test('live history keeps one channel entry while updating the last selected sour
   assert.equal(history[0].sourceChannelId, 'source-b:1');
 
   userDataRepository.clearHistory();
+  delete globalThis.window;
 });
 
 test('live source and candidate identity remain source-aware', () => {
