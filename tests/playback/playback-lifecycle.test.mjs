@@ -9,7 +9,7 @@ import { createPlaybackLifecyclePolicy } from '../../src/playback/playbackLifecy
 import { createPlaybackResourceManager } from '../../src/playback/playbackResourceManager.js';
 import { createPlaybackTaskRegistry } from '../../src/playback/playbackTaskRegistry.js';
 import { playbackService } from '../../src/services/playbackService.js';
-import { createLiveBufferPolicy } from '../../src/playback/liveBufferPolicy.js';
+import { createLiveBufferPolicy, applyLiveFragmentBufferPolicy } from '../../src/playback/liveBufferPolicy.js';
 import { createLiveRecoveryPolicy } from '../../src/playback/liveRecoveryPolicy.js';
 import { playbackRuntime } from '../../src/playback/playbackRuntime.js';
 import { PlayerCapability, filterPlayerInputByCapabilities } from '../../src/player/playerInterface.js';
@@ -134,7 +134,7 @@ test('live buffer policy preserves the 20 to 60 second anti-jitter strategy', ()
   assert.equal(config.lowLatencyMode, false);
 
   const hls = { config: { maxBufferLength: 20 } };
-  policy.onFragmentLoaded(hls);
+  assert.equal(applyLiveFragmentBufferPolicy(hls, policy), true);
   assert.equal(hls.config.maxBufferLength, 60);
 });
 
