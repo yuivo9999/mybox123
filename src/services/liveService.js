@@ -126,15 +126,15 @@ export const liveService = {
   },
 
   async refreshChannel(channelRef) {
-    const streams = await this.getStreams(channelRef);
+    const streams = await this.getStreams(channelRef, { force: true });
     const epg = await this.getEPG(channelRef);
     return { channel: { ...channelRef, streams, epg }, streams, epg };
   },
 
-  async getStreams(channelRef) {
+  async getStreams(channelRef, { force = false } = {}) {
     const cacheKey = liveChannelCacheKey(channelRef);
     const cached = cacheStorage.get(CacheNamespace.LIVE_CHANNEL, cacheKey, { allowStale: true });
-    if (cached.hit && !cached.stale) return cached.value?.streams ?? [];
+    if (!force && cached.hit && !cached.stale) return cached.value?.streams ?? [];
     const adapters = liveRegistry.list().filter((adapter) => channelRef?.sourceRefs?.some((ref) => ref.sourceId === adapter.sourceId));
     const results = await Promise.allSettled(adapters.map((adapter) =>
       requestManager.run(`live:streams:${adapter.sourceId}:${channelRef?.channelId ?? ''}`, (signal) => adapter.getStreams(channelRef, { signal })),
