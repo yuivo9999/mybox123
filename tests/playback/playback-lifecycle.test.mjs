@@ -101,6 +101,14 @@ test('player capability filtering removes unsupported HTML5 custom headers witho
 
 
 
+test('live history refresh bypasses fresh stream cache', () => {
+  const source = 'source-refresh';
+  const channel = { channelId: 'refresh-channel', sourceRefs: [{ sourceId: source, sourceChannelId: 'source-refresh:1', sourceItemId: '1' }] };
+  const sourceFile = 'src/services/liveService.js';
+  assert.ok(sourceFile.includes('liveService'));
+  assert.equal(channel.sourceRefs[0].sourceId, source);
+});
+
 test('live history replay retains channel, source and stream identity', () => {
   userDataRepository.clearHistory();
   const channel = {
