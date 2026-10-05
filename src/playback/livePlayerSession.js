@@ -29,6 +29,12 @@ export function createLivePlayerSession({ onReleased } = {}) {
       } else if (session.core) {
         session.core.attachPlayer(videoElement);
       }
+      // ensureRequest can run during render before the persistent host's effect
+      // registers the real <video>. Do not let that race consume the first
+      // resolveAndLoad without a player; start only after the video is attached.
+      if (request && session.core && videoElement) {
+        session.start();
+      }
       if (presentationTarget && videoElement?.parentNode !== presentationTarget) {
         presentationTarget.appendChild(videoElement);
       }
@@ -66,7 +72,7 @@ export function createLivePlayerSession({ onReleased } = {}) {
       if (released || !nextRequest || nextRequest.kind !== PlaybackKind.LIVE) return null;
       if (!session.core) {
         session.createPlayback(nextRequest);
-        return session.start();
+        return videoElement ? session.start() : session.controller;
       }
       const nextIds = (nextRequest.candidates ?? []).map(item => item.candidateId).join('|');
       const currentIds = (request?.candidates ?? []).map(item => item.candidateId).join('|');
