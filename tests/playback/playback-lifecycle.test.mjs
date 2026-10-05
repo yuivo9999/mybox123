@@ -280,11 +280,8 @@ test('live channel replacement resolves the new candidate instead of only emitti
     },
   });
 
+  const { calls } = installNativeBridge();
   const controller = playbackService.getLivePlayerController(requestA);
-  const events = [];
-  const unsubscribe = controller.subscribe(event => {
-    if (event.event === 'resolved' || event.event === 'playing') events.push(event.event);
-  });
 
   controller.replaceLiveCandidates(requestB.candidates, {
     channelId: requestB.channelId,
@@ -293,9 +290,8 @@ test('live channel replacement resolves the new candidate instead of only emitti
 
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(controller.currentCandidate?.streamId, 'b1');
-  assert.ok(events.includes('resolved') || events.includes('playing'));
+  assert.ok(calls.some(call => call.method === 'loadMedia' && call.url === 'https://example.test/b1.m3u8'));
 
-  unsubscribe();
   controller.release();
   delete globalThis.window;
 });
