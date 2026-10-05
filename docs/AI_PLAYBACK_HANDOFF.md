@@ -2457,3 +2457,20 @@ Commit：
 - [x] 刷新后仍按 `streamId + sourceId` 精确匹配；匹配不到时按 `sourceId` 回退。
 - [x] 历史回放最终记录实际选中的 candidate streamId，避免刷新失败/线路替换后继续保存已经失效的旧 streamId。
 - [ ] 仍需在真实多源 Live 数据上验证 sourceChannelId 变化、源下线和重新上线场景；Node 测试环境没有真实 source adapter。
+
+
+## 本轮追加：Live sourceChannelId 稳定性与历史去重契约（2026-10-05）
+
+- [x] `src/adapters/live/normalizeLive.js`：若上游提供显式 `item.sourceChannelId` / `stream.sourceChannelId`，归一化时优先保留；只有缺失时才由 `sourceId + sourceItemId` 生成。
+- [x] `tests/playback/playback-lifecycle.test.mjs`：新增 refresh cache bypass 行为测试，证明 `refreshChannel()` 在 fresh cache 存在时仍会再次访问 adapter。
+- [x] 新增 sourceChannelId 稳定性测试，避免刷新后覆盖上游已经稳定的源内频道身份。
+- [x] 新增 history dedupe 契约测试：同一 `channelId` 只保留一条最近历史，但会更新最近选择的 `sourceId/sourceChannelId/streamId`；历史仍是 channel 级业务对象，不按 stream 无限膨胀。
+- [ ] 真实多源数据仍需验证：sourceChannelId 是否由各实际 adapter 稳定提供，以及源下线/重新上线时历史精确恢复行为。
+- [ ] 真实浏览器/HLS 与 Android Native 播放仍是 PENDING。
+
+### 下一位 AI 立即执行
+1. `src/features/live/LiveFeature.jsx`、`src/pages/PlaybackPage.jsx`：继续沿 route/back/source switch 检查 request identity 与 session identity 是否始终闭合。
+2. `src/player/nativePlayerAdapter.js`：确认真实 bridge 是否携带 player/session identity；没有真实证据前保持 generation guard。
+3. `src/player/html5PlayerAdapter.js`：继续检查 custom headers/referer/cookie capability 与 candidate 选择边界，不扩大重构。
+4. `src/services/liveService.js` / `src/adapters/live/normalizeLive.js`：用真实多源数据验证 sourceChannelId、streamId、candidateId 的稳定关系。
+5. 阶段性 CI 已启动后不要频繁查询；按当前约定至少间隔约 10 分钟再统一检查，若失败再最小修复。
