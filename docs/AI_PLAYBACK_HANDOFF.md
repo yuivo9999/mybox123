@@ -2504,3 +2504,20 @@ Commit：
 验证状态：代码已提交；Node/CI 尚未在本轮小提交后执行/查询，按约定待阶段收口统一检查。
 
 下一步：继续审 LiveFeature ↔ PlaybackPage route/back/source switch 的 request identity；真实 Android Native callback identity 与真实 HLS latency 继续保持 PENDING。
+
+## 本轮大阶段收口：Live 播放路径单一化（2026-10-05）
+
+- [x] Live 不再使用 `PlaybackPage(kind=live)`。App 的 `live-play` 路由直接渲染 `LiveFeature`，避免 LiveFeature 与 PlaybackPage 之间形成两套播放器页面生命周期。
+- [x] 删除 `src/pages/PlaybackPage.jsx`；该页面已经没有 Live 业务入口。
+- [x] `src/features/live/LiveFeature.jsx` 移除 `SangtianPlayerWindow`，改为只提供 Live presentation surface，并通过 `LivePlayerController` 调用播放控制。
+- [x] `PersistentLivePlayerHost` 继续持有唯一 persistent video DOM；surface 变化只改变 presentation parent，不创建第二 video。
+- [x] LiveFeature 离开时只 detach presentation；显式 stop/release 才释放 Session。重新进入 LiveFeature 时由 runtime 重新 attach 同一 Live session/video（若 session 未被显式释放）。
+- [x] 架构测试锁定：App 不得引用 PlaybackPage；LiveFeature 不得引用 SangtianPlayerWindow 或直接控制 video。
+- [x] `SangtianPlayerWindow` 暂不删除整个文件，因为它仍被 VOD `MoviePlaybackPage` 使用；但它已经从 Live 播放链路清除。后续若要彻底删除该组件，应单独先完成 VOD presentation 替换，不能混入本轮 Live 生命周期收口。
+
+### 下一大阶段
+
+1. 统一验证 LiveFeature / live-play / live-channel 路由切换下的 Session、Controller、Core、Adapter、persistent video identity。
+2. 验证显式 stop 后 session release，以及重新进入 Live 后只建立一套新 session。
+3. 阶段边界统一检查 Node/CI；不要每个小提交都查询 CI。
+4. CI 通过后再进入下一大阶段，不继续在小 UI 细节上扩散。
