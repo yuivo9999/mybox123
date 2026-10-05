@@ -306,6 +306,14 @@ export function App(){
 function AppFrame({children}){return <div className="app-shell"><div className="screen">{children}</div></div>}
 function BottomNav({tab,onTab}){return <nav>{[['home',Home,'首页'],['movies',Film,'影视'],['live',Radio,'直播'],['favorites',Heart,'收藏'],['me',User,'我的']].map(([key,Icon,label])=><button className={tab===key?'active':''} onClick={()=>onTab(key)} key={key}><Icon size={21} fill={tab===key?'currentColor':'none'}/><span>{label}</span></button>)}</nav>}
 export function AppRoot(){
+ return (
+  <ErrorBoundary>
+    <AppRootContent />
+  </ErrorBoundary>
+ );
+}
+
+function AppRootContent(){
  const {tab,route,selected}=useSessionState();
  const recoverFromPageError=()=>{
    if(route==='movie-play'){
