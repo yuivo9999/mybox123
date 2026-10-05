@@ -2533,3 +2533,11 @@ Commit：
 - 播放速度、播放、暂停、seek 不再由 VOD UI 直接操作 video API。
 - 架构测试全局禁止旧 `SangtianPlayerWindow` / `MoviePlaybackPage` 残留，防止未来误接回旧链路。
 - 本轮先完成结构性大阶段，不因 UI 小细节停留；CI 按约定留出窗口后统一验证。
+
+
+## 本轮运行期修复：默认影视源故障回退 + Live 首次启动竞态（2026-10-05）
+
+- 影视源：默认/持久化选中的影视源如果请求失败或返回空目录，不再让整个影视首页进入“无法加载源”；首次失败后自动尝试一个其他已启用影视源。
+- Live：修复 LiveFeature 在持久化 `<video>` 注册前创建 Live Session 的启动竞态。没有真实 video element 时只创建 session/controller，不启动 resolveAndLoad；video 注册后才 attach + start，避免首个频道因为 PLAYER_ADAPTER_NOT_ATTACHED 被错误消耗。
+- 播放器控制权没有回退到页面：Live 仍由 LivePlayerSession → PlaybackCore → Adapter 控制，VOD 仍由 MoviePlayerView → PlaybackController → PlaybackCore 控制。
+- 已增加架构静态检查，防止上述 Live 启动竞态再次出现。
