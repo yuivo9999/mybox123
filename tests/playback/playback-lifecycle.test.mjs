@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { PlaybackKind, createPlaybackRequest } from '../../src/models/playback.js';
+import { PlaybackKind, createPlaybackRequest, createPlaybackCandidateId } from '../../src/models/playback.js';
+import { getLiveStreamCacheKey } from '../../src/features/live/liveStreamCache.js';
 import { createPlaybackCore } from '../../src/playback/playbackCore.js';
 import { createLivePlayerSession } from '../../src/playback/livePlayerSession.js';
 import { createPlaybackLifecyclePolicy } from '../../src/playback/playbackLifecyclePolicy.js';
@@ -94,6 +95,31 @@ test('player capability filtering removes unsupported HTML5 custom headers witho
   const nativeInput = filterPlayerInputByCapabilities(request, { [PlayerCapability.CUSTOM_HEADERS]: true });
   assert.deepEqual(nativeInput.ignored, []);
   assert.deepEqual(nativeInput.input.headers, request.headers);
+});
+
+
+
+test('live source and candidate identity remain source-aware', () => {
+  const base = {
+    kind: PlaybackKind.LIVE,
+    channelId: 'channel-1',
+    streamId: 'stream-1',
+    mediaUrl: 'https://example.test/live.m3u8',
+  };
+  const sourceA = createPlaybackCandidateId({ ...base, sourceId: 'source-a' });
+  const sourceB = createPlaybackCandidateId({ ...base, sourceId: 'source-b' });
+  const streamB = createPlaybackCandidateId({ ...base, sourceId: 'source-a', streamId: 'stream-2' });
+
+  assert.notEqual(sourceA, sourceB);
+  assert.notEqual(sourceA, streamB);
+
+  const channel = {
+    channelId: 'channel-1',
+    sourceRefs: [{ sourceId: 'source-a', sourceChannelId: 'source-a:1' }],
+  };
+  const sourceAwareKey = getLiveStreamCacheKey(channel, [{ sourceId: 'source-a', sourceType: 'live', enabled: true }]);
+  const fallbackKey = getLiveStreamCacheKey({ ...channel, sourceRefs: [{ sourceId: 'source-b', sourceChannelId: 'source-b:1' }] }, [{ sourceId: 'source-b', sourceType: 'live', enabled: true }]);
+  assert.notEqual(sourceAwareKey, fallbackKey);
 });
 
 test('live buffer policy preserves the 20 to 60 second anti-jitter strategy', () => {
