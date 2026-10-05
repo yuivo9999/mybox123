@@ -30,6 +30,7 @@ function expect(file, patterns, label = file) {
 }
 
 expectNo('src/app/App.jsx', [/createPlaybackCore/, /sourceRuntimeService/, /persistent\.saveSources/, /persistent\.setSourceEnabled/, /persistent\.setSourceActive/, /persistent\.removeSource/, /PlaybackPage/]);
+expect('src/app/App.jsx', [/PersistentLivePlayerHost/, /from ['\"]\.\.\/components\/playback\/PersistentLivePlayerHost\.jsx['\"]/], 'App persistent live host import');
 expectNo('src/features/live/LiveFeature.jsx', [/SangtianPlayerWindow/, /video\.play\(/, /video\.pause\(/, /video\.currentTime\s*=/, /video\.load\(/, /video\.src\s*=/]);
 expectNo('src/features/movie/MovieFeature.jsx', [/createPlaybackCore/, /playbackService/, /usePersistentState/]);
 expectNo('src/pages/MainPage.jsx', [/new Blob\(/, /FileReader/, /URL\.createObjectURL/, /document\.createElement/]);
