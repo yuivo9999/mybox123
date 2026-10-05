@@ -133,6 +133,29 @@ test('live history replay retains channel, source and stream identity', () => {
   userDataRepository.clearHistory();
 });
 
+test('live history keeps one channel entry while updating the last selected source and stream', () => {
+  userDataRepository.clearHistory();
+  const firstChannel = {
+    channelId: 'history-dedupe-channel',
+    streams: [{ streamId: 'stream-a', sourceId: 'source-a', sourceChannelId: 'source-a:1', url: 'https://example.test/a.m3u8' }],
+  };
+  const secondChannel = {
+    channelId: 'history-dedupe-channel',
+    streams: [{ streamId: 'stream-b', sourceId: 'source-b', sourceChannelId: 'source-b:1', url: 'https://example.test/b.m3u8' }],
+  };
+
+  userDataService.recordLivePlay(firstChannel, 'stream-a');
+  const history = userDataService.recordLivePlay(secondChannel, 'stream-b');
+
+  assert.equal(history.length, 1);
+  assert.equal(history[0].targetId, 'history-dedupe-channel');
+  assert.equal(history[0].streamId, 'stream-b');
+  assert.equal(history[0].sourceId, 'source-b');
+  assert.equal(history[0].sourceChannelId, 'source-b:1');
+
+  userDataRepository.clearHistory();
+});
+
 test('live source and candidate identity remain source-aware', () => {
   const base = {
     kind: PlaybackKind.LIVE,
