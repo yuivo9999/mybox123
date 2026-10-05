@@ -10,6 +10,7 @@ import { createPlaybackTaskRegistry } from '../../src/playback/playbackTaskRegis
 import { playbackService } from '../../src/services/playbackService.js';
 import { createLiveBufferPolicy } from '../../src/playback/liveBufferPolicy.js';
 import { createLiveRecoveryPolicy } from '../../src/playback/liveRecoveryPolicy.js';
+import { playbackRuntime } from '../../src/playback/playbackRuntime.js';
 
 function candidate(streamId, mediaUrl) {
   return {
@@ -505,7 +506,6 @@ test('old native callback is ignored after candidate switch', async () => {
 
 test('playback runtime preserves the live session and persistent video identity across repeated controller requests', () => {
   installNativeBridge();
-  const { playbackRuntime } = await import('../../src/playback/playbackRuntime.js');
   const request = playbackService.createLiveRequest({
     channel: {
       channelId: 'runtime-channel',
@@ -532,6 +532,61 @@ test('playback runtime preserves the live session and persistent video identity 
   first.detachPresentation();
   assert.equal(video.parentNode, host);
   first.release();
+  playbackRuntime.unregisterLivePlayerElement(video);
+  delete globalThis.window;
+});
+
+
+test('live playback request round-trip keeps one session while switching channel and returning', () => {
+  installNativeBridge();
+  const host = { appendChild(node) { node.parentNode = host; } };
+  const target = { appendChild(node) { node.parentNode = target; } };
+  const video = { parentNode: null };
+  playbackRuntime.registerLivePlayerElement(video, host);
+
+  const requestA = playbackService.createLiveRequest({
+    channel: {
+      channelId: 'roundtrip-a',
+      name: 'A',
+      streams: [candidate('a', 'https://example.test/a.m3u8')],
+    },
+    metadata: { returnRoute: 'live-channel' },
+  });
+  const requestB = playbackService.createLiveRequest({
+    channel: {
+      channelId: 'roundtrip-b',
+      name: 'B',
+      streams: [candidate('b', 'https://example.test/b.m3u8')],
+    },
+    metadata: { returnRoute: 'live-channel' },
+  });
+
+  const first = playbackRuntime.getLivePlayerSession(requestA);
+  const controller = first.controller;
+  const core = first.core;
+  first.attachPresentation(target);
+
+  const second = playbackRuntime.getLivePlayerSession(requestB);
+  assert.equal(second, first);
+  assert.equal(second.controller, controller);
+  assert.equal(second.core, core);
+  assert.equal(second.getVideoElement(), video);
+  assert.equal(video.parentNode, target);
+  assert.equal(controller.currentChannel?.channelId, 'roundtrip-b');
+  assert.equal(controller.currentCandidate?.candidateId, requestB.candidates[0]?.candidateId);
+
+  controller.leave();
+  assert.equal(video.parentNode, host);
+
+  const returned = playbackRuntime.getLivePlayerSession(requestA);
+  assert.equal(returned, first);
+  assert.equal(returned.controller, controller);
+  assert.equal(returned.core, core);
+  assert.equal(returned.getVideoElement(), video);
+  assert.equal(controller.currentChannel?.channelId, 'roundtrip-a');
+  assert.equal(controller.currentCandidate?.candidateId, requestA.candidates[0]?.candidateId);
+
+  controller.release();
   playbackRuntime.unregisterLivePlayerElement(video);
   delete globalThis.window;
 });
