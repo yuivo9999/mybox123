@@ -17,6 +17,8 @@ function sourceFiles(dir) {
 }
 const allSourceFiles = sourceFiles('src');
 for (const file of allSourceFiles) expectNo(file, [/SangtianPlayerWindow/, /MoviePlaybackPage/], file);
+assert.equal(fs.existsSync(path.join(root, 'src/pages/PlaybackPage.jsx')), false, 'deleted PlaybackPage must stay removed');
+assert.equal(fs.existsSync(path.join(root, 'src/features/movie/MoviePlaybackPage.jsx')), false, 'deleted MoviePlaybackPage must stay removed');
 
 function expectNo(file, patterns, label = file) {
   const source = read(file);
