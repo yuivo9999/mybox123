@@ -90,10 +90,7 @@ export function createLivePlayerSession({ onReleased } = {}) {
         channel: currentChannel,
         metadata: nextRequest.metadata ?? {},
       });
-      if (candidate) {
-        currentCandidate = candidate;
-        void session.core.resolveAndLoad(candidate).catch(() => {});
-      }
+      if (candidate) currentCandidate = candidate;
       return candidate;
     },
 
