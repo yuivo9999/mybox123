@@ -2427,3 +2427,24 @@ Commit：
 继续 P1：真实 HLS live latency/buffer 仍保持 PENDING，只有拿到真实流或真实设备/浏览器证据后才调整参数；随后再检查 source/channel/stream/candidate identity 在实际历史回放入口中的消费闭环。
 
 本轮按用户要求不为每个小提交等待 CI；阶段收口后再统一跑完整 CI，不把当前状态描述成已通过 CI。
+
+
+## 本轮追加：Live 历史回放身份闭环（2026-10-05）
+
+### 已完成
+- [x] `src/pages/MainPage.jsx`：播放历史中的 Live 条目现在消费记录的 `streamId/sourceId`，不再只按 `channelId` 打开频道。
+- [x] `src/app/App.jsx`：`playLive` 支持历史记录传入 `sourceId`，优先恢复“记录的 source + stream”；若该 stream 已不存在，则回退到同 source 的候选。
+- [x] `tests/playback/playback-lifecycle.test.mjs`：新增 Live history identity 行为测试，锁定 `channelId/sourceId/sourceChannelId/streamId`。
+- [x] 已确认收藏仍保持 channel 级语义，没有把 stream 错误升级成独立收藏对象。
+
+### 当前仍为 PENDING
+- [ ] 历史记录中的 `streamId/sourceId` 如果已经从当前 `channel.streams` 消失，需要进一步验证 `liveService.getStreams()` 刷新后的恢复路径；当前 UI 级回退只消费现有 request candidates。
+- [ ] 真实浏览器/HLS 实源延迟与 buffer 行为仍无法由当前 Node 测试环境证明；不得据此修改 20→60 秒策略。
+- [ ] Android Native 真实设备播放仍未验证。
+
+### 下一位 AI 立即执行
+1. `src/app/App.jsx` / `src/services/liveService.js`：验证历史 stream 已过期或不在缓存时，是否应该主动刷新该 channel 的 streams，再构造 Live playback request。
+2. `src/models/live.js` / `src/adapters/live/normalizeLive.js`：确认 refresh 后 sourceChannelId 与历史记录仍可稳定匹配。
+3. `src/services/userDataService.js`：确认同一 channel 不同 source/stream 的历史去重策略是否符合产品语义；当前 historyId 仍为 channel 级，因此同频道换线路会覆盖旧记录。
+4. `src/player/html5PlayerAdapter.js` / `src/playback/liveBufferPolicy.js`：仅在获得真实 HLS 浏览器数据后调整 buffer/latency 参数。
+5. 阶段收口时统一检查最新 HEAD 的 Playback lifecycle / Android APK / Pages CI，不对每个小 commit 单独等待 CI。
