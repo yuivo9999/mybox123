@@ -263,6 +263,38 @@ test('live lifecycle policy detaches on page leave and releases only on explicit
   assert.equal(moviePolicy.shouldReleaseOnLeave, true);
 });
 
+test('live channel replacement keeps the new candidate list switchable', () => {
+  installNativeBridge();
+  const requestA = playbackService.createLiveRequest({
+    channel: {
+      channelId: 'replace-a',
+      name: 'A',
+      streams: [candidate('a1', 'https://example.test/a1.m3u8')],
+    },
+  });
+  const requestB = playbackService.createLiveRequest({
+    channel: {
+      channelId: 'replace-b',
+      name: 'B',
+      streams: [
+        candidate('b1', 'https://example.test/b1.m3u8'),
+        candidate('b2', 'https://example.test/b2.m3u8'),
+      ],
+    },
+  });
+
+  const controller = playbackService.getLivePlayerController(requestA);
+  controller.replaceLiveCandidates(requestB.candidates, { channelId: requestB.channelId });
+  const switched = controller.switchCandidate(requestB.candidates[1].candidateId);
+
+  assert.equal(switched?.streamId, 'b2');
+  assert.equal(controller.currentCandidate?.streamId, 'b2');
+  assert.deepEqual(controller.failedCandidateIds, []);
+
+  controller.release();
+  delete globalThis.window;
+});
+
 test('live session preserves controller, core, and video identity across channel switch', async () => {
   const { calls } = installNativeBridge();
   const session = createLivePlayerSession();
