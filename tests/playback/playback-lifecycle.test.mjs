@@ -264,7 +264,6 @@ test('live lifecycle policy detaches on page leave and releases only on explicit
 });
 
 test('live channel replacement resolves the new candidate instead of only emitting sourceChanged', async () => {
-  installNativeBridge();
   const requestA = playbackService.createLiveRequest({
     channel: {
       channelId: 'replace-load-a',
