@@ -156,7 +156,7 @@ export function createPlaybackCore(task,hooks={}) {
 
  async function recover(error,code,generation=operationGeneration){
   if(!isCurrentOperation(generation))return false;
-  if(task.request.kind===PlaybackKind.LIVE && networkPolicy.shouldReconnect({code})){
+  if(task.request.kind===PlaybackKind.LIVE && liveRecoveryPolicy.shouldReconnect({code}) && networkPolicy.shouldReconnect({code})){
    transition(PlayerState.RECONNECTING);emit('reconnecting',{candidate:task.currentCandidate,reconnectCount:networkPolicy.reconnectCount});
    await new Promise(r=>setTimeout(r,networkPolicy.getReconnectDelay()));
    if(!isCurrentOperation(generation))return false;
