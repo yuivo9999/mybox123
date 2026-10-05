@@ -229,11 +229,11 @@ export function App(){
     }
     sessionStateStore.patch({ route: null, selected: null, tab: 'live' });
   };
- const playLive=(channel,streamId=null,returnRoute=null)=>{
+ const playLive=(channel,streamId=null,returnRoute=null,sourceId=null)=>{
    if(!channel)return;
-   const preferredSource=persistent.settings?.defaultLiveSource||null;
+   const preferredSource=sourceId||persistent.settings?.defaultLiveSource||null;
    const request=playbackService.createLiveRequest({channel,preferredSource,metadata:{title:channel.name,category:channel.category,channelId:channel.channelId,channel,returnRoute}});
-   if(streamId){const index=request.candidates.findIndex((candidate)=>candidate.streamId===streamId);if(index>=0){request.candidates=[request.candidates[index],...request.candidates.filter((_,i)=>i!==index)];sourceManagementService.touchUsage(request.candidates[0]?.sourceId);}}
+   if(streamId){const index=request.candidates.findIndex((candidate)=>candidate.streamId===streamId && (!sourceId || candidate.sourceId===sourceId));if(index>=0){request.candidates=[request.candidates[index],...request.candidates.filter((_,i)=>i!==index)];sourceManagementService.touchUsage(request.candidates[0]?.sourceId);}else if(sourceId){const sourceIndex=request.candidates.findIndex(candidate=>candidate.sourceId===sourceId);if(sourceIndex>=0){request.candidates=[request.candidates[sourceIndex],...request.candidates.filter((_,i)=>i!==sourceIndex)];sourceManagementService.touchUsage(request.candidates[0]?.sourceId);}}}
    else sourceManagementService.touchUsage(request.candidates[0]?.sourceId);
    sessionStateStore.patch({selected:request,route:'live-play',tab:'live'}); persistent.recordLivePlay(channel,streamId);
  };
