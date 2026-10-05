@@ -3,7 +3,7 @@ import {
   Copy, Maximize2, Minimize2, RotateCw, Sparkles, Terminal, Paperclip,
   Play, Pause, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, Rewind, FastForward,
   FileText, LayoutGrid, SlidersHorizontal, Check, RefreshCw, Ratio,
-  Lock, Unlock, ListVideo, Square
+  Lock, Unlock, ListVideo, Square, Heart
 } from 'lucide-react';
 
 export function SangtianFloatingBar({
