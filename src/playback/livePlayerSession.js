@@ -85,11 +85,16 @@ export function createLivePlayerSession({ onReleased } = {}) {
       }
       request = nextRequest;
       currentCandidate = null;
-      return session.core.replaceLiveCandidates(nextRequest.candidates ?? [], {
+      const candidate = session.core.replaceLiveCandidates(nextRequest.candidates ?? [], {
         channelId: nextRequest.channelId,
         channel: currentChannel,
         metadata: nextRequest.metadata ?? {},
       });
+      if (candidate) {
+        currentCandidate = candidate;
+        void session.core.resolveAndLoad(candidate).catch(() => {});
+      }
+      return candidate;
     },
 
     start() {
