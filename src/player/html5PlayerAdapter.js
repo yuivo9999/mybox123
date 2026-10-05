@@ -1,5 +1,7 @@
 import Hls from 'hls.js';
 import { PlayerState, PlayerCapability, createPlayerCapabilities, createPlayerAdapterContract } from './playerInterface.js';
+import { liveBufferPolicy } from '../playback/liveBufferPolicy.js';
+import { liveRecoveryPolicy } from '../playback/liveRecoveryPolicy.js';
 
 export function createHtml5PlayerAdapter(video, hooks = {}) {
   if (!video) throw new Error('PLAYER_ELEMENT_REQUIRED');
@@ -60,22 +62,22 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
           // 统一直播与流媒体播放内核技术：
           // 1. 初次打开时采用即时快速加载起播（低延迟首次渲染）。
           // 2. 随播放进行，动态将前置缓冲区提升至 60 秒（1分钟）提前量（lookahead buffer），抗网络抖动，杜绝卡顿。
-          const hls = new Hls({
-            enableWorker: true,
-            lowLatencyMode: false,
-            backBufferLength: 60,
-            maxBufferLength: isLiveStream ? 20 : 60,
-            maxMaxBufferLength: 120,
-            maxBufferSize: 80 * 1000 * 1000,
-            maxBufferHole: 0.8,
-            highBufferWatchdogPeriod: 2,
-            nudgeOffset: 0.2,
-            nudgeMaxRetry: 5,
-            liveSyncDurationCount: 6,
-            liveMaxLatencyDurationCount: 30,
-            fragLoadingTimeOut: 25000,
-            manifestLoadingTimeOut: 25000,
-          });
+          const hls = new Hls(isLiveStream
+            ? liveBufferPolicy.getHlsConfig()
+            : {
+              enableWorker: true,
+              lowLatencyMode: false,
+              backBufferLength: 60,
+              maxBufferLength: 60,
+              maxMaxBufferLength: 120,
+              maxBufferSize: 80 * 1000 * 1000,
+              maxBufferHole: 0.8,
+              highBufferWatchdogPeriod: 2,
+              nudgeOffset: 0.2,
+              nudgeMaxRetry: 5,
+              fragLoadingTimeOut: 25000,
+              manifestLoadingTimeOut: 25000,
+            });
           hlsInstance = hls;
           const currentHlsGeneration = ++hlsGeneration;
           const isCurrentHls = () => !released && hlsGeneration === currentHlsGeneration && hlsInstance === hls;
@@ -96,17 +98,15 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
           });
           hls.on(Hls.Events.FRAG_LOADED, () => {
             if (!isCurrentHls()) return;
-            // 首次分片加载起播后，平滑扩大前置缓冲至 60 秒（1分钟提前量）
-            if (hls.config.maxBufferLength < 60) {
-              hls.config.maxBufferLength = 60;
-            }
+            // 最高约 60 秒前置缓冲策略，用于抗网络抖动。
+            if (isLiveStream) liveBufferPolicy.onFragmentLoaded(hls);
           });
           hls.on(Hls.Events.ERROR, (event, data) => {
             if (!isCurrentHls()) return;
             if (data.fatal) {
               switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
-                  if (hlsRecoveryCount < 1) {
+                  if (liveRecoveryPolicy.shouldRecoverAdapter({ type: 'network', attempt: hlsRecoveryCount })) {
                     hlsRecoveryCount += 1;
                     hls.startLoad();
                   } else {
@@ -116,7 +116,7 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
                   }
                   break;
                 case Hls.ErrorTypes.MEDIA_ERROR:
-                  if (hlsRecoveryCount < 1) {
+                  if (liveRecoveryPolicy.shouldRecoverAdapter({ type: 'media', attempt: hlsRecoveryCount })) {
                     hlsRecoveryCount += 1;
                     hls.recoverMediaError();
                   } else {
