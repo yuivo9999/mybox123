@@ -34,6 +34,7 @@ expectNo('src/pages/MainPage.jsx', [/new Blob\(/, /FileReader/, /URL\.createObje
 expect('src/pages/MainPage.jsx', [/sourceConfigService/]);
 expect('src/app/App.jsx', [/sourceManagementService/]);
 expect('src/features/movie/MovieFeature.jsx', [/MoviePlayerView/]);
+expect('src/components/theme/SangtianPlayerConsole.jsx', [/\bHeart\b/, /\bRadio\b/], 'SangtianPlayerConsole icon imports');
 expect('src/services/sourceConfigService.js', [/importFile/, /download/]);
 expect('src/services/sourceManagementService.js', [/setEnabled/, /setActive/, /remove/, /updateStatus/, /touchUsage/]);
 expectNo('src/services/userDataService.js', [/sourceRepository/, /getSourceConfig/, /saveSourceConfig/, /touchSource/]);
