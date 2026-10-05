@@ -26,8 +26,8 @@ function expect(file, patterns, label = file) {
   for (const pattern of patterns) assert.match(source, pattern, label + ' missing required contract');
 }
 
-expectNo('src/app/App.jsx', [/createPlaybackCore/, /sourceRuntimeService/, /persistent\.saveSources/, /persistent\.setSourceEnabled/, /persistent\.setSourceActive/, /persistent\.removeSource/]);
-expectNo('src/pages/PlaybackPage.jsx', [/createPlaybackCore/]);
+expectNo('src/app/App.jsx', [/createPlaybackCore/, /sourceRuntimeService/, /persistent\.saveSources/, /persistent\.setSourceEnabled/, /persistent\.setSourceActive/, /persistent\.removeSource/, /PlaybackPage/]);
+expectNo('src/features/live/LiveFeature.jsx', [/SangtianPlayerWindow/, /video\.play\(/, /video\.pause\(/, /video\.currentTime\s*=/, /video\.load\(/, /video\.src\s*=/]);
 expectNo('src/features/movie/MovieFeature.jsx', [/createPlaybackCore/, /playbackService/, /usePersistentState/]);
 expectNo('src/pages/MainPage.jsx', [/new Blob\(/, /FileReader/, /URL\.createObjectURL/, /document\.createElement/]);
 expect('src/pages/MainPage.jsx', [/sourceConfigService/]);
@@ -74,7 +74,6 @@ expect('src/state/persistentStateStore.js', [/updateSettings/]);
 expect('src/pages/MainPage.jsx', [/自动继续播放/, /默认影视线路/, /默认直播线路/, /主题/, /字体/, /卡片显示/, /显示密度/, /SettingMenu/, /onUpdateSettings/]);
 expect('src/app/App.jsx', [/persistent\.settings/, /defaultMovieSource/, /defaultLiveSource/, /autoplayResume/, /onUpdateSettings/]);
 expect('src/services/playbackService.js', [/preferredSource/, /getVODCandidates/, /createVODRequest/, /createLiveRequest/]);
-expect('src/pages/PlaybackPage.jsx', [/重新播放/, /切换线路/]);
 expectNo('src/pages/MainPage.jsx', [/title="自动继续播放"\/>/, /title="默认播放线路"\/>/, /title="主题"\/>/, /title="字体"\/>/, /title="卡片显示"\/>/, /title="显示密度"\/>/]);
 
 const pageAndFeatureFiles = allSourceFiles.filter(file => file.startsWith('src/pages/') || file.startsWith('src/features/'));
