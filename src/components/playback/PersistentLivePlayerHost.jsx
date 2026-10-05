@@ -11,6 +11,7 @@ export function PersistentLivePlayerHost() {
     video.setAttribute('playsinline', '');
     video.setAttribute('preload', 'metadata');
     video.controls = false;
+    Object.assign(video.style, { position: 'absolute', inset: '0', width: '100%', height: '100%', objectFit: 'contain', background: '#000' });
     hostRef.current.appendChild(video);
     playbackRuntime.registerLivePlayerElement(video, hostRef.current);
     return () => playbackRuntime.unregisterLivePlayerElement(video);
