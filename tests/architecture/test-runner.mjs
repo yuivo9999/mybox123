@@ -16,6 +16,7 @@ function sourceFiles(dir) {
   return result;
 }
 const allSourceFiles = sourceFiles('src');
+for (const file of allSourceFiles) expectNo(file, [/SangtianPlayerWindow/, /MoviePlaybackPage/], file);
 
 function expectNo(file, patterns, label = file) {
   const source = read(file);
@@ -32,13 +33,13 @@ expectNo('src/features/movie/MovieFeature.jsx', [/createPlaybackCore/, /playback
 expectNo('src/pages/MainPage.jsx', [/new Blob\(/, /FileReader/, /URL\.createObjectURL/, /document\.createElement/]);
 expect('src/pages/MainPage.jsx', [/sourceConfigService/]);
 expect('src/app/App.jsx', [/sourceManagementService/]);
-expect('src/features/movie/MovieFeature.jsx', [/MoviePlaybackPage/]);
+expect('src/features/movie/MovieFeature.jsx', [/MoviePlayerView/]);
 expect('src/services/sourceConfigService.js', [/importFile/, /download/]);
 expect('src/services/sourceManagementService.js', [/setEnabled/, /setActive/, /remove/, /updateStatus/, /touchUsage/]);
 expectNo('src/services/userDataService.js', [/sourceRepository/, /getSourceConfig/, /saveSourceConfig/, /touchSource/]);
 expectNo('src/repositories/userDataRepository.js', [/getSourceConfig/, /saveSourceConfig/]);
 expectNo('src/state/persistentStateStore.js', [/sourceRepository/, /saveSources\(/, /setSourceEnabled/, /setSourceActive/, /removeSource/]);
-expect('src/features/movie/MoviePlaybackPage.jsx', [/playbackService\.createController/, /recordProgress/]);
+expect('src/features/movie/MoviePlayerView.jsx', [/playbackService\.createController/, /recordProgress/]);
 expect('src/runtime/nativeHttpBridge.js', [
   /CapacitorHttp\.request/,
   /isNativeHttpAvailable/,
