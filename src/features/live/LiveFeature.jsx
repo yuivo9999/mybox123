@@ -6,7 +6,6 @@ import { requestManager } from '../../services/requestManager.js';
 import { tv1LiveService } from '../../services/tv1LiveService.js';
 import { usePageState, pageStateStore } from '../../state/pageStateStore.js';
 import { SmartImage, EmptyState, LoadingState } from '../../components/StateViews.jsx';
-import { SangtianPlayerWindow } from '../../components/theme/SangtianPlayerConsole.jsx';
 
 export function createLiveFeature({ channels = [] } = {}) {
   return {
@@ -62,11 +61,9 @@ const globalLiveCache = {
   selectedCategory: '全部',
   resolvedStreams: {},
   activeStreamIndex: 0,
-  decoderEngine: 'exo',
-  isImmersive: false,
 };
 
-export function LiveFeature({ channels = [], sources = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite }) {
+export function LiveFeature({ channels = [], sources = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite, immersive = false }) {
   const page = usePageState();
   const videoRef = useRef(null);
   const playerWindowBodyRef = useRef(null);
@@ -79,8 +76,6 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   const [tv1Error, setTv1Error] = useState(null);
   const [resolvedStreams, setResolvedStreams] = useState(globalLiveCache.resolvedStreams || {});
   const [streamLoading, setStreamLoading] = useState(false);
-  const [decoderEngine, setDecoderEngine] = useState(globalLiveCache.decoderEngine || 'exo');
-  const [isImmersive, setIsImmersive] = useState(globalLiveCache.isImmersive || false);
 
   const enabledTv1Sources = useMemo(
     () => sources.filter(source => source.sourceType === 'live' && source.liveMode === 'tv1' && source.enabled !== false),
@@ -93,8 +88,6 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   useEffect(() => { globalLiveCache.activeStreamIndex = activeStreamIndex; }, [activeStreamIndex]);
   useEffect(() => { globalLiveCache.tv1Channels = tv1Channels; }, [tv1Channels]);
   useEffect(() => { globalLiveCache.resolvedStreams = resolvedStreams; }, [resolvedStreams]);
-  useEffect(() => { globalLiveCache.decoderEngine = decoderEngine; }, [decoderEngine]);
-  useEffect(() => { globalLiveCache.isImmersive = isImmersive; }, [isImmersive]);
 
   useEffect(() => {
     const controllers = new Map();
@@ -409,41 +402,69 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     <Page>
       <Header title="直播" />
 
-      <SangtianPlayerWindow
-        videoRef={videoRef}
-        controller={playbackController}
-        videoContainerRef={playerWindowBodyRef}
-        status={playbackStatus}
-        candidate={activeStream ? {
-          label: playbackCandidate?.label || activeStream.label || '默认线路',
-          url: playbackCandidate?.mediaUrl || activeStream.url,
-          protocol: playbackCandidate?.protocol || activeStream.protocol || 'HLS/M3U8',
-          sourceId: playbackCandidate?.sourceId || activeStream.sourceId,
-        } : { label: '请选择频道', protocol: 'LIVE' }}
-        error={playbackError}
-        resolvedInput={resolvedPlaybackInput}
-        isLive
-        terminalTag={activeChannel ? 'LIVE · ' + activeChannel.name : 'LIVE · 等待频道'}
-        channels={allChannels}
-        activeChannel={activeChannel}
-        activeStreamIndex={activeStreamIndex}
-        onSelectChannel={selectChannel}
-        onSwitchStreamIndex={idx => {
-          setActiveStreamIndex(idx);
-          const candidate = livePlaybackRequest?.candidates?.[idx];
-          if (candidate && playbackController) playbackController.switchCandidate(candidate.candidateId);
+      <section
+        className={`live-player-surface${immersive ? ' is-immersive' : ''}`}
+        aria-label="直播播放器"
+        style={{
+          position: immersive ? 'fixed' : 'relative',
+          inset: immersive ? 0 : undefined,
+          zIndex: immersive ? 20 : undefined,
+          minHeight: immersive ? '100vh' : 220,
+          background: '#050505',
+          overflow: 'hidden',
+          borderRadius: immersive ? 0 : 12,
         }}
-        onStop={() => {
-          playbackController?.stop();
-          setPlaybackCandidate(null);
-          setResolvedPlaybackInput(null);
-          setPlaybackStatus('stopped');
-        }}
-        decoderEngine={decoderEngine}
-        onChangeDecoderEngine={setDecoderEngine}
-        isImmersive={isImmersive}
-        onToggleImmersive={() => setIsImmersive(false)}
-      />
+      >
+        <div
+          ref={playerWindowBodyRef}
+          className="live-player-surface-body"
+          style={{ position: 'absolute', inset: 0 }}
+        />
+        <div
+          className="live-player-overlay"
+          style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 12 }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <span className="live-pill">{activeChannel ? `● ${activeChannel.name}` : '● LIVE'}</span>
+            <div style={{ display: 'flex', gap: 6, pointerEvents: 'auto' }}>
+              <button type="button" className="secondary icon-button" onClick={() => {
+                const body = playerWindowBodyRef.current;
+                if (body?.requestFullscreen) void body.requestFullscreen().catch(() => {});
+              }}>全屏</button>
+              <button type="button" className="secondary icon-button" onClick={() => {
+                setLiveControllerEpoch(value => value + 1);
+              }}>重连</button>
+              <button type="button" className="secondary icon-button" onClick={() => playbackController?.stop()}>停止</button>
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+            {playbackStatus === 'loading' || playbackStatus === 'preparing' || playbackStatus === 'reconnecting'
+              ? <div className="info-card"><span>{playbackStatus === 'reconnecting' ? '正在重连直播…' : '正在连接直播…'}</span></div>
+              : playbackStatus === 'error'
+                ? <div className="info-card"><span>{playbackError || '直播播放失败'}</span></div>
+                : null}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+            <span style={{ pointerEvents: 'none' }}>{playbackCandidate?.label || activeStream?.label || '直播线路'}</span>
+            <div style={{ display: 'flex', gap: 6, pointerEvents: 'auto' }}>
+              {(activeChannel?.streams || []).map((stream, index) => (
+                <button
+                  key={stream.streamId || index}
+                  type="button"
+                  className={activeStreamIndex === index ? 'primary' : 'secondary'}
+                  onClick={() => {
+                    setActiveStreamIndex(index);
+                    const candidate = livePlaybackRequest?.candidates?.[index];
+                    if (candidate) playbackController?.switchCandidate(candidate.candidateId);
+                  }}
+                >
+                  {stream.label || `线路 ${index + 1}`}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
       {activeChannel && (
         <div className="live-current-bar">
