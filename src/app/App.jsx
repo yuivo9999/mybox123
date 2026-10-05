@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Home, Film, Radio, Heart, User } from 'lucide-react';
 import { contentService } from '../services/contentService.js';
 import { playbackService } from '../services/playbackService.js';
+import { liveService } from '../services/liveService.js';
 import { cacheService } from '../services/cacheService.js';
 import { sourceManagementService } from '../services/sourceManagementService.js';
 import { usePersistentState } from '../state/usePersistentState.js';
@@ -229,13 +230,24 @@ export function App(){
     }
     sessionStateStore.patch({ route: null, selected: null, tab: 'live' });
   };
- const playLive=(channel,streamId=null,returnRoute=null,sourceId=null)=>{
+ const playLive=async(channel,streamId=null,returnRoute=null,sourceId=null)=>{
    if(!channel)return;
-   const preferredSource=sourceId||persistent.settings?.defaultLiveSource||null;
-   const request=playbackService.createLiveRequest({channel,preferredSource,metadata:{title:channel.name,category:channel.category,channelId:channel.channelId,channel,returnRoute}});
+   let resolvedChannel=channel;
+   let request=playbackService.createLiveRequest({channel:resolvedChannel,preferredSource:sourceId||persistent.settings?.defaultLiveSource||null,metadata:{title:channel.name,category:channel.category,channelId:channel.channelId,channel:resolvedChannel,returnRoute}});
+   const matchesRecordedStream=request.candidates.some(candidate=>candidate.streamId===streamId && (!sourceId || candidate.sourceId===sourceId));
+   const matchesRecordedSource=Boolean(sourceId)&&request.candidates.some(candidate=>candidate.sourceId===sourceId);
+   if(streamId && !matchesRecordedStream || sourceId && !matchesRecordedSource){
+     try {
+       const refreshed=await liveService.refreshChannel(channel);
+       if(refreshed?.streams?.length){
+         resolvedChannel={...channel,streams:refreshed.streams,epg:refreshed.epg??channel.epg};
+         request=playbackService.createLiveRequest({channel:resolvedChannel,preferredSource:sourceId||persistent.settings?.defaultLiveSource||null,metadata:{title:resolvedChannel.name,category:resolvedChannel.category,channelId:resolvedChannel.channelId,channel:resolvedChannel,returnRoute}});
+       }
+     } catch { /* use the current cached candidates when refresh is unavailable */ }
+   }
    if(streamId){const index=request.candidates.findIndex((candidate)=>candidate.streamId===streamId && (!sourceId || candidate.sourceId===sourceId));if(index>=0){request.candidates=[request.candidates[index],...request.candidates.filter((_,i)=>i!==index)];sourceManagementService.touchUsage(request.candidates[0]?.sourceId);}else if(sourceId){const sourceIndex=request.candidates.findIndex(candidate=>candidate.sourceId===sourceId);if(sourceIndex>=0){request.candidates=[request.candidates[sourceIndex],...request.candidates.filter((_,i)=>i!==sourceIndex)];sourceManagementService.touchUsage(request.candidates[0]?.sourceId);}}}
    else sourceManagementService.touchUsage(request.candidates[0]?.sourceId);
-   sessionStateStore.patch({selected:request,route:'live-play',tab:'live'}); persistent.recordLivePlay(channel,streamId);
+   sessionStateStore.patch({selected:request,route:'live-play',tab:'live'}); persistent.recordLivePlay(resolvedChannel,streamId);
  };
  const movieActive=['detail','movie-play','search'].includes(route)||tab==='home'||tab==='movies';
  const isManagementTab = ['sources', 'settings', 'appearance', 'me', 'about', 'data-management', 'history', 'search-history'].includes(tab);
