@@ -2521,3 +2521,15 @@ Commit：
 2. 验证显式 stop 后 session release，以及重新进入 Live 后只建立一套新 session。
 3. 阶段边界统一检查 Node/CI；不要每个小提交都查询 CI。
 4. CI 通过后再进入下一大阶段，不继续在小 UI 细节上扩散。
+
+
+## 本轮大阶段追加：VOD 播放路径单一化（2026-10-05）
+
+影视播放侧已与 Live 一样完成旧播放器页面/窗口清除：
+
+- `src/features/movie/MoviePlaybackPage.jsx` 已删除，`MovieFeature` 的 `movie-play` 路由改为 `MoviePlayerView`。
+- `SangtianPlayerWindow` 已从 `src/components/theme/SangtianPlayerConsole.jsx` 删除，不再保留第二套视频窗口生命周期。
+- `MoviePlayerView` 只负责 VOD presentation 与业务 UI；真正的播放控制仍进入现有 `PlaybackController/PlaybackCore`。
+- 播放速度、播放、暂停、seek 不再由 VOD UI 直接操作 video API。
+- 架构测试全局禁止旧 `SangtianPlayerWindow` / `MoviePlaybackPage` 残留，防止未来误接回旧链路。
+- 本轮先完成结构性大阶段，不因 UI 小细节停留；CI 按约定留出窗口后统一验证。
