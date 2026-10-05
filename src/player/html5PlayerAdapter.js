@@ -1,6 +1,6 @@
 import Hls from 'hls.js';
 import { PlayerState, PlayerCapability, createPlayerCapabilities, createPlayerAdapterContract, filterPlayerInputByCapabilities } from './playerInterface.js';
-import { liveBufferPolicy } from '../playback/liveBufferPolicy.js';
+import { liveBufferPolicy, applyLiveFragmentBufferPolicy } from '../playback/liveBufferPolicy.js';
 import { liveRecoveryPolicy } from '../playback/liveRecoveryPolicy.js';
 
 export function createHtml5PlayerAdapter(video, hooks = {}) {
@@ -100,7 +100,7 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
           hls.on(Hls.Events.FRAG_LOADED, () => {
             if (!isCurrentHls()) return;
             // 最高约 60 秒前置缓冲策略，用于抗网络抖动。
-            if (isLiveStream) liveBufferPolicy.onFragmentLoaded(hls);
+            if (isLiveStream) applyLiveFragmentBufferPolicy(hls, liveBufferPolicy);
           });
           hls.on(Hls.Events.ERROR, (event, data) => {
             if (!isCurrentHls()) return;
