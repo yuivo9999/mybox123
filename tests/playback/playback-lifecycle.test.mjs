@@ -8,6 +8,8 @@ import { createPlaybackLifecyclePolicy } from '../../src/playback/playbackLifecy
 import { createPlaybackResourceManager } from '../../src/playback/playbackResourceManager.js';
 import { createPlaybackTaskRegistry } from '../../src/playback/playbackTaskRegistry.js';
 import { playbackService } from '../../src/services/playbackService.js';
+import { createLiveBufferPolicy } from '../../src/playback/liveBufferPolicy.js';
+import { createLiveRecoveryPolicy } from '../../src/playback/liveRecoveryPolicy.js';
 
 function candidate(streamId, mediaUrl) {
   return {
@@ -75,6 +77,34 @@ function createLiveCore(hooks = {}) {
   const task = playbackService.createTask(request);
   return { request, task, core: createPlaybackCore(task, hooks) };
 }
+
+test('live buffer policy preserves the 20 to 60 second anti-jitter strategy', () => {
+  const policy = createLiveBufferPolicy();
+  const config = policy.getHlsConfig();
+
+  assert.equal(config.maxBufferLength, 20);
+  assert.equal(config.maxMaxBufferLength, 120);
+  assert.equal(config.backBufferLength, 60);
+  assert.equal(config.liveSyncDurationCount, 6);
+  assert.equal(config.liveMaxLatencyDurationCount, 30);
+  assert.equal(config.lowLatencyMode, false);
+
+  const hls = { config: { maxBufferLength: 20 } };
+  policy.onFragmentLoaded(hls);
+  assert.equal(hls.config.maxBufferLength, 60);
+});
+
+test('live recovery policy keeps low-level adapter recovery separate from business reconnect', () => {
+  const policy = createLiveRecoveryPolicy();
+
+  assert.equal(policy.getAdapterAction('network'), 'startLoad');
+  assert.equal(policy.getAdapterAction('media'), 'recoverMediaError');
+  assert.equal(policy.shouldRecoverAdapter({ type: 'network', attempt: 0 }), true);
+  assert.equal(policy.shouldRecoverAdapter({ type: 'network', attempt: 1 }), false);
+  assert.equal(policy.shouldRecoverAdapter({ type: 'media', attempt: 0 }), true);
+  assert.equal(policy.shouldReconnect({ code: 'network' }), true);
+  assert.equal(policy.shouldReconnect({ code: 'parse' }), false);
+});
 
 test('resource manager keeps movie and live owners independent', () => {
   const registry = createPlaybackTaskRegistry();
