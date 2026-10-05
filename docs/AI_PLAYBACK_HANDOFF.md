@@ -2489,3 +2489,18 @@ Commit：
 - [x] 重新审计 `src/player/nativePlayerAdapter.js` 与 `src/playback/playbackCore.js`：Core 侧已有 `playerGeneration + operationGeneration`，旧 callback 引用在代码层可被隔离。
 - [ ] **UNKNOWN/PENDING**：Native bridge 当前通过单一 `window.TVBoxWebView.onPlayerEvent` 分发，仓库内没有发现 player/session identity 字段或 bridge 文档，因此无法证明 Android bridge 晚到事件一定能区分旧播放器与新播放器。
 - [x] 在没有真实 bridge identity 证据前，不继续猜测性修改 adapter；保持 generation guard，待真实 Android event payload 证据后再决定是否需要全局 dispatcher/session token。
+
+
+# 2026-10-05 本轮执行记录：LiveFeature stop/reacquire 闭环
+
+发现 LiveFeature preview 在显式 stop 后仍留存已 release 的 controller 引用。因为页面没有卸载，下一次切频道会调用旧 controller，导致 preview 无法重新建立播放。
+
+本轮修改：
+- src/features/live/LiveFeature.jsx：增加 liveControllerEpoch；stop 仍按契约 release，下一次频道选择时才递增 epoch 并重新通过 playbackRuntime 获取 controller。
+- tests/playback/playback-lifecycle.test.mjs：新增 explicit stop → next request reacquire 行为测试。
+
+当前结论：LiveFeature 与 PlaybackPage 都具备“显式 stop 后不复用 released controller”的闭环；仍保持单一 runtime Live session，不创建第二个长期播放器。
+
+验证状态：代码已提交；Node/CI 尚未在本轮小提交后执行/查询，按约定待阶段收口统一检查。
+
+下一步：继续审 LiveFeature ↔ PlaybackPage route/back/source switch 的 request identity；真实 Android Native callback identity 与真实 HLS latency 继续保持 PENDING。
