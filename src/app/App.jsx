@@ -12,6 +12,7 @@ import { pageStateStore } from '../state/pageStateStore.js';
 import { MovieFeature } from '../features/movie/MovieFeature.jsx';
 import { LiveFeature, LiveChannelPanel } from '../features/live/LiveFeature.jsx';
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
+import { PersistentLivePlayerHost } from '../components/playback/PersistentLivePlayerHost.jsx';
 import { webViewRuntime } from '../runtime/webViewRuntime.js';
 import { MainPage } from '../pages/MainPage.jsx';
 import { LoadingState, ErrorState } from '../components/StateViews.jsx';
