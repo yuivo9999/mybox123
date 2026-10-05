@@ -2448,3 +2448,12 @@ Commit：
 3. `src/services/userDataService.js`：确认同一 channel 不同 source/stream 的历史去重策略是否符合产品语义；当前 historyId 仍为 channel 级，因此同频道换线路会覆盖旧记录。
 4. `src/player/html5PlayerAdapter.js` / `src/playback/liveBufferPolicy.js`：仅在获得真实 HLS 浏览器数据后调整 buffer/latency 参数。
 5. 阶段收口时统一检查最新 HEAD 的 Playback lifecycle / Android APK / Pages CI，不对每个小 commit 单独等待 CI。
+
+
+## 本轮追加：历史线路失效时主动刷新（2026-10-05）
+
+- [x] `App.playLive()`：历史 `streamId/sourceId` 不再存在于当前 candidates 时，先调用 `liveService.refreshChannel()`，再重新构造 Live playback request。
+- [x] `liveService.refreshChannel()`：改为 `getStreams(channelRef, { force: true })`，确保 refresh 真正绕过 fresh stream cache。
+- [x] 刷新后仍按 `streamId + sourceId` 精确匹配；匹配不到时按 `sourceId` 回退。
+- [x] 历史回放最终记录实际选中的 candidate streamId，避免刷新失败/线路替换后继续保存已经失效的旧 streamId。
+- [ ] 仍需在真实多源 Live 数据上验证 sourceChannelId 变化、源下线和重新上线场景；Node 测试环境没有真实 source adapter。
