@@ -106,7 +106,7 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
             if (data.fatal) {
               switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
-                  if (liveRecoveryPolicy.shouldRecoverAdapter({ type: 'network', attempt: hlsRecoveryCount, isLive: isLiveStream })) {
+                  if (isLiveStream ? liveRecoveryPolicy.shouldRecoverAdapter({ type: 'network', attempt: hlsRecoveryCount }) : hlsRecoveryCount < 1) {
                     hlsRecoveryCount += 1;
                     hls.startLoad();
                   } else {
@@ -116,7 +116,7 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
                   }
                   break;
                 case Hls.ErrorTypes.MEDIA_ERROR:
-                  if (liveRecoveryPolicy.shouldRecoverAdapter({ type: 'media', attempt: hlsRecoveryCount, isLive: isLiveStream })) {
+                  if (isLiveStream ? liveRecoveryPolicy.shouldRecoverAdapter({ type: 'media', attempt: hlsRecoveryCount }) : hlsRecoveryCount < 1) {
                     hlsRecoveryCount += 1;
                     hls.recoverMediaError();
                   } else {

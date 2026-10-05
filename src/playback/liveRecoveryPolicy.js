@@ -10,7 +10,7 @@ export function createLiveRecoveryPolicy(overrides = {}) {
 
   return Object.freeze({
     maxAdapterRecoveryAttempts: config.maxAdapterRecoveryAttempts,
-    shouldRecoverAdapter({ type, attempt = 0, isLive = true } = {}) {
+    shouldRecoverAdapter({ type, attempt = 0 } = {}) {
       if (attempt >= config.maxAdapterRecoveryAttempts) return false;
       return type === 'network' || type === 'media';
     },

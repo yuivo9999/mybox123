@@ -102,8 +102,6 @@ test('live recovery policy keeps low-level adapter recovery separate from busine
   assert.equal(policy.shouldRecoverAdapter({ type: 'network', attempt: 0 }), true);
   assert.equal(policy.shouldRecoverAdapter({ type: 'network', attempt: 1 }), false);
   assert.equal(policy.shouldRecoverAdapter({ type: 'media', attempt: 0 }), true);
-  assert.equal(policy.shouldRecoverAdapter({ type: 'network', attempt: 0, isLive: false }), true);
-  assert.equal(policy.shouldRecoverAdapter({ type: 'network', attempt: 1, isLive: false }), false);
   assert.equal(policy.shouldReconnect({ code: 'network' }), true);
   assert.equal(policy.shouldReconnect({ code: 'parse' }), false);
 });
