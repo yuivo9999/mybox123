@@ -33,6 +33,20 @@ function deferred() {
   return { promise, resolve };
 }
 
+function installMemoryStorageWindow() {
+  const values = new Map();
+  globalThis.window = {
+    localStorage: {
+      get length() { return values.size; },
+      key(index) { return Array.from(values.keys())[index] ?? null; },
+      getItem(key) { return values.get(key) ?? null; },
+      setItem(key, value) { values.set(key, String(value)); },
+      removeItem(key) { values.delete(key); },
+    },
+  };
+  return values;
+}
+
 function installNativeBridge() {
   const calls = [];
   const loadWaiters = new Map();
@@ -110,6 +124,7 @@ test('live history refresh bypasses fresh stream cache', () => {
 });
 
 test('live history replay retains channel, source and stream identity', () => {
+  installMemoryStorageWindow();
   userDataRepository.clearHistory();
   const channel = {
     channelId: 'history-channel',
@@ -131,9 +146,11 @@ test('live history replay retains channel, source and stream identity', () => {
   assert.equal(item.sourceChannelId, 'source-b:history');
 
   userDataRepository.clearHistory();
+  delete globalThis.window;
 });
 
 test('live history keeps one channel entry while updating the last selected source and stream', () => {
+  installMemoryStorageWindow();
   userDataRepository.clearHistory();
   const firstChannel = {
     channelId: 'history-dedupe-channel',
