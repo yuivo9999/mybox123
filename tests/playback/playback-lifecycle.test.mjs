@@ -13,6 +13,8 @@ import { createLiveBufferPolicy, applyLiveFragmentBufferPolicy } from '../../src
 import { createLiveRecoveryPolicy } from '../../src/playback/liveRecoveryPolicy.js';
 import { playbackRuntime } from '../../src/playback/playbackRuntime.js';
 import { PlayerCapability, filterPlayerInputByCapabilities } from '../../src/player/playerInterface.js';
+import { userDataService } from '../../src/services/userDataService.js';
+import { userDataRepository } from '../../src/repositories/userDataRepository.js';
 
 function candidate(streamId, mediaUrl) {
   return {
@@ -98,6 +100,30 @@ test('player capability filtering removes unsupported HTML5 custom headers witho
 });
 
 
+
+test('live history replay retains channel, source and stream identity', () => {
+  userDataRepository.clearHistory();
+  const channel = {
+    channelId: 'history-channel',
+    name: 'History Channel',
+    sourceRefs: [{ sourceId: 'source-a', sourceChannelId: 'source-a:history' }],
+    streams: [
+      { streamId: 'stream-a', sourceId: 'source-a', sourceChannelId: 'source-a:history', url: 'https://example.test/a.m3u8' },
+      { streamId: 'stream-b', sourceId: 'source-b', sourceChannelId: 'source-b:history', url: 'https://example.test/b.m3u8' },
+    ],
+  };
+
+  const history = userDataService.recordLivePlay(channel, 'stream-b');
+  const item = history[0];
+
+  assert.equal(item.targetType, 'channel');
+  assert.equal(item.targetId, 'history-channel');
+  assert.equal(item.streamId, 'stream-b');
+  assert.equal(item.sourceId, 'source-b');
+  assert.equal(item.sourceChannelId, 'source-b:history');
+
+  userDataRepository.clearHistory();
+});
 
 test('live source and candidate identity remain source-aware', () => {
   const base = {
