@@ -210,7 +210,11 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   const [playbackStatus, setPlaybackStatus] = useState('idle');
   const [playbackError, setPlaybackError] = useState('');
   const [resolvedPlaybackInput, setResolvedPlaybackInput] = useState(null);
-  const playbackController = useMemo(() => livePlaybackRequest ? playbackService.getLivePlayerController(livePlaybackRequest) : null, [Boolean(livePlaybackRequest)]);
+  const [liveControllerEpoch, setLiveControllerEpoch] = useState(0);
+  const playbackController = useMemo(
+    () => livePlaybackRequest ? playbackService.getLivePlayerController(livePlaybackRequest) : null,
+    [Boolean(livePlaybackRequest), liveControllerEpoch],
+  );
 
   // Load current EPG program details when active channel changes
   useEffect(() => {
@@ -271,6 +275,12 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     setStreamLoading(false);
     setSelectedChannelId(channel.channelId);
     setActiveStreamIndex(0);
+    // An explicit stop releases the singleton Live session. A later channel
+    // selection must reacquire a fresh controller instead of calling the
+    // released controller retained by this still-mounted preview page.
+    if (playbackStatus === 'stopped') {
+      setLiveControllerEpoch(value => value + 1);
+    }
     setPlaybackCandidate(null);
     setResolvedPlaybackInput(null);
     setPlaybackError('');
@@ -424,7 +434,7 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
           if (candidate && playbackController) playbackController.switchCandidate(candidate.candidateId);
         }}
         onStop={() => {
-          playbackController.stop();
+          playbackController?.stop();
           setPlaybackCandidate(null);
           setResolvedPlaybackInput(null);
           setPlaybackStatus('stopped');
