@@ -234,7 +234,7 @@ export function createPlaybackTask(request) {
       return current();
     },
     switchCandidate(candidateId) {
-      const index = snapshot.candidates.findIndex((candidate) => candidate.candidateId === candidateId);
+      const index = activeCandidates.findIndex((candidate) => candidate.candidateId === candidateId);
       if (index < 0 || failedCandidates.has(candidateId)) return null;
       if (isPlaybackCandidateExpired(activeCandidates[index])) {
         failedCandidates.add(candidateId);
