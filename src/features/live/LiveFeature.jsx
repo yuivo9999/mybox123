@@ -432,9 +432,16 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
                 if (body?.requestFullscreen) void body.requestFullscreen().catch(() => {});
               }}>全屏</button>
               <button type="button" className="secondary icon-button" onClick={() => {
+                try { playbackController?.stop(); } catch {}
+                setPlaybackStatus('stopped');
                 setLiveControllerEpoch(value => value + 1);
               }}>重连</button>
-              <button type="button" className="secondary icon-button" onClick={() => playbackController?.stop()}>停止</button>
+              <button type="button" className="secondary icon-button" onClick={() => {
+                try { playbackController?.stop(); } catch {}
+                setPlaybackStatus('stopped');
+                setPlaybackCandidate(null);
+                setResolvedPlaybackInput(null);
+              }}>停止</button>
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
