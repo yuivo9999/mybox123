@@ -37,3 +37,13 @@ export function createPlayerAdapterContract(adapter) {
   for (const method of required) if (typeof adapter?.[method] !== 'function') throw new Error(`PLAYER_ADAPTER_METHOD_REQUIRED:${method}`);
   return adapter;
 }
+
+export function filterPlayerInputByCapabilities(input, capabilities = {}) {
+  const next = { ...(input ?? {}) };
+  const ignored = [];
+  if (next.headers && Object.keys(next.headers).length && capabilities[PlayerCapability.CUSTOM_HEADERS] !== true) {
+    delete next.headers;
+    ignored.push('headers');
+  }
+  return { input: next, ignored };
+}
