@@ -165,7 +165,13 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
     };
   }, [enabledTv1Sources]);
 
-  const allChannels = useMemo(() => [...channels, ...tv1Channels], [channels, tv1Channels]);
+  const allChannels = useMemo(() => {
+    const base = [...channels, ...tv1Channels];
+    if (initialChannel && !base.some(channel => channel.channelId === initialChannel.channelId)) {
+      base.push(initialChannel);
+    }
+    return base;
+  }, [channels, tv1Channels, initialChannel]);
 
   // 源启停/删除后，立即丢弃已经失效的频道选择与延迟流缓存。
   // 不能只依赖页面卸载：Live 页面可能一直挂载，而 sources 会原地变化。
