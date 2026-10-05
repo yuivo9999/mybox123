@@ -1,5 +1,5 @@
 import Hls from 'hls.js';
-import { PlayerState, PlayerCapability, createPlayerCapabilities, createPlayerAdapterContract } from './playerInterface.js';
+import { PlayerState, PlayerCapability, createPlayerCapabilities, createPlayerAdapterContract, filterPlayerInputByCapabilities } from './playerInterface.js';
 import { liveBufferPolicy } from '../playback/liveBufferPolicy.js';
 import { liveRecoveryPolicy } from '../playback/liveRecoveryPolicy.js';
 
@@ -42,7 +42,8 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
     get capabilities(){return createPlayerCapabilities(video);},
     load(next){
       if(released)throw new Error('PLAYER_ADAPTER_RELEASED');
-      input=next;
+      const filtered = filterPlayerInputByCapabilities(next, createPlayerCapabilities(video));
+      input=filtered.input;
       state=PlayerState.LOADING;
       hlsRecoveryCount=0;
       cleanupHls();
@@ -144,7 +145,7 @@ export function createHtml5PlayerAdapter(video, hooks = {}) {
       }
 
       if(next.cookies&&typeof document!=='undefined'){try{for(const cookie of String(next.cookies).split(/;\s*/)){const i=cookie.indexOf('=');if(i>0)document.cookie=cookie;}}catch{}}
-      if(next.headers&&Object.keys(next.headers).length)emit('requestContextIgnored',{reason:'HTML5_VIDEO_CANNOT_SET_CUSTOM_HEADERS'});
+      if(filtered.ignored.length)emit('requestContextIgnored',{reason:'HTML5_VIDEO_CANNOT_SET_CUSTOM_HEADERS',fields:filtered.ignored});
       return input;
     },
     prepare(){if(!input)throw new Error('PLAYER_INPUT_REQUIRED');state=PlayerState.PREPARING;video.load();return input;},
