@@ -501,3 +501,37 @@ test('old native callback is ignored after candidate switch', async () => {
   assert.ok(calls.some((item) => item.method === 'releaseMedia'));
   delete globalThis.window;
 });
+
+
+test('playback runtime preserves the live session and persistent video identity across repeated controller requests', () => {
+  installNativeBridge();
+  const { playbackRuntime } = await import('../../src/playback/playbackRuntime.js');
+  const request = playbackService.createLiveRequest({
+    channel: {
+      channelId: 'runtime-channel',
+      name: 'Runtime',
+      streams: [candidate('runtime-a', 'https://example.test/runtime.m3u8')],
+    },
+  });
+
+  const host = { appendChild(node) { node.parentNode = host; } };
+  const target = { appendChild(node) { node.parentNode = target; } };
+  const video = { parentNode: null };
+
+  playbackRuntime.registerLivePlayerElement(video, host);
+  const first = playbackRuntime.getLivePlayerSession(request);
+  const firstController = first.controller;
+  first.attachPresentation(target);
+
+  const second = playbackRuntime.getLivePlayerSession(request);
+  assert.equal(second, first);
+  assert.equal(second.controller, firstController);
+  assert.equal(second.getVideoElement(), video);
+  assert.equal(video.parentNode, target);
+
+  first.detachPresentation();
+  assert.equal(video.parentNode, host);
+  first.release();
+  playbackRuntime.unregisterLivePlayerElement(video);
+  delete globalThis.window;
+});
