@@ -2474,3 +2474,11 @@ Commit：
 3. `src/player/html5PlayerAdapter.js`：继续检查 custom headers/referer/cookie capability 与 candidate 选择边界，不扩大重构。
 4. `src/services/liveService.js` / `src/adapters/live/normalizeLive.js`：用真实多源数据验证 sourceChannelId、streamId、candidateId 的稳定关系。
 5. 阶段性 CI 已启动后不要频繁查询；按当前约定至少间隔约 10 分钟再统一检查，若失败再最小修复。
+
+
+## 本轮追加：切台后线路切换竞态契约（2026-10-05）
+
+- [x] 发现 `src/services/playbackService.js#createPlaybackTask.switchCandidate()` 在 `replaceCandidates()` 后仍读取旧的 `snapshot.candidates`。
+- [x] 最小修复：`switchCandidate()` 改为读取当前 `activeCandidates`，因此 Live channel replacement 后的新线路仍可正常切换。
+- [x] `tests/playback/playback-lifecycle.test.mjs` 新增行为测试：A → B 切台后，B 的第二条 candidate 可以继续切换。
+- [ ] 尚未运行 Node/CI；按约定继续积累阶段性改动，不频繁查询 CI。
