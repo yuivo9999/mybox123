@@ -247,7 +247,7 @@ export function App(){
    }
    if(streamId){const index=request.candidates.findIndex((candidate)=>candidate.streamId===streamId && (!sourceId || candidate.sourceId===sourceId));if(index>=0){request.candidates=[request.candidates[index],...request.candidates.filter((_,i)=>i!==index)];sourceManagementService.touchUsage(request.candidates[0]?.sourceId);}else if(sourceId){const sourceIndex=request.candidates.findIndex(candidate=>candidate.sourceId===sourceId);if(sourceIndex>=0){request.candidates=[request.candidates[sourceIndex],...request.candidates.filter((_,i)=>i!==sourceIndex)];sourceManagementService.touchUsage(request.candidates[0]?.sourceId);}}}
    else sourceManagementService.touchUsage(request.candidates[0]?.sourceId);
-   sessionStateStore.patch({selected:request,route:'live-play',tab:'live'}); persistent.recordLivePlay(resolvedChannel,streamId);
+   sessionStateStore.patch({selected:request,route:'live-play',tab:'live'}); persistent.recordLivePlay(resolvedChannel,request.candidates[0]?.streamId ?? streamId);
  };
  const movieActive=['detail','movie-play','search'].includes(route)||tab==='home'||tab==='movies';
  const isManagementTab = ['sources', 'settings', 'appearance', 'me', 'about', 'data-management', 'history', 'search-history'].includes(tab);
