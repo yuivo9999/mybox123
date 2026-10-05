@@ -63,7 +63,7 @@ const globalLiveCache = {
   activeStreamIndex: 0,
 };
 
-export function LiveFeature({ channels = [], sources = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite, immersive = false }) {
+export function LiveFeature({ channels = [], sources = [], favorites = [], onChannel, onPlay, onTab, toggleFavorite, immersive = false, initialChannel = null, initialStreamId = null }) {
   const page = usePageState();
   const videoRef = useRef(null);
   const playerWindowBodyRef = useRef(null);
@@ -76,6 +76,15 @@ export function LiveFeature({ channels = [], sources = [], favorites = [], onCha
   const [tv1Error, setTv1Error] = useState(null);
   const [resolvedStreams, setResolvedStreams] = useState(globalLiveCache.resolvedStreams || {});
   const [streamLoading, setStreamLoading] = useState(false);
+
+  useEffect(() => {
+    if (!initialChannel?.channelId) return;
+    setSelectedChannelId(initialChannel.channelId);
+    if (initialStreamId && Array.isArray(initialChannel.streams)) {
+      const index = initialChannel.streams.findIndex(stream => stream.streamId === initialStreamId);
+      if (index >= 0) setActiveStreamIndex(index);
+    }
+  }, [initialChannel, initialStreamId]);
 
   const enabledTv1Sources = useMemo(
     () => sources.filter(source => source.sourceType === 'live' && source.liveMode === 'tv1' && source.enabled !== false),
