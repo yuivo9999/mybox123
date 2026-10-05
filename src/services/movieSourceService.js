@@ -87,6 +87,7 @@ export async function testMovieSource(source, options = {}) {
 
 export async function syncMovieSources(sourceConfigs = [], selectedSourceId = null, options = {}) {
   movieRegistry.clear();
+  const fallbackAttempted = options.__fallbackAttempted === true;
 
   const enabledMovieSources = sourceConfigs.filter(source =>
     source.enabled !== false
@@ -208,6 +209,22 @@ export async function syncMovieSources(sourceConfigs = [], selectedSourceId = nu
       };
     }
   }));
+
+  // A persisted/default movie source can become unavailable without the app
+  // itself being broken. One failed default source must not leave the catalog
+  // empty when another enabled source is available.
+  const primaryResult = settled[0] ?? null;
+  const fallbackSource = !fallbackAttempted && primaryResult && (
+    primaryResult.status === 'rejected' || primaryResult.value?.length === 0
+  )
+    ? enabledMovieSources.find(source => source.sourceId !== primaryResult.sourceId)
+    : null;
+  if (fallbackSource) {
+    return syncMovieSources(sourceConfigs, fallbackSource.sourceId, {
+      ...options,
+      __fallbackAttempted: true,
+    });
+  }
 
   return {
     movies: contentService.getMovies(
