@@ -263,6 +263,43 @@ test('live lifecycle policy detaches on page leave and releases only on explicit
   assert.equal(moviePolicy.shouldReleaseOnLeave, true);
 });
 
+test('live channel replacement resolves the new candidate instead of only emitting sourceChanged', async () => {
+  installNativeBridge();
+  const requestA = playbackService.createLiveRequest({
+    channel: {
+      channelId: 'replace-load-a',
+      name: 'A',
+      streams: [candidate('a1', 'https://example.test/a1.m3u8')],
+    },
+  });
+  const requestB = playbackService.createLiveRequest({
+    channel: {
+      channelId: 'replace-load-b',
+      name: 'B',
+      streams: [candidate('b1', 'https://example.test/b1.m3u8')],
+    },
+  });
+
+  const controller = playbackService.getLivePlayerController(requestA);
+  const events = [];
+  const unsubscribe = controller.subscribe(event => {
+    if (event.event === 'resolved' || event.event === 'playing') events.push(event.event);
+  });
+
+  controller.replaceLiveCandidates(requestB.candidates, {
+    channelId: requestB.channelId,
+    channel: requestB.metadata?.channel,
+  });
+
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(controller.currentCandidate?.streamId, 'b1');
+  assert.ok(events.includes('resolved') || events.includes('playing'));
+
+  unsubscribe();
+  controller.release();
+  delete globalThis.window;
+});
+
 test('live channel replacement keeps the new candidate list switchable', () => {
   installNativeBridge();
   const requestA = playbackService.createLiveRequest({
