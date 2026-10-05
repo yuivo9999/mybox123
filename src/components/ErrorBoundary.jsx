@@ -19,21 +19,8 @@ export class ErrorBoundary extends React.Component {
       componentStack: info?.componentStack ?? '',
     });
 
-    // 页面级渲染异常不再弹出阻塞式错误窗口。
-    // 同一种异常只自动恢复一次，避免持续异常形成重试死循环。
-    const signature = [
-      error?.name ?? 'Error',
-      error?.message ?? String(error),
-      this.props.route ?? '',
-    ].join('|');
-
-    if (signature !== this.lastRecoverySignature) {
-      this.lastRecoverySignature = signature;
-      this.props.onReset?.();
-      setTimeout(() => {
-        this.setState({ hasError: false, error: null });
-      }, 0);
-    }
+    // 不再静默吞掉渲染异常：此前 fallback=null 会把运行时错误表现成整页黑屏。
+    // 保留错误状态，让用户能看到真实异常并主动重试；这样才能定位后续回归。
   }
 
   reset = () => {
@@ -44,6 +31,23 @@ export class ErrorBoundary extends React.Component {
 
   render() {
     if (!this.state.hasError) return this.props.children;
-    return this.props.fallback ?? null;
+    if (this.props.fallback) return this.props.fallback;
+    const message = this.state.error?.message || String(this.state.error || '未知渲染错误');
+    return (
+      <main className="page error-boundary-page">
+        <section className="error-boundary-card" role="alert">
+          <span className="eyebrow">TVBOX REACT · RUNTIME ERROR</span>
+          <h1>页面渲染失败</h1>
+          <p>应用没有继续显示黑屏。请先返回上一级，或重试当前页面。</p>
+          <pre>{message}</pre>
+          <div className="actions">
+            <button className="secondary" type="button" onClick={this.reset}>重试</button>
+            {this.props.onReset && (
+              <button className="primary" type="button" onClick={this.reset}>返回安全页面</button>
+            )}
+          </div>
+        </section>
+      </main>
+    );
   }
 }
