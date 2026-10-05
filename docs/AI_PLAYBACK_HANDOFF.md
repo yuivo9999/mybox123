@@ -2403,3 +2403,27 @@ Commit：
 ## 下一步
 
 继续 P0：检查 `live-play` 请求从 LiveFeature 进入 PlaybackPage 后的 **request identity / back / source switch / channel switch** 是否闭合；重点防止旧 request 的 candidate 或 resolved input 在返回、切源后重新写入新播放页。
+
+
+# 2026-10-05 本轮执行记录：P0 live-play request identity + P1 capability boundary
+
+## 已完成
+
+- 修正 tests/playback/playback-lifecycle.test.mjs 中 persistent runtime identity 测试的错误 await import 用法，改为静态 import。
+- 新增 Live request round-trip 行为测试：A → B → detach/back → A，验证同一 LivePlayerSession、Controller、Core、persistent video DOM 均保持不变，且当前 channel/candidate 随 request 切换正确更新。
+- 新增 source/candidate identity 测试：不同 sourceId / streamId 必须产生不同 candidateId；live stream cache key 保持 source-aware。
+- P1 HTML5 capability boundary 完成：playerInterface 增加统一 filterPlayerInputByCapabilities()；HTML5 adapter 对不支持的 custom headers 在 adapter 边界过滤，并通过 requestContextIgnored 明确报告 headers 未应用；Native adapter 仍保留 CUSTOM_HEADERS=true。
+- 新增 capability filtering 测试，确认过滤不会修改原始 request，也不会错误丢弃 cookies。
+
+## 当前判断
+
+- LiveFeature → PlaybackPage → LiveFeature 的 route/back/request round-trip 已有自动化 identity 覆盖。
+- Channel/source switch 继续复用同一 session/core，通过 replaceLiveCandidates + operation generation 切换输入。
+- History/favorites 当前以 channel 为业务对象，同时 history 保存 streamId/sourceId/sourceChannelId，没有把 stream 当成独立收藏对象；这与当前产品语义一致。
+- getLiveStreamCacheKey() 与 playback candidate identity 均已保持 source-aware；目前没有证据要求扩大缓存 identity。
+
+## 下一步
+
+继续 P1：真实 HLS live latency/buffer 仍保持 PENDING，只有拿到真实流或真实设备/浏览器证据后才调整参数；随后再检查 source/channel/stream/candidate identity 在实际历史回放入口中的消费闭环。
+
+本轮按用户要求不为每个小提交等待 CI；阶段收口后再统一跑完整 CI，不把当前状态描述成已通过 CI。
