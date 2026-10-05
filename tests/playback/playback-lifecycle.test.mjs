@@ -11,6 +11,7 @@ import { playbackService } from '../../src/services/playbackService.js';
 import { createLiveBufferPolicy } from '../../src/playback/liveBufferPolicy.js';
 import { createLiveRecoveryPolicy } from '../../src/playback/liveRecoveryPolicy.js';
 import { playbackRuntime } from '../../src/playback/playbackRuntime.js';
+import { PlayerCapability, filterPlayerInputByCapabilities } from '../../src/player/playerInterface.js';
 
 function candidate(streamId, mediaUrl) {
   return {
@@ -78,6 +79,22 @@ function createLiveCore(hooks = {}) {
   const task = playbackService.createTask(request);
   return { request, task, core: createPlaybackCore(task, hooks) };
 }
+
+
+
+test('player capability filtering removes unsupported HTML5 custom headers without mutating the request', () => {
+  const request = { url: 'https://example.test/live.m3u8', headers: { Authorization: 'Bearer test' }, cookies: 'sid=test' };
+  const filtered = filterPlayerInputByCapabilities(request, { [PlayerCapability.CUSTOM_HEADERS]: false });
+
+  assert.deepEqual(filtered.ignored, ['headers']);
+  assert.equal(filtered.input.headers, undefined);
+  assert.equal(filtered.input.cookies, 'sid=test');
+  assert.deepEqual(request.headers, { Authorization: 'Bearer test' });
+
+  const nativeInput = filterPlayerInputByCapabilities(request, { [PlayerCapability.CUSTOM_HEADERS]: true });
+  assert.deepEqual(nativeInput.ignored, []);
+  assert.deepEqual(nativeInput.input.headers, request.headers);
+});
 
 test('live buffer policy preserves the 20 to 60 second anti-jitter strategy', () => {
   const policy = createLiveBufferPolicy();
