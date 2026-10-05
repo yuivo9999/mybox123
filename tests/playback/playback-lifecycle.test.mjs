@@ -369,6 +369,34 @@ test('playback service returns the same live controller until the session is rel
 });
 
 
+test('explicit live stop releases the singleton so the next request can reacquire it', () => {
+  installNativeBridge();
+  const requestA = playbackService.createLiveRequest({
+    channel: {
+      channelId: 'stop-reacquire-a',
+      name: 'Stop A',
+      streams: [candidate('a', 'https://example.test/a.m3u8')],
+    },
+  });
+  const requestB = playbackService.createLiveRequest({
+    channel: {
+      channelId: 'stop-reacquire-b',
+      name: 'Stop B',
+      streams: [candidate('b', 'https://example.test/b.m3u8')],
+    },
+  });
+
+  const first = playbackService.getLivePlayerController(requestA);
+  first.stop();
+  const second = playbackService.getLivePlayerController(requestB);
+
+  assert.notEqual(second, first);
+  assert.equal(second.currentChannel?.channelId, 'stop-reacquire-b');
+
+  second.release();
+  delete globalThis.window;
+});
+
 test('second live controller request reuses the existing session instead of competing for it', () => {
   installNativeBridge();
   const firstRequest = playbackService.createLiveRequest({
